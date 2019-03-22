@@ -38,7 +38,7 @@ class Board():
      #   """Generate all possible moves for a given color
       #  """
 
-    def generate_knight_moves(color):
+    def generate_knight_moves(self, color):
         # This code was written from white point of view but flipping piece sign
         # allows it to work for black as well.
         mult = 1 if color.value else -1
@@ -87,7 +87,7 @@ class Board():
 
         return end_states
     
-    def generate_rook_moves(color):
+    def generate_rook_moves(self, color):
         # This code was written from white point of view but flipping piece sign
         # allows it to work for black as well.
         mult = 1 if color.value else -1
@@ -99,10 +99,10 @@ class Board():
 
         rooks = np.append(x, y, axis=1)
 
-        return generate_straight_moves(color, rooks)
+        return self.generate_straight_moves(color, rooks)
 
     
-    def generate_straight_moves(color, starts, queen=False):
+    def generate_straight_moves(self, color, starts, queen=False):
         # This code was written from white point of view but flipping piece sign
         # allows it to work for black as well.
         mult = 1 if color.value else -1
@@ -111,7 +111,6 @@ class Board():
         piece_val = 5 if queen else 2
         end_states = []
         for pos in starts:
-            print(pos)
             # This slices out the array from the rook towards the edge of the board.
             # Need to reverse the leftward and upward directions so they go "out"
             # from the rook, i.e. the left array should be the board locations
@@ -158,7 +157,7 @@ class Board():
         return end_states
 
     
-    def generate_bishop_moves(color):
+    def generate_bishop_moves(self, color):
         mult = 1 if color.value else -1
         state = np.copy(self.current_state * mult) 
 
@@ -168,10 +167,10 @@ class Board():
 
         bishops = np.append(x, y, axis=1)
 
-        return generate_diagonal_moves(color, bishops)
+        return self.generate_diagonal_moves(color, bishops)
 
 
-    def generate_diagonal_moves(color, starts, queen=False):
+    def generate_diagonal_moves(self, color, starts, queen=False):
         mult = 1 if color.value else -1
         state = np.copy(self.current_state * mult) 
 
@@ -219,9 +218,9 @@ class Board():
 
         return end_states
     
-    def generate_queen_moves(color):
+    def generate_queen_moves(self, color):
         mult = 1 if color.value else -1
-        state = np.copy(current_state * mult) 
+        state = np.copy(self.current_state * mult) 
 
         x, y = np.where(state==5)
         x = x.reshape(len(x), 1)
@@ -229,15 +228,15 @@ class Board():
 
         queens = np.append(x, y, axis=1)
 
-        diags = generate_diagonal_moves(color, queens, True)
-        straights = generate_straight_moves(color, queens, True)
+        diags = self.generate_diagonal_moves(color, queens, True)
+        straights = self.generate_straight_moves(color, queens, True)
 
         end_states = diags + straights
 
         return end_states
 
 
-    def get_board_svg():
+    def get_board_svg(self):
         # Parses the board in first as a background.
         tree = ET.ElementTree()
         tree.parse("pieces/board.svg")
@@ -275,4 +274,4 @@ class Board():
             it.iternext()
 
         # Returns the SVG representing the board
-        return SVG(ET.tostring(board))
+        return SVG(ET.tostring(composite))

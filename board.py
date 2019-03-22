@@ -2,6 +2,14 @@ import xml.etree.ElementTree as ET
 
 import numpy as np
 from IPython.display import SVG
+from enum import Enum
+
+
+# Enum for white or black.
+class Color(Enum):
+    WHITE = True
+    BLACK = False
+    
 
 class Board():
     """The board state.
@@ -31,10 +39,10 @@ class Board():
      #   """Generate all possible moves for a given color
       #  """
 
-    def generate_knight_moves(is_white):
+    def generate_knight_moves(color):
         # This code was written from white point of view but flipping piece sign
         # allows it to work for black as well.
-        mult = 1 if is_white else -1
+        mult = 1 if color else -1
         state = np.copy(self.current_state * mult) 
 
         # This is quick code for finding the position of all knights.
@@ -81,7 +89,7 @@ class Board():
         return end_states
 
 
-    def display_board():
+    def get_board_svg():
         # Parses the board in first as a background.
         tree = ET.ElementTree()
         tree.parse("pieces/board.svg")

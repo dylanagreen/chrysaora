@@ -45,11 +45,11 @@ class Board():
         state = np.copy(self.current_state * mult) 
 
         # This is quick code for finding the position of all knights.
-        x, y = np.where(state==3)
+        x, y = np.where(state == 3)
         x = x.reshape(len(x), 1)
         y = y.reshape(len(y), 1)
 
-        knight_locs = np.append(x,y,axis=1)
+        knight_locs = np.append(x, y, axis=1)
         moves = np.asarray([[2, 1], [2, -1], [-2, 1], [-2, -1]])
 
         end_states = []
@@ -91,13 +91,13 @@ class Board():
         # This code was written from white point of view but flipping piece sign
         # allows it to work for black as well.
         mult = 1 if color.value else -1
-        state = np.copy(current_state * mult) 
+        state = np.copy(self.current_state * mult) 
 
         x, y = np.where(state == 2)
         x = x.reshape(len(x), 1)
         y = y.reshape(len(y), 1)
 
-        rooks = np.append(x,y,axis=1)
+        rooks = np.append(x, y, axis=1)
 
         return generate_straight_moves(color, rooks)
 
@@ -106,7 +106,7 @@ class Board():
         # This code was written from white point of view but flipping piece sign
         # allows it to work for black as well.
         mult = 1 if color.value else -1
-        state = np.copy(current_state * mult) 
+        state = np.copy(self.current_state * mult) 
 
         piece_val = 5 if queen else 2
         end_states = []
@@ -157,6 +157,68 @@ class Board():
 
         return end_states
 
+    
+    def generate_bishop_moves(color):
+        mult = 1 if color.value else -1
+        state = np.copy(self.current_state * mult) 
+
+        x, y = np.where(state==4)
+        x = x.reshape(len(x), 1)
+        y = y.reshape(len(y), 1)
+
+        bishops = np.append(x, y, axis=1)
+
+        return generate_diagonal_moves(color, bishops)
+
+
+    def generate_diagonal_moves(color, starts, queen=False):
+        mult = 1 if color.value else -1
+        state = np.copy(self.current_state * mult) 
+
+        piece_val = 5 if queen else 4
+
+        end_states = []
+        for pos in starts:
+
+            # This dict contains the direction that the loop will travel in
+            addition_dict = {'ul' : np.array([-1, -1]), 
+                            'ur' : np.array([-1, 1]), 
+                            'lr' : np.array([1, 1]), 
+                            'll' : np.array([1, -1])}
+            # This dict contains the maximum the loop will travel in each diagonal direction
+            # Subtracting from 7 is necessary for the edges that are the maximum
+            max_dict = {'ul' : np.min(pos),
+                       'ur' : np.min(np.abs([0, 7] - pos)),
+                       'lr' : np.min(7 - pos),
+                       'll' : np.min(np.abs([7, 0] - pos))}
+
+            # Traverses each direction
+            for key, val in addition_dict.items():
+                i = 1
+                blocked = False
+                while i <= max_dict[key] and not blocked:
+
+                    end = pos + i*val
+
+                    # We get blocked if we hit a piece of the opposite color
+                    # And by one of this color, but we break if we do that since we can't 
+                    # take our own color.
+                    if state[end[0], end[1]] < 0:
+                        blocked = True
+                    elif state[end[0], end[1]] > 0:
+                        break
+
+                    # This puts the piece in its new place
+                    s1 = np.copy(state)
+                    s1[pos[0], pos[1]] = 0
+                    s1[end[0], end[1]] = 4
+
+                    end_states.append(np.copy(s1 * mult))
+
+                    i = i + 1
+
+        return end_states
+    
     
     def get_board_svg():
         # Parses the board in first as a background.

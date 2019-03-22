@@ -18,7 +18,7 @@ class Board():
     
     """
     
-    def __init__(self, state, is_white):
+    def __init__(self, state):
         
         if state is not None:
             self.current_state = state
@@ -32,7 +32,6 @@ class Board():
                                             [0, 0, 0, 0, 0, 0, 0, 0],
                                             [1, 1, 1, 1, 1, 1, 1, 1],
                                             [2, 3, 4, 5, 6, 4, 3, 2]])
-        self.is_white = is_white
         self.previous_state = None
         
     #def generate_moves(color):
@@ -42,7 +41,7 @@ class Board():
     def generate_knight_moves(color):
         # This code was written from white point of view but flipping piece sign
         # allows it to work for black as well.
-        mult = 1 if color else -1
+        mult = 1 if color.value else -1
         state = np.copy(self.current_state * mult) 
 
         # This is quick code for finding the position of all knights.

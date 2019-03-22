@@ -211,7 +211,7 @@ class Board():
                     # This puts the piece in its new place
                     s1 = np.copy(state)
                     s1[pos[0], pos[1]] = 0
-                    s1[end[0], end[1]] = 4
+                    s1[end[0], end[1]] = piece_val
 
                     end_states.append(np.copy(s1 * mult))
 
@@ -219,7 +219,24 @@ class Board():
 
         return end_states
     
-    
+    def generate_queen_moves(color):
+        mult = 1 if color.value else -1
+        state = np.copy(current_state * mult) 
+
+        x, y = np.where(state==5)
+        x = x.reshape(len(x), 1)
+        y = y.reshape(len(y), 1)
+
+        queens = np.append(x, y, axis=1)
+
+        diags = generate_diagonal_moves(color, queens, True)
+        straights = generate_straight_moves(color, queens, True)
+
+        end_states = diags + straights
+
+        return end_states
+
+
     def get_board_svg():
         # Parses the board in first as a background.
         tree = ET.ElementTree()

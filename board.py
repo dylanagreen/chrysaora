@@ -86,8 +86,78 @@ class Board():
                     end_states.append(np.copy(s1 * mult))
 
         return end_states
+    
+    def generate_rook_moves(color):
+        # This code was written from white point of view but flipping piece sign
+        # allows it to work for black as well.
+        mult = 1 if color.value else -1
+        state = np.copy(current_state * mult) 
 
+        x, y = np.where(state == 2)
+        x = x.reshape(len(x), 1)
+        y = y.reshape(len(y), 1)
 
+        rooks = np.append(x,y,axis=1)
+
+        return generate_straight_moves(color, rooks)
+
+    
+    def generate_straight_moves(color, starts, queen=False):
+        # This code was written from white point of view but flipping piece sign
+        # allows it to work for black as well.
+        mult = 1 if color.value else -1
+        state = np.copy(current_state * mult) 
+
+        piece_val = 5 if queen else 2
+        end_states = []
+        for pos in starts:
+            print(pos)
+            # This slices out the array from the rook towards the edge of the board.
+            # Need to reverse the leftward and upward directions so they go "out"
+            # from the rook, i.e. the left array should be the board locations
+            # going right to left and not vice versa.
+            # This is so that we can minimize code changes per direction.
+            direction_dict = {}
+            direction_dict['r'] = state[pos[0], pos[1] + 1:]
+            direction_dict['l'] = state[pos[0], :pos[1]][::-1]
+            direction_dict['u'] = state[:pos[0],pos[1]][::-1]
+            direction_dict['d'] = state[pos[0] + 1:,pos[1]]
+
+            for key, val in direction_dict.items():
+                # Reverses the direction of adding to the position since we
+                # reversed the up and leftward arrays.
+                sign = -1 if key == 'u' or key == 'l' else 1
+
+                once = True
+                blocked = False
+
+                i = 0
+                while (once or not blocked) and i < len(val) and len(val) > 0:
+                    once = False
+
+                    # Sets to true once we hit a piece.
+                    # We don't break because we still want to add this position.
+                    # Although we do break if it's a piece of our color.
+                    if val[i] < 0:
+                        blocked = True
+                    elif val[i] > 0:
+                        break
+
+                    i = i+1
+
+                    s1 = np.copy(state)
+                    s1[pos[0], pos[1]] = 0
+
+                    # This was an embarrasing bug to correct.
+                    if key == 'r' or key == 'l':
+                        s1[pos[0], pos[1] + (i * sign)] = piece_val
+                    else:
+                        s1[pos[0] + (i * sign), pos[1]] = piece_val
+                    end_states.append(np.copy(s1 * mult))
+
+        return end_states
+
+    
     def get_board_svg():
         # Parses the board in first as a background.
         tree = ET.ElementTree()

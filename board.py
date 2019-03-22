@@ -235,6 +235,39 @@ class Board():
 
         return end_states
 
+    
+    def generate_king_moves(color):
+        mult = 1 if color.value else -1
+        state = np.copy(self.current_state * mult) 
+
+        x, y = np.where(state==6)
+        x = x.reshape(len(x), 1)
+        y = y.reshape(len(y), 1)
+
+        # You shouldn't need a loop, because why would you have more than 1 king?
+        # Just reshape instead
+        king = np.append(x,y,axis=1).reshape(2)
+
+        shifts = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1],
+                 [1, -1], [1, 0], [1, 1]]
+
+        end_states = []
+        for pos in shifts:
+            end = pos + king
+
+            if 0 <= end[0] < 8 and 0 <= end[1] < 8:
+                s1 = np.copy(state)
+
+                # Can't take our own pieces, so don't add it as a board pos
+                if s1[end[0], end[1]] > 0:
+                    continue
+
+                s1[king[0], king[1]] = 0
+                s1[end[0], end[1]] = 6
+                end_states.append(np.copy(s1 * mult))
+
+        return end_states
+
 
     def get_board_svg(self):
         # Parses the board in first as a background.

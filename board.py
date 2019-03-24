@@ -35,10 +35,10 @@ class Board():
                                             [1, 1, 1, 1, 1, 1, 1, 1],
                                             [2, 3, 4, 5, 6, 4, 3, 2]])
         self.previous_state = None
-        
+
         # Dict containing a conversion between the piece num and the piece name.
         self.piece_names = {1:"P", 2:"R", 3:"N", 4:"B", 5:"Q", 6:"K"}
-        
+
         if castle_dict is not None:
             self.castle_dict = castle_dict
         else:
@@ -50,7 +50,7 @@ class Board():
     def generate_moves(self, color):
         """Generate all possible moves for a given color
         """
-        
+
         pawns = self.generate_pawn_moves(color)
         knights = self.generate_knight_moves(color)
         rooks = self.generate_rook_moves(color)
@@ -58,7 +58,7 @@ class Board():
         queens = self.generate_queen_moves(color)
         kings = self.generate_king_moves(color)
         castline = self.generate_castle_moves(color)
-        
+
         return pawns+knights+rooks+bishops+queens+kings
 
     def generate_pawn_moves(self, color):
@@ -335,22 +335,22 @@ class Board():
                 end_states.append(rowcolumn_to_algebraic(king, end, 6))
 
         return end_states
-        
+
     def generate_castle_moves(self, color):
         # Hardcoded because you can only castle from starting positions.
         # Basically just need to check that the files between the king and
         # the rook are clear, then return the castling algebraic (O-O or O-O-O)
         rank = 0 - int(color.value) # 0 for Black, -1 for White
         kingside = "WKR" if color.value else "BKR"
-        
+
         end_states = []
         if castling_dict[kingside] and np.sum(self.current_state[rank, 5:7])== 0:
             end_states.append("O-O")
-        
+
         queenside = "QKR" if color.value else "QKR"
         if castling_dict[queenside] and np.sum(self.current_state[rank, 1:4])== 0:
             end_states.append("O-O-O")
-            
+
         return end_states
 
 
@@ -378,7 +378,7 @@ class Board():
                 name = 'b' + name
             else:
                 name = 'w' + name
-                
+
             tree.parse("pieces/" + name + ".svg")
             piece = tree.getroot()
 
@@ -412,3 +412,38 @@ def rowcolumn_to_algebraic(start, end, piece, promotion=None):
         alg.append(piece_names[np.abs(promotion)])
 
     return "".join(alg)
+
+
+def load_fen(fen):
+    piece_values = {"P":1, "R":2, "N":3, "B":4, "Q":5, "K":6,
+                "p":-1, "r":-2, "n":-3, "b":-4, "q":-5, "k":-6}
+
+    fields = fen.split(' ')
+
+    rows = fields[0].split('/')
+
+    board = []
+    # Iterates over each row
+    for r in rows:
+        rank = []
+        for c in r:
+            # Puts in the requisite number of 0s
+            if c.isdigit():
+                for i in range(0, int(c)):
+                    rank.append(0)
+            else:
+                rank.append(piece_values[c])
+        board.append(rank)
+
+    board = np.asarray(board)
+
+    # Sets castling rights.
+    castle_dict = {"WQR" : False, "WKR" : False, "BQR" : False, "BKR" : False}
+    castle_names = {"K" : "WKR", "Q" : "WQR", "k" : "BKR", "q" : "BQR"}
+    castling = fields[2]
+    for c in castling:
+        if  c == "-":
+            break
+        castle_dict[castle_names[c]] = True
+
+    return Board(board, castle_dict)

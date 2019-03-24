@@ -20,7 +20,7 @@ class Board():
 
     """
 
-    def __init__(self, state):
+    def __init__(self, state, castle_dict):
 
         if state is not None:
             self.current_state = state
@@ -38,10 +38,28 @@ class Board():
         
         # Dict containing a conversion between the piece num and the piece name.
         self.piece_names = {1:"P", 2:"R", 3:"N", 4:"B", 5:"Q", 6:"K"}
+        
+        if castle_dict is not None:
+            self.castle_dict = castle_dict
+        else:
+            # White Queenside Rook, White Kingside Rook etc.
+            # No point storing king motion, if it moves both get set to False.
+            self.castle_dict = {"WQR" : True, "WKR" : True,
+                                "BQR" : True, "BKR" : True}
 
-    #def generate_moves(color):
-     #   """Generate all possible moves for a given color
-      #  """
+    def generate_moves(self, color):
+        """Generate all possible moves for a given color
+        """
+        
+        pawns = self.generate_pawn_moves(color)
+        knights = self.generate_knight_moves(color)
+        rooks = self.generate_rook_moves(color)
+        bishops = self.generate_bishop_moves(color)
+        queens = self.generate_queen_moves(color)
+        kings = self.generate_king_moves(color)
+        castline = self.generate_castle_moves(color)
+        
+        return pawns+knights+rooks+bishops+queens+kings
 
     def generate_pawn_moves(self, color):
         # Mult required to simplify finding algorithm.
@@ -316,6 +334,23 @@ class Board():
                     continue
                 end_states.append(rowcolumn_to_algebraic(king, end, 6))
 
+        return end_states
+        
+    def generate_castle_moves(self, color):
+        # Hardcoded because you can only castle from starting positions.
+        # Basically just need to check that the files between the king and
+        # the rook are clear, then return the castling algebraic (O-O or O-O-O)
+        rank = 0 - int(color.value) # 0 for Black, -1 for White
+        kingside = "WKR" if color.value else "BKR"
+        
+        end_states = []
+        if castling_dict[kingside] and np.sum(self.current_state[rank, 5:7])== 0:
+            end_states.append("O-O")
+        
+        queenside = "QKR" if color.value else "QKR"
+        if castling_dict[queenside] and np.sum(self.current_state[rank, 1:4])== 0:
+            end_states.append("O-O-O")
+            
         return end_states
 
 

@@ -1,25 +1,27 @@
 import xml.etree.ElementTree as ET
+from enum import Enum
+from string import ascii_lowercase
 
 import numpy as np
 from IPython.display import SVG
-from enum import Enum
 
 
 # Enum for white or black.
 class Color(Enum):
     WHITE = True
     BLACK = False
-    
+
 
 class Board():
     """The board state.
-    
-    state = the current board state
-    
+
+    current_state = the current board state
+    previous_state = the previous state
+
     """
-    
+
     def __init__(self, state):
-        
+
         if state is not None:
             self.current_state = state
         else:
@@ -33,16 +35,77 @@ class Board():
                                             [1, 1, 1, 1, 1, 1, 1, 1],
                                             [2, 3, 4, 5, 6, 4, 3, 2]])
         self.previous_state = None
-        
+
     #def generate_moves(color):
      #   """Generate all possible moves for a given color
       #  """
+
+    def generate_pawn_moves(self, color):
+        # Mult required to simplify finding algorithm.
+        # Could use piece here instead, but in the end there are the
+        # same amount of multiplications done.
+        mult = 1 if color.value else -1
+        # Direction of travel, reverse for black and white.
+        d = -1 * mult
+        state = np.copy(self.current_state * mult)
+
+        x, y = np.where(state==1)
+        x = x.reshape(len(x), 1)
+        y = y.reshape(len(y), 1)
+
+        pawns = np.append(x,y,axis=1)
+
+        end_states = []
+        for pos in pawns:
+            # En Passant first since we can take En Passant if there
+            # is a piece directly in front of our pawn.
+            # However, requires the pawn on row 5 (from bottom)
+            if pos[0] == 4 + d:
+                if state[pos[0], pos[1] - 1] == -1 and previous_state[pos[0] + 2*d, pos[1] - 1] == -1:
+                    end = [pos[0] + d, pos[1] - 1]
+                    end_states.append(rowcolumn_to_algebraic(pos, end, 1))
+
+                elif state[pos[0], pos[1] + 1] == -1 and previous_state[pos[0] + 2*d, pos[1] + 1] == -1:
+                    end = [pos[0] + d, pos[1] + 1]
+                    end_states.append(rowcolumn_to_algebraic(pos, end, 1))
+
+            # Makes sure the space in front of us is clear
+            elif state[pos[0] + d, pos[1]] == 0:
+                # Pawn promotion
+                # We do this first because pawns have to promote so we can't
+                # just "move one forward" in this position
+                # (7 - d)%7 = 6 if going down (dir = 1) or 1 (dir = -1)
+                if pos[0] == (7 - d) % 7:
+                    for i in range(2, 6):
+                        end = [pos[0] + d, pos[1]]
+                        end_states.append(rowcolumn_to_algebraic(pos, end, 1, i))
+                    continue
+                # We do the two forward next as an elif
+                # (7 + d)%7 = 1 if going down (dir = 1) or 6 (dir = -1)
+                elif pos[0] == (7 + d) % 7 and state[pos[0] + 2*d, pos[1]] == 0:
+                    end = [pos[0] + 2*d,pos[1]]
+                    end_states.append(rowcolumn_to_algebraic(pos, end, 1))
+
+                # Add one move forward
+                end = [pos[0] + d,pos[1]]
+                end_states.append(rowcolumn_to_algebraic(pos, end, 1))
+
+            if pos[1] - 1 > -1 and state[pos[0] + d, pos[1] - 1] < 0:
+                end = [pos[0] + d,pos[1] - 1]
+                end_states.append(rowcolumn_to_algebraic(pos, end, 1))
+
+            if pos[1] + 1 < 8 and state[pos[0] + d, pos[1] + 1] < 0:
+                end = [pos[0] + d,pos[1] + 1]
+                end_states.append(rowcolumn_to_algebraic(pos, end, 1))
+
+        return end_states
+
 
     def generate_knight_moves(self, color):
         # This code was written from white point of view but flipping piece sign
         # allows it to work for black as well.
         mult = 1 if color.value else -1
-        state = np.copy(self.current_state * mult) 
+        state = np.copy(self.current_state * mult)
 
         # This is quick code for finding the position of all knights.
         x, y = np.where(state == 3)
@@ -70,28 +133,24 @@ class Board():
                 cond1 = cond1 and s1[end1[0], end1[1]] <= 0
                 cond2 = cond2 and s1[end2[0], end2[1]] <= 0
 
-                # The following code blocks only run if the ending positions are actually on the board.
-                # The first knight position, sets the old one to empty (0) then sets the new space.
+                # The following code blocks only run if the ending positions
+                # are actually on the board.
+                # The first knight position
                 if cond1:
-                    s1 = np.copy(state)
-                    s1[pos[0], pos[1]] = 0
-                    s1[end1[0], end1[1]] = 3
-                    end_states.append(np.copy(s1 * mult))
+                    end_states.append(rowcolumn_to_algebraic(pos, end1, 3))
 
                 # Second possible knight position
                 if cond2:
-                    s1 = np.copy(state)
-                    s1[pos[0], pos[1]] = 0
-                    s1[end2[0], end2[1]] = 3
-                    end_states.append(np.copy(s1 * mult))
+                    end_states.append(rowcolumn_to_algebraic(pos, end2, 3))
 
         return end_states
-    
+
+
     def generate_rook_moves(self, color):
         # This code was written from white point of view but flipping piece sign
         # allows it to work for black as well.
         mult = 1 if color.value else -1
-        state = np.copy(self.current_state * mult) 
+        state = np.copy(self.current_state * mult)
 
         x, y = np.where(state == 2)
         x = x.reshape(len(x), 1)
@@ -101,12 +160,12 @@ class Board():
 
         return self.generate_straight_moves(color, rooks)
 
-    
+
     def generate_straight_moves(self, color, starts, queen=False):
         # This code was written from white point of view but flipping piece sign
         # allows it to work for black as well.
         mult = 1 if color.value else -1
-        state = np.copy(self.current_state * mult) 
+        state = np.copy(self.current_state * mult)
 
         piece_val = 5 if queen else 2
         end_states = []
@@ -141,25 +200,21 @@ class Board():
                         blocked = True
                     elif val[i] > 0:
                         break
-
                     i = i+1
-
-                    s1 = np.copy(state)
-                    s1[pos[0], pos[1]] = 0
 
                     # This was an embarrasing bug to correct.
                     if key == 'r' or key == 'l':
-                        s1[pos[0], pos[1] + (i * sign)] = piece_val
+                        end = [pos[0], pos[1] + (i * sign)]
                     else:
-                        s1[pos[0] + (i * sign), pos[1]] = piece_val
-                    end_states.append(np.copy(s1 * mult))
+                        end = [pos[0] + (i * sign), pos[1]]
+                    end_states.append(rowcolumn_to_algebraic(pos, end, piece_val))
 
         return end_states
 
-    
+
     def generate_bishop_moves(self, color):
         mult = 1 if color.value else -1
-        state = np.copy(self.current_state * mult) 
+        state = np.copy(self.current_state * mult)
 
         x, y = np.where(state==4)
         x = x.reshape(len(x), 1)
@@ -172,7 +227,7 @@ class Board():
 
     def generate_diagonal_moves(self, color, starts, queen=False):
         mult = 1 if color.value else -1
-        state = np.copy(self.current_state * mult) 
+        state = np.copy(self.current_state * mult)
 
         piece_val = 5 if queen else 4
 
@@ -180,9 +235,9 @@ class Board():
         for pos in starts:
 
             # This dict contains the direction that the loop will travel in
-            addition_dict = {'ul' : np.array([-1, -1]), 
-                            'ur' : np.array([-1, 1]), 
-                            'lr' : np.array([1, 1]), 
+            addition_dict = {'ul' : np.array([-1, -1]),
+                            'ur' : np.array([-1, 1]),
+                            'lr' : np.array([1, 1]),
                             'll' : np.array([1, -1])}
             # This dict contains the maximum the loop will travel in each diagonal direction
             # Subtracting from 7 is necessary for the edges that are the maximum
@@ -197,30 +252,26 @@ class Board():
                 blocked = False
                 while i <= max_dict[key] and not blocked:
 
-                    end = pos + i*val
+                    end = pos + i * val
 
                     # We get blocked if we hit a piece of the opposite color
-                    # And by one of this color, but we break if we do that since we can't 
-                    # take our own color.
+                    # And by one of this color, but we break if we do that
+                    # since we can't take our own color.
                     if state[end[0], end[1]] < 0:
                         blocked = True
                     elif state[end[0], end[1]] > 0:
                         break
 
                     # This puts the piece in its new place
-                    s1 = np.copy(state)
-                    s1[pos[0], pos[1]] = 0
-                    s1[end[0], end[1]] = piece_val
-
-                    end_states.append(np.copy(s1 * mult))
+                    end_states.append(rowcolumn_to_algebraic(pos, end, piece_val))
 
                     i = i + 1
 
         return end_states
-    
+
     def generate_queen_moves(self, color):
         mult = 1 if color.value else -1
-        state = np.copy(self.current_state * mult) 
+        state = np.copy(self.current_state * mult)
 
         x, y = np.where(state==5)
         x = x.reshape(len(x), 1)
@@ -235,10 +286,10 @@ class Board():
 
         return end_states
 
-    
-    def generate_king_moves(color):
+
+    def generate_king_moves(self, color):
         mult = 1 if color.value else -1
-        state = np.copy(self.current_state * mult) 
+        state = np.copy(self.current_state * mult)
 
         x, y = np.where(state==6)
         x = x.reshape(len(x), 1)
@@ -256,15 +307,11 @@ class Board():
             end = pos + king
 
             if 0 <= end[0] < 8 and 0 <= end[1] < 8:
-                s1 = np.copy(state)
 
                 # Can't take our own pieces, so don't add it as a board pos
-                if s1[end[0], end[1]] > 0:
+                if state[end[0], end[1]] > 0:
                     continue
-
-                s1[king[0], king[1]] = 0
-                s1[end[0], end[1]] = 6
-                end_states.append(np.copy(s1 * mult))
+                end_states.append(rowcolumn_to_algebraic(king, end, 6))
 
         return end_states
 
@@ -275,7 +322,7 @@ class Board():
         tree.parse("pieces/board.svg")
         composite = tree.getroot()
 
-        # Dict containing a conversion between the piece number and the piece name.
+        # Dict containing a conversion between the piece num and the piece name.
         piece_names = {1:"wp", 2:"wr", 3:"wkn", 4:"wb", 5:"wq", 6:"wk",
                        -1:"bp", -2:"br", -3:"bkn", -4:"bb", -5:"bq", -6:"bk"}
 
@@ -286,7 +333,7 @@ class Board():
             pos = it.multi_index
             piece = it[0]
 
-            # 0 is an empty space so we increment the iterator and skip the rest.
+            # 0 is empty space so we increment the iterator and skip the rest.
             if piece == 0:
                 it.iternext()
                 continue
@@ -308,3 +355,20 @@ class Board():
 
         # Returns the SVG representing the board
         return SVG(ET.tostring(composite))
+
+def rowcolumn_to_algebraic(start, end, piece, promotion=None):
+    piece_names = {1:"P", 2:"R", 3:"N", 4:"B", 5:"Q", 6:"K"}
+
+    alg = []
+
+    # Don't need to append pawn name
+    if piece > 1:
+        alg.append(piece_names[np.abs(piece)]) # Piece Name
+    alg.append(ascii_lowercase[end[1]]) # End File
+    alg.append(str(8 - end[0])) # End Rank
+
+    if promotion:
+        alg.append("=")
+        alg.append(piece_names[np.abs(promotion)])
+
+    return "".join(alg)

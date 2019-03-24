@@ -35,6 +35,9 @@ class Board():
                                             [1, 1, 1, 1, 1, 1, 1, 1],
                                             [2, 3, 4, 5, 6, 4, 3, 2]])
         self.previous_state = None
+        
+        # Dict containing a conversion between the piece num and the piece name.
+        self.piece_names = {1:"P", 2:"R", 3:"N", 4:"B", 5:"Q", 6:"K"}
 
     #def generate_moves(color):
      #   """Generate all possible moves for a given color
@@ -322,10 +325,6 @@ class Board():
         tree.parse("pieces/board.svg")
         composite = tree.getroot()
 
-        # Dict containing a conversion between the piece num and the piece name.
-        piece_names = {1:"wp", 2:"wr", 3:"wkn", 4:"wb", 5:"wq", 6:"wk",
-                       -1:"bp", -2:"br", -3:"bkn", -4:"bb", -5:"bq", -6:"bk"}
-
         # Numpy iterator that gives us the position as well as the piece number
         it = np.nditer(self.current_state, flags=['multi_index'])
 
@@ -339,7 +338,13 @@ class Board():
                 continue
 
             # Parses the raw piece svg file into XML
-            tree.parse("pieces/" + piece_names[int(piece)] + ".svg")
+            name = self.piece_names[np.abs(piece)].lower()
+            if piece < 0:
+                name = 'b' + name
+            else:
+                name = 'w' + name
+                
+            tree.parse("pieces/" + name + ".svg")
             piece = tree.getroot()
 
             # The positioning of the piece. Each square is 50x50 pixels.

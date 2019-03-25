@@ -20,7 +20,7 @@ class Board():
 
     """
 
-    def __init__(self, state, castle_dict):
+    def __init__(self, state, castle_dict, to_move):
 
         if state is not None:
             self.current_state = state
@@ -46,6 +46,11 @@ class Board():
             # No point storing king motion, if it moves both get set to False.
             self.castle_dict = {"WQR" : True, "WKR" : True,
                                 "BQR" : True, "BKR" : True}
+                                
+        if to_move is not None:
+            self.to_move = to_move
+        else:
+            self.to_move = Color.WHITE
 
     def generate_moves(self, color):
         """Generate all possible moves for a given color
@@ -67,6 +72,7 @@ class Board():
         # same amount of multiplications done.
         mult = 1 if color.value else -1
         # Direction of travel, reverse for black and white.
+        # Positive is going downwards, negative is going upwards.
         d = -1 * mult
         state = np.copy(self.current_state * mult)
 
@@ -77,6 +83,9 @@ class Board():
         pawns = np.append(x,y,axis=1)
 
         end_states = []
+        
+        # The ending rank for pawn promotions
+        endrank = 7 if d == 1 else 0
         for pos in pawns:
             # En Passant first since we can take En Passant if there
             # is a piece directly in front of our pawn.
@@ -96,28 +105,41 @@ class Board():
                 # We do this first because pawns have to promote so we can't
                 # just "move one forward" in this position
                 # (7 - d)%7 = 6 if going down (dir = 1) or 1 (dir = -1)
-                if pos[0] == (7 - d) % 7:
+                if pos[0] + d == endrank:
                     for i in range(2, 6):
                         end = [pos[0] + d, pos[1]]
                         end_states.append(rowcolumn_to_algebraic(pos, end, 1, i))
-                    continue
+                else:
+                    # Add one move forward
+                    end = [pos[0] + d,pos[1]]
+                    end_states.append(rowcolumn_to_algebraic(pos, end, 1))
                 # We do the two forward next as an elif
                 # (7 + d)%7 = 1 if going down (dir = 1) or 6 (dir = -1)
-                elif pos[0] == (7 + d) % 7 and state[pos[0] + 2*d, pos[1]] == 0:
+                if pos[0] == (7 + d) % 7 and state[pos[0] + 2*d, pos[1]] == 0:
                     end = [pos[0] + 2*d,pos[1]]
                     end_states.append(rowcolumn_to_algebraic(pos, end, 1))
 
-                # Add one move forward
-                end = [pos[0] + d,pos[1]]
-                end_states.append(rowcolumn_to_algebraic(pos, end, 1))
-
+            # Takes to the left
             if pos[1] - 1 > -1 and state[pos[0] + d, pos[1] - 1] < 0:
                 end = [pos[0] + d,pos[1] - 1]
-                end_states.append(rowcolumn_to_algebraic(pos, end, 1))
+                
+                # Promotion upon taking
+                if pos[0] + d == endrank:
+                    for i in range(2, 6):
+                        end_states.append(rowcolumn_to_algebraic(pos, end, 1, i))
+                else:
+                    end_states.append(rowcolumn_to_algebraic(pos, end, 1))
 
+            # Takes to the right
             if pos[1] + 1 < 8 and state[pos[0] + d, pos[1] + 1] < 0:
                 end = [pos[0] + d,pos[1] + 1]
-                end_states.append(rowcolumn_to_algebraic(pos, end, 1))
+                
+                # Promotion upon taking
+                if pos[0] + d == endrank:
+                    for i in range(2, 6):
+                        end_states.append(rowcolumn_to_algebraic(pos, end, 1, i))
+                else:
+                    end_states.append(rowcolumn_to_algebraic(pos, end, 1))
 
         return end_states
 
@@ -395,6 +417,56 @@ class Board():
 
         # Returns the SVG representing the board
         return SVG(ET.tostring(composite))
+        
+    def make_move(self, move):
+        # Reverse piece -> number dictionary
+        piece_number = {v: k for k, v in self.piece_names.items()}
+        
+        # move in algebraic notation.
+        # This means only a pawn moved, forward either 1 or 2.
+        if len(move) == 2:
+            endrank = 8 - int(move[1]) # Rank = y
+            endfile = asii_lowercase.index(move[0]) # File = x
+            
+            # Direction opposite of motion, down for white, up for black
+            # Simply to check which pawn is moving, so we can set it to 0
+            d = 1 if self.to_move.value else -1
+            
+            # Allowed ending indices if moving two
+            allowed = 4 if self.to_move.value else 3
+            
+            # Checks that the space behind the pawn is empty (for moving 2)
+            empty = self.current_state[endrank + d, endfile] == 0
+            legal = endrank == allowed and empty
+            
+            # Good, a legal move
+            if self.current_state[endrank + d, endfile] == 1:
+                new_state = np.copy(self.current_state)
+                new_state[endrank, endfile] = 1
+                new_state[endrank + d, endfile] = 0
+                return new_state
+            elif self.current_state[endrank + 2*d, endfile] == 1 and legal:
+                new_state = np.copy(self.current_state)
+                new_state[endrank, endfile] = 1
+                new_state[endrank + 2*d, endfile] = 0
+                return new_state
+        # Literally any other piece moves but doesn't take anything
+        elif len(move) == 3:
+            piece_num = piece_number[move[0]]
+            endrank = 8 - int(move[2]) # Rank = y
+            endfile = asii_lowercase.index(move[1]) # File = x
+            
+            # This code is the same as the move generation, and quickly finds
+            # all pieces of the given type.
+            x, y = np.where(state==piece_num)
+            x = x.reshape(len(x), 1)
+            y = y.reshape(len(y), 1)
+
+            found = np.append(x, y, axis=1)
+            
+            #for loc in found:
+                # Rooks
+                #if piece_num == 2:
 
 def rowcolumn_to_algebraic(start, end, piece, promotion=None):
     piece_names = {1:"P", 2:"R", 3:"N", 4:"B", 5:"Q", 6:"K"}

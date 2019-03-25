@@ -463,7 +463,9 @@ class Board():
         for i, c in enumerate(move):
             # Appends a found [rank] character
             if c.islower():
-                files.append(c)
+                # We use a lower case x for taking so I have to exclude it.
+                if not c == "x":
+                    files.append(c)
                 # This is a full move, [rank][file]
                 if move[i+1].isdigit():
                     locs.append(move[i:i+2])
@@ -527,10 +529,13 @@ class Board():
                 startfile = ascii_lowercase.index(files[0]) # End File = x
                 if s[1] == startfile:
                     return move_piece(s, end, piece)
+                continue
             elif len(ranks) > 1:
                 startrank = 8 - int(ranks[0]) # End Rank = y
                 if s[0] == startrank:
                     return move_piece(s, end, piece)
+                continue
+                
             # Pawns
             if piece == 1:
                 # Direction the pawn would move.

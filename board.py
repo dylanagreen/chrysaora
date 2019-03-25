@@ -46,7 +46,7 @@ class Board():
             # No point storing king motion, if it moves both get set to False.
             self.castle_dict = {"WQR" : True, "WKR" : True,
                                 "BQR" : True, "BKR" : True}
-                                
+
         if to_move is not None:
             self.to_move = to_move
         else:
@@ -83,7 +83,7 @@ class Board():
         pawns = np.append(x,y,axis=1)
 
         end_states = []
-        
+
         # The ending rank for pawn promotions
         endrank = 7 if d == 1 else 0
         for pos in pawns:
@@ -122,7 +122,7 @@ class Board():
             # Takes to the left
             if pos[1] - 1 > -1 and state[pos[0] + d, pos[1] - 1] < 0:
                 end = [pos[0] + d,pos[1] - 1]
-                
+
                 # Promotion upon taking
                 if pos[0] + d == endrank:
                     for i in range(2, 6):
@@ -133,7 +133,7 @@ class Board():
             # Takes to the right
             if pos[1] + 1 < 8 and state[pos[0] + d, pos[1] + 1] < 0:
                 end = [pos[0] + d,pos[1] + 1]
-                
+
                 # Promotion upon taking
                 if pos[0] + d == endrank:
                     for i in range(2, 6):
@@ -417,56 +417,164 @@ class Board():
 
         # Returns the SVG representing the board
         return SVG(ET.tostring(composite))
-        
-    def make_move(self, move):
+
+    def algebraic_to_boardstate(self, move):
         # Reverse piece -> number dictionary
         piece_number = {v: k for k, v in self.piece_names.items()}
-        
-        # move in algebraic notation.
-        # This means only a pawn moved, forward either 1 or 2.
-        if len(move) == 2:
-            endrank = 8 - int(move[1]) # Rank = y
-            endfile = asii_lowercase.index(move[0]) # File = x
-            
-            # Direction opposite of motion, down for white, up for black
-            # Simply to check which pawn is moving, so we can set it to 0
-            d = 1 if self.to_move.value else -1
-            
-            # Allowed ending indices if moving two
-            allowed = 4 if self.to_move.value else 3
-            
-            # Checks that the space behind the pawn is empty (for moving 2)
-            empty = self.current_state[endrank + d, endfile] == 0
-            legal = endrank == allowed and empty
-            
-            # Good, a legal move
-            if self.current_state[endrank + d, endfile] == 1:
-                new_state = np.copy(self.current_state)
-                new_state[endrank, endfile] = 1
-                new_state[endrank + d, endfile] = 0
-                return new_state
-            elif self.current_state[endrank + 2*d, endfile] == 1 and legal:
-                new_state = np.copy(self.current_state)
-                new_state[endrank, endfile] = 1
-                new_state[endrank + 2*d, endfile] = 0
-                return new_state
-        # Literally any other piece moves but doesn't take anything
-        elif len(move) == 3:
-            piece_num = piece_number[move[0]]
-            endrank = 8 - int(move[2]) # Rank = y
-            endfile = asii_lowercase.index(move[1]) # File = x
-            
-            # This code is the same as the move generation, and quickly finds
-            # all pieces of the given type.
-            x, y = np.where(state==piece_num)
-            x = x.reshape(len(x), 1)
-            y = y.reshape(len(y), 1)
 
-            found = np.append(x, y, axis=1)
-            
-            #for loc in found:
-                # Rooks
-                #if piece_num == 2:
+        # Kingside castling
+        if move == "O-O" or move == "0-0":
+            # Need to make sure this is allowed
+            check = "WKR" if self.to_move.value else "BKR"
+            rank = y if self.to_move.value else 0
+            if self.castle_dict[check]:
+                new_state = np.copy(self.current_state)
+                new_state[rank, 7] = 0
+                new_state[rank, 4] = 0
+                new_state[rank, 6] = piece_number["K"]
+                new_state[rank, 5] = piece_number["R"]
+                return new_state
+        # Queenside castling
+        elif move == "O-O-O" or move == "0-0-0":
+            check = "WQR" if self.to_move.value else "BQR"
+            rank = y if self.to_move.value else 0
+            # Need to make sure this is allowed
+            if self.castle_dict[check]:
+                new_state = np.copy(self.current_state)
+                new_state[rank, 7] = 0
+                new_state[rank, 0] = 0
+                new_state[rank, 2] = piece_number["K"]
+                new_state[rank, 3] = piece_number["R"]
+                return new_state
+
+
+        locs = []
+        ranks = []
+        files = []
+        piece = "P" # Default to pawn, this generally be changed.
+        for i, c in enumerate(move):
+            # Appends a found [rank] character
+            if c.islower():
+                files.append(c)
+                # This is a full move, [rank][file]
+                if move[i+1].isdigit():
+                    locs.append(move[i:i+2])
+            # A [file] character
+            if c.isdigit():
+                ranks.append(c)
+            # A [piece] character
+            # If we have an = then this is the piece the pawn promotes to.
+            if c.isupper():
+                piece = c
+
+        if len(locs) <= 0 or len(locs) >= 3:
+            raise ValueError("You tried to make an illegal move.")
+            return self.current_state
+
+
+        # Always true, no matter how long locs is at this point (1 or 2)
+        # If it's one then that's just the destination
+        # If it's two then the first is the start, and the second is the end.
+        dest = locs[-1]
+        endfile = ascii_lowercase.index(dest[0]) # End File = x
+        endrank = 8 - int(dest[1]) # End Rank = y
+        end = [endrank, endfile]
+
+        # Gets the value of the piece
+        piece = piece_number[piece]
+        mult = 1 if self.to_move.value else -1
+
+        # Internal function that moves a piece, to reduce code duplication.
+        # Additionally updates the self.to_move value.
+        def move_piece(start, end, piece):
+            new_state = np.copy(self.current_state)
+            new_state[start[0], start[1]] = 0
+            new_state[end[0], end[1]] = piece
+            #self.to_move = Color.BLACK if self.to_move.value else Color.WHITE
+            return new_state
+
+        # Disambiguation case, don't need to find the pieces in this case
+        # since we know where to start at.
+        if len(locs) > 1:
+            piece = piece * mult
+            dest = locs[0]
+            startfile = ascii_lowercase.index(dest[0]) # End File = x
+            startrank = 8 - int(dest[1]) # End Rank = y
+            start = [startrank, startfile]
+            return move_piece(start, end, piece)
+
+
+        state = np.copy(self.current_state * mult)
+
+        search = 1 if "=" in move else piece
+        x, y = np.where(state==search)
+        x = x.reshape(len(x), 1)
+        y = y.reshape(len(y), 1)
+        starts = np.append(x, y, axis=1)
+
+        piece = piece * mult
+        for s in starts:
+            # Partial disambiguation cases first
+            if len(files) > 1:
+                startfile = ascii_lowercase.index(files[0]) # End File = x
+                if s[1] == startfile:
+                    return move_piece(s, end, piece)
+            elif len(ranks) > 1:
+                startrank = 8 - int(ranks[0]) # End Rank = y
+                if s[0] == startrank:
+                    return move_piece(s, end, piece)
+            # Pawns
+            if piece == 1:
+                # Direction the pawn would move.
+                d = -1 if self.to_move.value else 1
+
+                # The only time we ever need to check for taking since the
+                # piece moves differently. Also if we got here only one
+                # pawn should be able to take, since we dealt with
+                # disambiguation already.
+                if "x" in move:
+                    # Takes going to the right diagonally
+                    if s[0] + d == end[0] and s[1] + 1 == end[1]:
+                        return move_piece(s, end, piece)
+                    # Takes going to the left diagonally
+                    elif s[0] + d == end[0] and s[1] - 1 == end[1]:
+                        return move_piece(s, end, piece)
+                elif  s[0] + d == end[0] and s[1] == end[1]:
+                    return move_piece(s, end, piece)
+            # Rooks (and straight Queens)
+            if piece == 2 or piece == 5:
+                # If this rook is on the rank or file then it's the correct one
+                if s[0] == end[0] or s[1] == end[1]:
+                    return move_piece(s, end, piece)
+
+            # Bishops (and diagonal Queens)
+            if piece == 4 or piece == 5:
+                # Finds the slope of the line between start and end
+                # If it's 1,1 we know it's a good diagonal.
+                diag = np.abs(s - end)
+                diag = diag / np.max(diag)
+
+                if np.array_equal(diag, [1, 1]):
+                    return move_piece(s, end, piece)
+            # Knights
+            if piece == 3:
+                # Finds the slope of the line between start and end
+                # If it's 1,2 or 2,1 it's a good knight move
+                slope = np.abs(end-s)
+                slope = slope / np.min(slope)
+                if np.array_equal(slope, [1, 2]) or np.array_equal(slope, [2, 1]):
+                    return move_piece(s, end, piece)
+            if piece == 6:
+                #If the distance between s and end is 1 then the king can
+                # get here. You should only have one king so I don't know why
+                # I check this but if you pass a move where a king tries to
+                # move two spaces then I guess this will catch it.
+                if np.sum(np.abs(s - end)) == 1:
+                    return move_piece(s, end, piece)
+
+        raise ValueError("You tried to make an illegal move.")
+        return self.current_state
+
 
 def rowcolumn_to_algebraic(start, end, piece, promotion=None):
     piece_names = {1:"P", 2:"R", 3:"N", 4:"B", 5:"Q", 6:"K"}
@@ -476,8 +584,8 @@ def rowcolumn_to_algebraic(start, end, piece, promotion=None):
     # Don't need to append pawn name
     if piece > 1:
         alg.append(piece_names[np.abs(piece)]) # Piece Name
-    alg.append(ascii_lowercase[end[1]]) # End File
-    alg.append(str(8 - end[0])) # End Rank
+    alg.append(ascii_lowercase[end[1]]) # End File = x
+    alg.append(str(8 - end[0])) # End Rank = y
 
     if promotion:
         alg.append("=")

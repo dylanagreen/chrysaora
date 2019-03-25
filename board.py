@@ -418,6 +418,14 @@ class Board():
         # Returns the SVG representing the board
         return SVG(ET.tostring(composite))
 
+
+    def make_move(self, move):
+        new_state = self.algebraic_to_boardstate(move)
+        self.previous_state = np.copy(self.current_state)
+        self.to_move = Color.BLACK if self.to_move.value else Color.WHITE
+        self.current_state = np.copy(new_state)
+
+
     def algebraic_to_boardstate(self, move):
         # Reverse piece -> number dictionary
         piece_number = {v: k for k, v in self.piece_names.items()}
@@ -426,7 +434,7 @@ class Board():
         if move == "O-O" or move == "0-0":
             # Need to make sure this is allowed
             check = "WKR" if self.to_move.value else "BKR"
-            rank = y if self.to_move.value else 0
+            rank = 7 if self.to_move.value else 0
             if self.castle_dict[check]:
                 new_state = np.copy(self.current_state)
                 new_state[rank, 7] = 0
@@ -437,12 +445,12 @@ class Board():
         # Queenside castling
         elif move == "O-O-O" or move == "0-0-0":
             check = "WQR" if self.to_move.value else "BQR"
-            rank = y if self.to_move.value else 0
+            rank = 7 if self.to_move.value else 0
             # Need to make sure this is allowed
             if self.castle_dict[check]:
                 new_state = np.copy(self.current_state)
-                new_state[rank, 7] = 0
                 new_state[rank, 0] = 0
+                new_state[rank, 4] = 0
                 new_state[rank, 2] = piece_number["K"]
                 new_state[rank, 3] = piece_number["R"]
                 return new_state

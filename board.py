@@ -1,6 +1,8 @@
 import xml.etree.ElementTree as ET
 from enum import Enum
 from string import ascii_lowercase
+import os.path
+import re
 
 import numpy as np
 from IPython.display import SVG
@@ -34,7 +36,8 @@ class Board():
                                             [0, 0, 0, 0, 0, 0, 0, 0],
                                             [1, 1, 1, 1, 1, 1, 1, 1],
                                             [2, 3, 4, 5, 6, 4, 3, 2]])
-        self.previous_state = None
+        self.game_states = []
+        self.game_states.append(np.copy(self.current_state))
 
         # Dict containing a conversion between the piece num and the piece name.
         self.piece_names = {1:"P", 2:"R", 3:"N", 4:"B", 5:"Q", 6:"K"}
@@ -129,6 +132,7 @@ class Board():
         # Positive is going downwards, negative is going upwards.
         d = -1 * mult
         state = np.copy(self.current_state * mult)
+        previous_state = np.copy(self.game_states[-1] * mult)
 
         x, y = np.where(state==1)
         x = x.reshape(len(x), 1)
@@ -481,10 +485,11 @@ class Board():
 
     def make_move(self, move):
         new_state = self.algebraic_to_boardstate(move)
-        self.previous_state = np.copy(self.current_state)
+        self.game_states.append(np.copy(self.current_state))
 
         self.current_state = np.copy(new_state)
 
+        piece = ""
         for i, c in enumerate(move):
             # If we have an = then this is the piece the pawn promotes to.
             if c.isupper():
@@ -499,7 +504,7 @@ class Board():
                 self.castle_dict["BKR"] = False
                 self.castle_dict["BQR"] = False
         elif piece == "R":
-            diff = self.previous_state - self.current_state
+            diff = self.game_states[-1] - self.current_state
             # If the rook position is nonzero in the difference we know that
             # the rook moved off that position. And hence castling that side
             # Is no longer allowed.
@@ -512,12 +517,16 @@ class Board():
             elif diff[7, 7] == -2:
                 self.castle_dict["WKR"] = False
 
+        if move.endswith("#"):
+            if self.to_move.value:
+                self.black_checkmate = True
+            else:
+                self.white_checkmate = True
         self.to_move = Color.BLACK if self.to_move.value else Color.WHITE
 
 
-
     def unmake_move(self):
-        self.current_state = np.copy(self.previous_state)
+        self.current_state = np.copy(self.game_states.pop(-1))
 
 
     def algebraic_to_boardstate(self, move):
@@ -673,7 +682,6 @@ class Board():
                 # Finds the slope of the line between start and end
                 # If it's 1,2 or 2,1 it's a good knight move
                 slope = np.abs(end-s)
-                slope = slope / np.min(slope)
                 if np.array_equal(slope, [1, 2]) or np.array_equal(slope, [2, 1]):
                     return move_piece(s, end, end_piece)
             if piece == 6:
@@ -756,6 +764,51 @@ def load_fen(fen):
 
     return Board(board, castle_dict, to_move)
 
+
+def load_pgn(name):
+    loc = os.path.join("games", name)
+    if not os.path.isfile(loc):
+        print("PGN not found!")
+        return
+
+    # We're going to extract the text into a single string so we need to append
+    # lines here into this array.
+    game_line = []
+    with open(loc, 'r') as f:
+        for line in f:
+            line = line.rstrip()
+            if not line.startswith("["):
+               game_line.append(line + " ")
+    game_line = "".join(game_line)
+
+    # Removes the comments in the PGN, one at a time.
+    while "{" in game_line:
+        before = game_line[:game_line.index("{")]
+        after = game_line[game_line.index("}") + 1:]
+        game_line = before + after
+
+    # \d+ looks for 1 or more digits
+    # \. escapes the period
+    # \s* looks for 0 or more white space
+    # Entire: looks for 1 or more digits followed by a period followed by
+    # whitespace or no whitespace
+    moves = re.split("\d+\.\s*", game_line)
+
+    plies = []
+    for m in moves:
+        spl = m.split(" ")
+        for s in spl:
+            if s:
+                plies.append(s)
+
+    plies.pop(-1)
+
+    # Makes all the moves and then returns the board state at the end.
+    b = Board(None, None, None)
+    for ply in plies:
+        b.make_move(ply)
+
+    return b
 
 def is_in_check(state, color):
     # The direction a pawn must travel to take this color's king.
@@ -857,3 +910,6 @@ def is_in_check(state, color):
                 return True
 
     return False
+
+if __name__ == "__main__":
+    load_pgn("anderssen_kieseritzky_1851.pgn")

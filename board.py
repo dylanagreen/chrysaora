@@ -51,6 +51,9 @@ class Board():
             self.to_move = to_move
         else:
             self.to_move = Color.WHITE
+            
+        self.white_checkmate = False
+        self.black_checkmate = False
 
     def generate_moves(self, color):
         """Generate all possible moves for a given color
@@ -74,7 +77,7 @@ class Board():
         # out of check as well. Neat.
         for m in total_moves:
             s = self.algebraic_to_boardstate(m)
-            check = is_in_check(s, self.to_move)
+            check = is_in_check(s, color)
 
             # I could remove it from the old list, but doing so while iterating
             # is dangerous. Plus, remove() requires a search, which increases
@@ -82,6 +85,19 @@ class Board():
             if not check:
                 new_moves.append(m)
 
+        # If there are no moves that get us out of check we need to see if
+        # we're in check right now.
+        # If we are that's check mate. If we're not... that's a stalemate.
+        if len(new_moves) == 0:
+            check = is_in_check(self.current_state, color)
+            if check:
+                if self.to_move.value:
+                    self.white_checkmate = True
+                else:
+                    self.black_checkmate = True
+                return []
+            else:
+                return []
         return new_moves
 
     def generate_pawn_moves(self, color):
@@ -637,7 +653,10 @@ class Board():
                 # get here. You should only have one king so I don't know why
                 # I check this but if you pass a move where a king tries to
                 # move two spaces then I guess this will catch it.
-                if np.sum(np.abs(s - end)) == 1:
+                # Used to check the sum of the dist, but diagonals sum to 2
+                # so oops.
+                dist = np.abs(s - end)
+                if dist[0] == 1 or dist[1] == 1:
                     return move_piece(s, end, end_piece)
 
         raise ValueError("You tried to make an illegal move.")

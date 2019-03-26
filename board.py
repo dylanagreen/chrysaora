@@ -422,8 +422,38 @@ class Board():
     def make_move(self, move):
         new_state = self.algebraic_to_boardstate(move)
         self.previous_state = np.copy(self.current_state)
-        self.to_move = Color.BLACK if self.to_move.value else Color.WHITE
+
         self.current_state = np.copy(new_state)
+
+        for i, c in enumerate(move):
+            # If we have an = then this is the piece the pawn promotes to.
+            if c.isupper():
+                piece = c
+
+        # Updates the castle dict for castling rights.
+        if piece == "K":
+            if self.to_move.value:
+                self.castle_dict["WKR"] = False
+                self.castle_dict["WQR"] = False
+            else:
+                self.castle_dict["BKR"] = False
+                self.castle_dict["BQR"] = False
+        elif piece == "R":
+            diff = self.previous_state - self.current_state
+            # If the rook position is nonzero in the difference we know that
+            # the rook moved off that position. And hence castling that side
+            # Is no longer allowed.
+            if diff[0, 0] == -2:
+                self.castle_dict["BQR"] = False
+            elif diff[0, 7] == -2:
+                self.castle_dict["BKR"] = False
+            elif diff[7, 0] == -2:
+                self.castle_dict["WQR"] = False
+            elif diff[7, 7] == -2:
+                self.castle_dict["WKR"] = False
+
+        self.to_move = Color.BLACK if self.to_move.value else Color.WHITE
+
 
 
     def unmake_move(self):
@@ -707,7 +737,7 @@ def is_in_check(state, color):
 
     for pos in knights:
         slope = np.abs(pos-king)
-        
+
         # Avoids a divide by 0 error. If it's on the same rank or file
         # the knight can't get the king anyway.
         if slope[1] == 0 or slope[0] == 0:
@@ -732,7 +762,7 @@ def is_in_check(state, color):
             for i in range(1, 7):
                 cur_pos = king + i * slope
                 cur_pos = cur_pos.astype(int)
-                
+
                 if state[cur_pos[0], cur_pos[1]] == 0:
                     continue
                 else:

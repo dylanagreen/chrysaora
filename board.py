@@ -426,6 +426,10 @@ class Board():
         self.current_state = np.copy(new_state)
 
 
+    def unmake_move(self):
+        self.current_state = np.copy(self.previous_state)
+
+
     def algebraic_to_boardstate(self, move):
         # Reverse piece -> number dictionary
         piece_number = {v: k for k, v in self.piece_names.items()}
@@ -535,7 +539,7 @@ class Board():
                 if s[0] == startrank:
                     return move_piece(s, end, piece)
                 continue
-                
+
             # Pawns
             if piece == 1:
                 # Direction the pawn would move.
@@ -640,3 +644,103 @@ def load_fen(fen):
         castle_dict[castle_names[c]] = True
 
     return Board(board, castle_dict)
+
+
+def is_in_check(state, color):
+    # The direction a pawn must travel to take this color's king.
+    # I.e. Black pawns must travel in the positive y (downward) direction
+    # To take a white king.
+    d = 1 if color.value else -1
+
+    mult = 1 if color.value else -1
+
+    x, y = np.where(state*mult==6)
+    x = x.reshape(len(x), 1)
+    y = y.reshape(len(y), 1)
+
+    # You shouldn't need a loop, because why would you have more than 1 king?
+    # Just reshape instead
+    king = np.append(x,y,axis=1).reshape(2)
+
+    # Check pawns first because they're the easiest.
+    pawn = -1 if color.value else 1
+    if state[king[0] - d, king[1] - 1] == pawn or state[king[0] - d, king[1] + 1] == pawn:
+        return True
+
+    mult = -1 * mult
+    x, y = np.where(state*mult==2)
+    x = x.reshape(len(x), 1)
+    y = y.reshape(len(y), 1)
+    rooks = np.append(x,y,axis=1)
+
+    x, y = np.where(state*mult==5)
+    x = x.reshape(len(x), 1)
+    y = y.reshape(len(y), 1)
+    queens = np.append(x,y,axis=1)
+
+    # Check rooks next because I seem to do that a lot.
+    for pos in np.append(rooks, queens, axis=0):
+        # Rook needs to be on the same file or rank to be able to put the king
+        # in check
+        # Check the sum between the two pieces, if it's 0 then no pieces are
+        # between and it's a valid check.
+        if pos[0] == king[0]:
+            if pos[1] < king[1]:
+                f = state[king[0], pos[1] + 1:king[1]]
+            else:
+                f = state[king[0], king[1] + 1:pos[1]]
+            if np.sum(f) == 0:
+                return True
+        elif pos[1] == king[1]:
+            if pos[0] < king[0]:
+                f = state[pos[0] + 1:king[0], king[1]]
+            else:
+                f = state[king[0] + 1:pos[0], king[1]]
+            if np.sum(f) == 0:
+                return True
+
+    # Knights can hop which is why I'm doing them before bishops
+    x, y = np.where(state*mult==3)
+    x = x.reshape(len(x), 1)
+    y = y.reshape(len(y), 1)
+    knights = np.append(x,y,axis=1)
+
+    for pos in knights:
+        slope = np.abs(pos-king)
+        
+        # Avoids a divide by 0 error. If it's on the same rank or file
+        # the knight can't get the king anyway.
+        if slope[1] == 0 or slope[0] == 0:
+            continue
+        slope = slope / np.min(slope)
+        if np.array_equal(slope, [1, 2]) or np.array_equal(slope, [2, 1]):
+            return True
+
+    # Now bishops and diagonal queens, I guess
+    # Knights can hop which is why I'm doing them before bishops
+    x, y = np.where(state*mult==4)
+    x = x.reshape(len(x), 1)
+    y = y.reshape(len(y), 1)
+    bishops = np.append(x,y,axis=1)
+
+    for pos in np.append(bishops, queens, axis=0):
+        # First we check that the piece is even on a diagonal from the king.
+        slope = pos-king
+        slope = slope / np.max(slope)
+        if np.array_equal(np.abs(slope), [1, 1]):
+            # Now we have to check that the space between the two is empty.
+            for i in range(1, 7):
+                cur_pos = king + i * slope
+                cur_pos = cur_pos.astype(int)
+                
+                if state[cur_pos[0], cur_pos[1]] == 0:
+                    continue
+                else:
+                    break
+            # This will execute if the position that caused the for loop to
+            # break is the bishop itself, otherwise this does not execute.
+            # Or the queen. Same thing.
+            if np.array_equal(cur_pos, pos):
+                return True
+
+    return False

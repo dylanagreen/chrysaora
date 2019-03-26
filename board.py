@@ -100,6 +100,26 @@ class Board():
                 return []
         return new_moves
 
+
+    def disambiguate_moves(self, moves):
+        # Shortcut for if there's no possible moves being disambiguated.
+        if len(moves) == 0:
+            return []
+        moves = np.asarray(moves)
+        unique, counts = np.unique(moves[...,0], return_counts=True)
+
+        duplicates = unique[counts > 1]
+
+        moves2 = []
+        for i, m in enumerate(moves):
+            if m[0] in duplicates:
+                moves2.append(m[1])
+            else:
+                moves2.append(m[0])
+
+        return moves2
+
+
     def generate_pawn_moves(self, color):
         # Mult required to simplify finding algorithm.
         # Could use piece here instead, but in the end there are the
@@ -175,6 +195,7 @@ class Board():
                 else:
                     end_states.append(rowcolumn_to_algebraic(pos, end, 1))
 
+        end_states = self.disambiguate_moves(end_states)
         return end_states
 
 
@@ -204,9 +225,10 @@ class Board():
                 cond1 = np.sum(end1 > 7) == 0 and np.sum(end1 < 0) == 0
                 cond2 = np.sum(end2 > 7) == 0 and np.sum(end2 < 0) == 0
 
-                # This adds to the condition that the end square must not be occupied by a piece of the same
-                # color. Since white is always >0 we require the end square to be empty (==0) or occupied
-                # by black (<0)
+                # This adds to the condition that the end square must not be
+                # occupied by a piece of the same color. Since white is
+                # always >0 we require the end square to be empty (==0) or
+                # occupied by black (<0)
                 cond1 = cond1 and s1[end1[0], end1[1]] <= 0
                 cond2 = cond2 and s1[end2[0], end2[1]] <= 0
 
@@ -220,6 +242,7 @@ class Board():
                 if cond2:
                     end_states.append(rowcolumn_to_algebraic(pos, end2, 3))
 
+        end_states = self.disambiguate_moves(end_states)
         return end_states
 
 
@@ -286,6 +309,7 @@ class Board():
                         end = [pos[0] + (i * sign), pos[1]]
                     end_states.append(rowcolumn_to_algebraic(pos, end, piece_val))
 
+        end_states = self.disambiguate_moves(end_states)
         return end_states
 
 
@@ -344,6 +368,7 @@ class Board():
 
                     i = i + 1
 
+        end_states = self.disambiguate_moves(end_states)
         return end_states
 
     def generate_queen_moves(self, color):
@@ -390,6 +415,7 @@ class Board():
                     continue
                 end_states.append(rowcolumn_to_algebraic(king, end, 6))
 
+        end_states = self.disambiguate_moves(end_states)
         return end_states
 
     def generate_castle_moves(self, color):
@@ -526,7 +552,6 @@ class Board():
                 place((rank, 2), piece_number["K"])
                 place((rank, 3), piece_number["R"])
                 return new_state
-
 
         locs = []
         ranks = []
@@ -669,19 +694,32 @@ class Board():
 def rowcolumn_to_algebraic(start, end, piece, promotion=None):
     piece_names = {1:"P", 2:"R", 3:"N", 4:"B", 5:"Q", 6:"K"}
 
-    alg = []
+    # Alg2 fully disambiguates
+    alg1 = []
+    alg2 = []
 
     # Don't need to append pawn name
     if piece > 1:
-        alg.append(piece_names[np.abs(piece)]) # Piece Name
-    alg.append(ascii_lowercase[end[1]]) # End File = x
-    alg.append(str(8 - end[0])) # End Rank = y
+        alg1.append(piece_names[np.abs(piece)]) # Piece Name
+        alg2.append(piece_names[np.abs(piece)])
+
+    alg2.append(ascii_lowercase[start[1]]) # File = x
+    alg2.append(str(8 - start[0])) # Rank = y
+
+    alg1.append(ascii_lowercase[end[1]]) # End File = x
+    alg1.append(str(8 - end[0])) # End Rank = y
+
+    alg2.append(ascii_lowercase[end[1]]) # End File = x
+    alg2.append(str(8 - end[0])) # End Rank = y
 
     if promotion:
-        alg.append("=")
-        alg.append(piece_names[np.abs(promotion)])
+        alg1.append("=")
+        alg1.append(piece_names[np.abs(promotion)])
 
-    return "".join(alg)
+        alg2.append("=")
+        alg2.append(piece_names[np.abs(promotion)])
+
+    return ("".join(alg1), "".join(alg2))
 
 
 def load_fen(fen):

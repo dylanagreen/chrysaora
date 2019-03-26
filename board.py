@@ -62,9 +62,27 @@ class Board():
         bishops = self.generate_bishop_moves(color)
         queens = self.generate_queen_moves(color)
         kings = self.generate_king_moves(color)
-        castline = self.generate_castle_moves(color)
+        castling = self.generate_castle_moves(color)
 
-        return pawns+knights+rooks+bishops+queens+kings
+        total_moves = pawns+knights+rooks+bishops+queens+kings+castling
+
+        new_moves = []
+        # M for move, s for state
+        # This removes moves where the ending state is in check.
+        # Becuase you're not allowed to move into check.
+        # This has the double bonus of removing moves that don't get you
+        # out of check as well. Neat.
+        for m in total_moves:
+            s = self.algebraic_to_boardstate(m)
+            check = is_in_check(s, self.to_move)
+
+            # I could remove it from the old list, but doing so while iterating
+            # is dangerous. Plus, remove() requires a search, which increases
+            # the run time much more than an append.
+            if not check:
+                new_moves.append(m)
+
+        return new_moves
 
     def generate_pawn_moves(self, color):
         # Mult required to simplify finding algorithm.
@@ -366,11 +384,11 @@ class Board():
         kingside = "WKR" if color.value else "BKR"
 
         end_states = []
-        if castling_dict[kingside] and np.sum(self.current_state[rank, 5:7])== 0:
+        if self.castle_dict[kingside] and np.sum(self.current_state[rank, 5:7])== 0:
             end_states.append("O-O")
 
-        queenside = "QKR" if color.value else "QKR"
-        if castling_dict[queenside] and np.sum(self.current_state[rank, 1:4])== 0:
+        queenside = "WQR" if color.value else "BQR"
+        if self.castle_dict[queenside] and np.sum(self.current_state[rank, 1:4])== 0:
             end_states.append("O-O-O")
 
         return end_states
@@ -515,7 +533,6 @@ class Board():
             raise ValueError("You tried to make an illegal move.")
             return self.current_state
 
-
         # Always true, no matter how long locs is at this point (1 or 2)
         # If it's one then that's just the destination
         # If it's two then the first is the start, and the second is the end.
@@ -556,18 +573,19 @@ class Board():
         y = y.reshape(len(y), 1)
         starts = np.append(x, y, axis=1)
 
-        piece = piece * mult
+        # Need this to be separate or the if blocks don't trigger.
+        end_piece = piece * mult
         for s in starts:
             # Partial disambiguation cases first
             if len(files) > 1:
                 startfile = ascii_lowercase.index(files[0]) # End File = x
                 if s[1] == startfile:
-                    return move_piece(s, end, piece)
+                    return move_piece(s, end, end_piece)
                 continue
             elif len(ranks) > 1:
                 startrank = 8 - int(ranks[0]) # End Rank = y
                 if s[0] == startrank:
-                    return move_piece(s, end, piece)
+                    return move_piece(s, end, end_piece)
                 continue
 
             # Pawns
@@ -575,24 +593,27 @@ class Board():
                 # Direction the pawn would move.
                 d = -1 if self.to_move.value else 1
 
+
                 # The only time we ever need to check for taking since the
                 # piece moves differently. Also if we got here only one
                 # pawn should be able to take, since we dealt with
                 # disambiguation already.
                 if "x" in move:
                     # Takes going to the right diagonally
-                    if s[0] + d == end[0] and s[1] + 1 == end[1]:
-                        return move_piece(s, end, piece)
+                    if np.array_equal(s[0] + d, end[0]) and s[1] + 1 == end[1]:
+                        return move_piece(s, end, end_piece)
                     # Takes going to the left diagonally
                     elif s[0] + d == end[0] and s[1] - 1 == end[1]:
-                        return move_piece(s, end, piece)
+                        return move_piece(s, end, end_piece)
                 elif  s[0] + d == end[0] and s[1] == end[1]:
-                    return move_piece(s, end, piece)
+                    return move_piece(s, end, end_piece)
+                elif  s[0] + (2 * d) == end[0] and s[1] == end[1]:
+                    return move_piece(s, end, end_piece)
             # Rooks (and straight Queens)
             if piece == 2 or piece == 5:
                 # If this rook is on the rank or file then it's the correct one
                 if s[0] == end[0] or s[1] == end[1]:
-                    return move_piece(s, end, piece)
+                    return move_piece(s, end, end_piece)
 
             # Bishops (and diagonal Queens)
             if piece == 4 or piece == 5:
@@ -602,7 +623,7 @@ class Board():
                 diag = diag / np.max(diag)
 
                 if np.array_equal(diag, [1, 1]):
-                    return move_piece(s, end, piece)
+                    return move_piece(s, end, end_piece)
             # Knights
             if piece == 3:
                 # Finds the slope of the line between start and end
@@ -610,14 +631,14 @@ class Board():
                 slope = np.abs(end-s)
                 slope = slope / np.min(slope)
                 if np.array_equal(slope, [1, 2]) or np.array_equal(slope, [2, 1]):
-                    return move_piece(s, end, piece)
+                    return move_piece(s, end, end_piece)
             if piece == 6:
                 #If the distance between s and end is 1 then the king can
                 # get here. You should only have one king so I don't know why
                 # I check this but if you pass a move where a king tries to
                 # move two spaces then I guess this will catch it.
                 if np.sum(np.abs(s - end)) == 1:
-                    return move_piece(s, end, piece)
+                    return move_piece(s, end, end_piece)
 
         raise ValueError("You tried to make an illegal move.")
         return self.current_state
@@ -646,9 +667,7 @@ def load_fen(fen):
                 "p":-1, "r":-2, "n":-3, "b":-4, "q":-5, "k":-6}
 
     fields = fen.split(' ')
-
     rows = fields[0].split('/')
-
     board = []
     # Iterates over each row
     for r in rows:
@@ -673,7 +692,9 @@ def load_fen(fen):
             break
         castle_dict[castle_names[c]] = True
 
-    return Board(board, castle_dict)
+    to_move = Color.WHITE if fields[1] == "w" else Color.BLACK
+
+    return Board(board, castle_dict, to_move)
 
 
 def is_in_check(state, color):
@@ -694,7 +715,9 @@ def is_in_check(state, color):
 
     # Check pawns first because they're the easiest.
     pawn = -1 if color.value else 1
-    if state[king[0] - d, king[1] - 1] == pawn or state[king[0] - d, king[1] + 1] == pawn:
+    if king[1] - 1 >= 0 and state[king[0] - d, king[1] - 1] == pawn:
+        return True
+    elif king[1] + 1 < 8 and state[king[0] - d, king[1] + 1] == pawn:
         return True
 
     mult = -1 * mult

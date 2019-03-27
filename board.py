@@ -64,6 +64,7 @@ class Board():
             self.to_move = Color.WHITE
 
         self.status = Status.IN_PROGRESS
+        self.move_list = []
 
     def generate_moves(self, color):
         """Generate all possible moves for a given color
@@ -531,10 +532,12 @@ class Board():
             else:
                 self.status = Status.BLACK_VICTORY
         self.to_move = Color.BLACK if self.to_move.value else Color.WHITE
+        self.move_list.append(move)
 
 
     def unmake_move(self):
         self.current_state = np.copy(self.game_states.pop(-1))
+        self.move_list.pop(-1) # Take the last move off the move list as well.
 
 
     def algebraic_to_boardstate(self, move):
@@ -708,6 +711,26 @@ class Board():
 
         raise ValueError("You tried to make an illegal move.")
         return self.current_state
+
+
+    def __str__(self):
+        s = ""
+        for y in range(0, 8):
+            for x in range(0, 8):
+                loc = self.current_state[y, x]
+                # Black is supposed to be lower case hence this
+                # if block differentiating between the two.
+                if loc < 0:
+                    s = s + self.piece_names[np.abs(loc)].lower()
+                elif loc > 0:
+                    s = s + self.piece_names[loc]
+                else:
+                    s = s + "."
+                # This space makes it look nice
+                s = s + " "
+            # End of line new line.
+            s = s + "\n"
+        return s
 
 
 def rowcolumn_to_algebraic(start, end, piece, promotion=None):
@@ -922,4 +945,5 @@ def is_in_check(state, color):
     return False
 
 if __name__ == "__main__":
-    load_pgn("anderssen_kieseritzky_1851.pgn")
+    board = Board(None, None, None)
+    print(str(board))

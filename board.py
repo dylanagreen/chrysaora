@@ -889,7 +889,6 @@ def is_in_check(state, color):
         # the knight can't get the king anyway.
         if slope[1] == 0 or slope[0] == 0:
             continue
-        slope = slope / np.min(slope)
         if np.array_equal(slope, [1, 2]) or np.array_equal(slope, [2, 1]):
             return True
 

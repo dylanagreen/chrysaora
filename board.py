@@ -1,6 +1,7 @@
 import xml.etree.ElementTree as ET
 from enum import Enum
 from string import ascii_lowercase
+from datetime import date
 import os.path
 import re
 
@@ -804,8 +805,12 @@ def load_fen(fen):
     return Board(board, castle_dict, to_move)
 
 
-def load_pgn(name):
-    loc = os.path.join("games", name)
+def load_pgn(name, loc="games"):
+    # In case you pass the name without .pgn at the end.
+    if not name.endswith(".pgn"):
+        name = name + ".pgn"
+
+    loc = os.path.join(loc, name)
     if not os.path.isfile(loc):
         print("PGN not found!")
         return
@@ -860,6 +865,47 @@ def load_pgn(name):
 
 def save_pgn(board):
     moves = board.move_list
+    headers = board.headers
+
+    # This checks if the headers is empty since we initialize to empty dicts.
+    empty = not headers
+    no_moves = moves is None
+
+    if not empty:
+        name = headers["White"] + "vs" + headers["Black"] + headers["Date"] + ".pgn"
+    else:
+        name = "???vs???" + str(date.today()) + ".pgn"
+    loc = "results/"
+
+    if not os.path.exists(loc):
+        os.makedirs(loc)
+
+    # This actually writes everything to the file.
+    with open(os.path.join(loc, name), "w") as f:
+        if not empty:
+            for k, v in headers.items():
+                line = "[" + k + " " + "\"" + v + "\"" + "]\n"
+                f.write(line)
+
+        # Inserts a blank line between the headers and the move line.
+        f.write("\n")
+        if not no_moves:
+            for i, m in enumerate(moves):
+                line = str(m) + " "
+                if i % 2 == 0:
+                    move_num = int(i / 2 + 1)
+                    line = str(move_num) + ". " + line
+
+                f.write(line)
+
+        # Writes the result at the end of the PGN or * for ongoing game.
+        if not empty and "Result" in headers:
+            f.write(headers["Result"])
+        else:
+            f.write("*")
+
+    return name
+
 
 
 def is_in_check(state, color):
@@ -963,5 +1009,5 @@ def is_in_check(state, color):
     return False
 
 if __name__ == "__main__":
-    board = Board(None, None, None)
-    print(str(board))
+    b = load_pgn("anderssen_kieseritzky_1851.pgn")
+    save_pgn(b)

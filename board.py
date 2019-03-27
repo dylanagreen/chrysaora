@@ -30,7 +30,7 @@ class Board():
 
     """
 
-    def __init__(self, state, castle_dict, to_move):
+    def __init__(self, state, castle_dict, to_move, headers=None):
 
         if state is not None:
             self.current_state = state
@@ -65,6 +65,11 @@ class Board():
 
         self.status = Status.IN_PROGRESS
         self.move_list = []
+
+        if headers is not None:
+            self.headers = headers
+        else:
+            self.headers = {}
 
     def generate_moves(self, color):
         """Generate all possible moves for a given color
@@ -599,7 +604,7 @@ class Board():
             raise ValueError("You tried to make an illegal move.")
             return self.current_state
 
-        if len(locs) <= 0 or len(locs) >= 3:
+        if len(locs) == 0 or len(locs) >= 3:
             raise ValueError("You tried to make an illegal move.")
             return self.current_state
 
@@ -808,11 +813,18 @@ def load_pgn(name):
     # We're going to extract the text into a single string so we need to append
     # lines here into this array.
     game_line = []
+    tags = {}
     with open(loc, 'r') as f:
         for line in f:
             line = line.rstrip()
             if not line.startswith("["):
-               game_line.append(line + " ")
+                game_line.append(line + " ")
+            # This parses the tags by stripping the [] and then splitting on
+            # the quotes surrounding the value.
+            else:
+                line = line.strip("[]")
+                pair = line.split("\"")
+                tags[pair[0].rstrip()] = pair[1]
     game_line = "".join(game_line)
 
     # Removes the comments in the PGN, one at a time.
@@ -835,14 +847,20 @@ def load_pgn(name):
             if s:
                 plies.append(s)
 
+    # Pop off the last ply (the game result)
     plies.pop(-1)
 
     # Makes all the moves and then returns the board state at the end.
-    b = Board(None, None, None)
+    b = Board(None, None, None, headers=tags)
     for ply in plies:
         b.make_move(ply)
 
     return b
+
+
+def save_pgn(board):
+    moves = board.move_list
+
 
 def is_in_check(state, color):
     # The direction a pawn must travel to take this color's king.

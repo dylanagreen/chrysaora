@@ -14,6 +14,14 @@ class Color(Enum):
     BLACK = False
 
 
+# Enum for game status
+class Status(Enum):
+    IN_PROGRESS = 0
+    DRAW = 1
+    WHITE_VICTORY = 2
+    BLACK_VICTORY = 3
+
+
 class Board():
     """The board state.
 
@@ -55,8 +63,7 @@ class Board():
         else:
             self.to_move = Color.WHITE
 
-        self.white_checkmate = False
-        self.black_checkmate = False
+        self.status = Status.IN_PROGRESS
 
     def generate_moves(self, color):
         """Generate all possible moves for a given color
@@ -94,12 +101,13 @@ class Board():
         if len(new_moves) == 0:
             check = is_in_check(self.current_state, color)
             if check:
-                if self.to_move.value:
-                    self.white_checkmate = True
+                if self.to_move == Color.WHITE:
+                    self.status = Status.BLACK_VICTORY
                 else:
-                    self.black_checkmate = True
+                    self.status = Status.WHITE_VICTORY
                 return []
             else:
+                self.status = Status.DRAW
                 return []
         return new_moves
 
@@ -518,10 +526,10 @@ class Board():
                 self.castle_dict["WKR"] = False
 
         if move.endswith("#"):
-            if self.to_move.value:
-                self.black_checkmate = True
+            if self.to_move == Color.WHITE:
+                self.status = Status.WHITE_VICTORY
             else:
-                self.white_checkmate = True
+                self.status = Status.BLACK_VICTORY
         self.to_move = Color.BLACK if self.to_move.value else Color.WHITE
 
 
@@ -566,22 +574,27 @@ class Board():
         ranks = []
         files = []
         piece = "P" # Default to pawn, this generally be changed.
-        for i, c in enumerate(move):
-            # Appends a found [rank] character
-            if c.islower():
-                # We use a lower case x for taking so I have to exclude it.
-                if not c == "x":
-                    files.append(c)
-                # This is a full move, [rank][file]
-                if move[i+1].isdigit():
-                    locs.append(move[i:i+2])
-            # A [file] character
-            if c.isdigit():
-                ranks.append(c)
-            # A [piece] character
-            # If we have an = then this is the piece the pawn promotes to.
-            if c.isupper():
-                piece = c
+        try:
+            for i, c in enumerate(move):
+                # Appends a found [rank] character
+                if c.islower():
+                    # We use a lower case x for taking so I have to exclude it.
+                    if not c == "x":
+                        files.append(c)
+                        # This is a full move, [rank][file]
+                    if move[i+1].isdigit():
+                        locs.append(move[i:i+2])
+                # A [file] character
+                if c.isdigit():
+                    ranks.append(c)
+                # A [piece] character
+                # If we have an = then this is the piece the pawn promotes to.
+                if c.isupper():
+                    piece = c
+
+        except(IndexError):
+            raise ValueError("You tried to make an illegal move.")
+            return self.current_state
 
         if len(locs) <= 0 or len(locs) >= 3:
             raise ValueError("You tried to make an illegal move.")
@@ -617,7 +630,6 @@ class Board():
             start = [startrank, startfile]
             return move_piece(start, end, piece)
 
-
         state = np.copy(self.current_state * mult)
 
         search = 1 if "=" in move else piece
@@ -645,7 +657,6 @@ class Board():
             if piece == 1:
                 # Direction the pawn would move.
                 d = -1 if self.to_move.value else 1
-
 
                 # The only time we ever need to check for taking since the
                 # piece moves differently. Also if we got here only one

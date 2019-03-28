@@ -86,26 +86,10 @@ class Board():
 
         total_moves = pawns+knights+rooks+bishops+queens+kings+castling
 
-        new_moves = []
-        # M for move, s for state
-        # This removes moves where the ending state is in check.
-        # Becuase you're not allowed to move into check.
-        # This has the double bonus of removing moves that don't get you
-        # out of check as well. Neat.
-        for m in total_moves:
-            s = self.algebraic_to_boardstate(m)
-            check = is_in_check(s, color)
-
-            # I could remove it from the old list, but doing so while iterating
-            # is dangerous. Plus, remove() requires a search, which increases
-            # the run time much more than an append.
-            if not check:
-                new_moves.append(m)
-
         # If there are no moves that get us out of check we need to see if
         # we're in check right now.
         # If we are that's check mate. If we're not... that's a stalemate.
-        if len(new_moves) == 0:
+        if len(total_moves) == 0:
             check = is_in_check(self.current_state, color)
             if check:
                 if self.to_move == Color.WHITE:
@@ -116,7 +100,7 @@ class Board():
             else:
                 self.status = Status.DRAW
                 return []
-        return new_moves
+        return total_moves
 
 
     def disambiguate_moves(self, moves):
@@ -126,6 +110,9 @@ class Board():
         moves = np.asarray(moves)
         unique, counts = np.unique(moves[...,0], return_counts=True)
 
+        # By using advanced indexing we receive a list of items that appear
+        # more than once in the ambiguous case list (the first item of the
+        # moves tuples)
         duplicates = unique[counts > 1]
 
         moves2 = []
@@ -136,6 +123,25 @@ class Board():
                 moves2.append(m[0])
 
         return moves2
+
+
+    def remove_moves_in_check(self, moves, color):
+        new_moves = []
+        # M for move, s for state
+        # This removes moves where the ending state is in check.
+        # Becuase you're not allowed to move into check.
+        # This has the double bonus of removing moves that don't get you
+        # out of check as well. Neat.
+        for m in moves:
+            s = self.algebraic_to_boardstate(m)
+            check = is_in_check(s, color)
+
+            # I could remove it from the old list, but doing so while iterating
+            # is dangerous. Plus, remove() requires a search, which increases
+            # the run time much more than an append.
+            if not check:
+                new_moves.append(m)
+        return new_moves
 
 
     def generate_pawn_moves(self, color):
@@ -166,11 +172,11 @@ class Board():
             if pos[0] == 4 + d:
                 if state[pos[0], pos[1] - 1] == -1 and previous_state[pos[0] + 2*d, pos[1] - 1] == -1:
                     end = [pos[0] + d, pos[1] - 1]
-                    end_states.append(rowcolumn_to_algebraic(pos, end, 1))
+                    end_states.append(self.row_column_to_algebraic(pos, end, 1))
 
                 elif state[pos[0], pos[1] + 1] == -1 and previous_state[pos[0] + 2*d, pos[1] + 1] == -1:
                     end = [pos[0] + d, pos[1] + 1]
-                    end_states.append(rowcolumn_to_algebraic(pos, end, 1))
+                    end_states.append(self.row_column_to_algebraic(pos, end, 1))
 
             # Makes sure the space in front of us is clear
             elif state[pos[0] + d, pos[1]] == 0:
@@ -181,16 +187,16 @@ class Board():
                 if pos[0] + d == endrank:
                     for i in range(2, 6):
                         end = [pos[0] + d, pos[1]]
-                        end_states.append(rowcolumn_to_algebraic(pos, end, 1, i))
+                        end_states.append(self.row_column_to_algebraic(pos, end, 1, i))
                 else:
                     # Add one move forward
                     end = [pos[0] + d,pos[1]]
-                    end_states.append(rowcolumn_to_algebraic(pos, end, 1))
+                    end_states.append(self.row_column_to_algebraic(pos, end, 1))
                 # We do the two forward next as an elif
                 # (7 + d)%7 = 1 if going down (dir = 1) or 6 (dir = -1)
                 if pos[0] == (7 + d) % 7 and state[pos[0] + 2*d, pos[1]] == 0:
                     end = [pos[0] + 2*d,pos[1]]
-                    end_states.append(rowcolumn_to_algebraic(pos, end, 1))
+                    end_states.append(self.row_column_to_algebraic(pos, end, 1))
 
             # Takes to the left
             if pos[1] - 1 > -1 and state[pos[0] + d, pos[1] - 1] < 0:
@@ -199,9 +205,9 @@ class Board():
                 # Promotion upon taking
                 if pos[0] + d == endrank:
                     for i in range(2, 6):
-                        end_states.append(rowcolumn_to_algebraic(pos, end, 1, i))
+                        end_states.append(self.row_column_to_algebraic(pos, end, 1, i))
                 else:
-                    end_states.append(rowcolumn_to_algebraic(pos, end, 1))
+                    end_states.append(self.row_column_to_algebraic(pos, end, 1))
 
             # Takes to the right
             if pos[1] + 1 < 8 and state[pos[0] + d, pos[1] + 1] < 0:
@@ -210,11 +216,12 @@ class Board():
                 # Promotion upon taking
                 if pos[0] + d == endrank:
                     for i in range(2, 6):
-                        end_states.append(rowcolumn_to_algebraic(pos, end, 1, i))
+                        end_states.append(self.row_column_to_algebraic(pos, end, 1, i))
                 else:
-                    end_states.append(rowcolumn_to_algebraic(pos, end, 1))
+                    end_states.append(self.row_column_to_algebraic(pos, end, 1))
 
         end_states = self.disambiguate_moves(end_states)
+        end_states = self.remove_moves_in_check(end_states, color)
         return end_states
 
 
@@ -255,13 +262,14 @@ class Board():
                 # are actually on the board.
                 # The first knight position
                 if cond1:
-                    end_states.append(rowcolumn_to_algebraic(pos, end1, 3))
+                    end_states.append(self.row_column_to_algebraic(pos, end1, 3))
 
                 # Second possible knight position
                 if cond2:
-                    end_states.append(rowcolumn_to_algebraic(pos, end2, 3))
+                    end_states.append(self.row_column_to_algebraic(pos, end2, 3))
 
         end_states = self.disambiguate_moves(end_states)
+        end_states = self.remove_moves_in_check(end_states, color)
         return end_states
 
 
@@ -326,9 +334,10 @@ class Board():
                         end = [pos[0], pos[1] + (i * sign)]
                     else:
                         end = [pos[0] + (i * sign), pos[1]]
-                    end_states.append(rowcolumn_to_algebraic(pos, end, piece_val))
+                    end_states.append(self.row_column_to_algebraic(pos, end, piece_val))
 
         end_states = self.disambiguate_moves(end_states)
+        end_states = self.remove_moves_in_check(end_states, color)
         return end_states
 
 
@@ -383,11 +392,12 @@ class Board():
                         break
 
                     # This puts the piece in its new place
-                    end_states.append(rowcolumn_to_algebraic(pos, end, piece_val))
+                    end_states.append(self.row_column_to_algebraic(pos, end, piece_val))
 
                     i = i + 1
 
         end_states = self.disambiguate_moves(end_states)
+        end_states = self.remove_moves_in_check(end_states, color)
         return end_states
 
     def generate_queen_moves(self, color):
@@ -416,8 +426,8 @@ class Board():
         x = x.reshape(len(x), 1)
         y = y.reshape(len(y), 1)
 
-        # You shouldn't need a loop, because why would you have more than 1 king?
-        # Just reshape instead
+        # You shouldn't need a loop, because why would you have more than 1
+        # king? Just reshape instead
         king = np.append(x,y,axis=1).reshape(2)
 
         shifts = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1],
@@ -432,19 +442,20 @@ class Board():
                 # Can't take our own pieces, so don't add it as a board pos
                 if state[end[0], end[1]] > 0:
                     continue
-                end_states.append(rowcolumn_to_algebraic(king, end, 6))
+                end_states.append(self.row_column_to_algebraic(king, end, 6))
 
         end_states = self.disambiguate_moves(end_states)
+        end_states = self.remove_moves_in_check(end_states, color)
         return end_states
 
     def generate_castle_moves(self, color):
         # Hardcoded because you can only castle from starting positions.
         # Basically just need to check that the files between the king and
         # the rook are clear, then return the castling algebraic (O-O or O-O-O)
-        rank = 0 - int(color.value) # 0 for Black, -1 for White
-        kingside = "WKR" if color.value else "BKR"
-
         end_states = []
+
+        rank = 7 if color.value else 0 # 0 for Black, 7 for White
+        kingside = "WKR" if color.value else "BKR"
         if self.castle_dict[kingside] and np.sum(self.current_state[rank, 5:7])== 0:
             end_states.append("O-O")
 
@@ -550,6 +561,22 @@ class Board():
         self.move_list.pop(-1) # Take the last move off the move list as well.
 
 
+    def check_move_legality(self, move):
+        # Castling is the easiest to check for legality.
+        # Kingside castling
+        if move == "O-O" or move == "0-0":
+            check = "WKR" if self.to_move.value else "BKR"
+            rank = 7 if self.to_move.value else 0
+            if self.castle_dict[check] and np.sum(self.current_state[rank, 5:7])== 0:
+                return True
+        # Queenside castling
+        elif move == "O-O-O" or move == "0-0-0":
+            check = "WQR" if self.to_move.value else "BQR"
+            rank = 7 if self.to_move.value else 0
+            # Need to make sure this is allowed
+            if self.castle_dict[check] and np.sum(self.current_state[rank, 1:4])== 0:
+                return True
+
     def algebraic_to_boardstate(self, move):
         # Reverse piece -> number dictionary
         piece_number = {v: k for k, v in self.piece_names.items()}
@@ -645,8 +672,8 @@ class Board():
 
         state = np.copy(self.current_state * mult)
 
-        search = 1 if "=" in move else piece
-        x, y = np.where(state==search)
+        start_piece = 1 if "=" in move else piece
+        x, y = np.where(state==start_piece)
         x = x.reshape(len(x), 1)
         y = y.reshape(len(y), 1)
         starts = np.append(x, y, axis=1)
@@ -667,7 +694,7 @@ class Board():
                 continue
 
             # Pawns
-            if piece == 1:
+            if start_piece == 1:
                 # Direction the pawn would move.
                 d = -1 if self.to_move.value else 1
 
@@ -687,13 +714,13 @@ class Board():
                 elif  s[0] + (2 * d) == end[0] and s[1] == end[1]:
                     return move_piece(s, end, end_piece)
             # Rooks (and straight Queens)
-            if piece == 2 or piece == 5:
+            if start_piece == 2 or start_piece == 5:
                 # If this rook is on the rank or file then it's the correct one
                 if s[0] == end[0] or s[1] == end[1]:
                     return move_piece(s, end, end_piece)
 
             # Bishops (and diagonal Queens)
-            if piece == 4 or piece == 5:
+            if start_piece == 4 or start_piece == 5:
                 # Finds the slope of the line between start and end
                 # If it's 1,1 we know it's a good diagonal.
                 diag = np.abs(s - end)
@@ -702,13 +729,13 @@ class Board():
                 if np.array_equal(diag, [1, 1]):
                     return move_piece(s, end, end_piece)
             # Knights
-            if piece == 3:
+            if start_piece == 3:
                 # Finds the slope of the line between start and end
                 # If it's 1,2 or 2,1 it's a good knight move
                 slope = np.abs(end-s)
                 if np.array_equal(slope, [1, 2]) or np.array_equal(slope, [2, 1]):
                     return move_piece(s, end, end_piece)
-            if piece == 6:
+            if start_piece == 6:
                 #If the distance between s and end is 1 then the king can
                 # get here. You should only have one king so I don't know why
                 # I check this but if you pass a move where a king tries to
@@ -718,7 +745,6 @@ class Board():
                 dist = np.abs(s - end)
                 if dist[0] == 1 or dist[1] == 1:
                     return move_piece(s, end, end_piece)
-
         raise ValueError("You tried to make an illegal move.")
         return self.current_state
 
@@ -743,35 +769,44 @@ class Board():
         return s
 
 
-def rowcolumn_to_algebraic(start, end, piece, promotion=None):
-    piece_names = {1:"P", 2:"R", 3:"N", 4:"B", 5:"Q", 6:"K"}
+    def row_column_to_algebraic(self, start, end, piece, promotion=None):
+        piece_names = {1:"P", 2:"R", 3:"N", 4:"B", 5:"Q", 6:"K"}
 
-    # Alg2 fully disambiguates
-    alg1 = []
-    alg2 = []
+        # Alg2 fully disambiguates
+        alg1 = []
+        alg2 = []
 
-    # Don't need to append pawn name
-    if piece > 1:
-        alg1.append(piece_names[np.abs(piece)]) # Piece Name
-        alg2.append(piece_names[np.abs(piece)])
+        # Don't need to append pawn name
+        if piece > 1:
+            alg1.append(piece_names[np.abs(piece)]) # Piece Name
+            alg2.append(piece_names[np.abs(piece)])
 
-    alg2.append(ascii_lowercase[start[1]]) # File = x
-    alg2.append(str(8 - start[0])) # Rank = y
+        # Since alg 2 fully disambiguates we append file and rank to it to start.
+        alg2.append(ascii_lowercase[start[1]]) # File = x
+        alg2.append(str(8 - start[0])) # Rank = y
 
-    alg1.append(ascii_lowercase[end[1]]) # End File = x
-    alg1.append(str(8 - end[0])) # End Rank = y
+        if not self.current_state[end[0], end[1]] == 0:
+            # On pawn capures alg notation requires including the starting file.
+            if piece == 1:
+                alg1.append(ascii_lowercase[start[1]])
+            alg1.append("x")
+            alg2.append("x")
 
-    alg2.append(ascii_lowercase[end[1]]) # End File = x
-    alg2.append(str(8 - end[0])) # End Rank = y
+        # We here append the ending position to the move.
+        alg1.append(ascii_lowercase[end[1]]) # End File = x
+        alg1.append(str(8 - end[0])) # End Rank = y
 
-    if promotion:
-        alg1.append("=")
-        alg1.append(piece_names[np.abs(promotion)])
+        alg2.append(ascii_lowercase[end[1]]) # End File = x
+        alg2.append(str(8 - end[0])) # End Rank = y
 
-        alg2.append("=")
-        alg2.append(piece_names[np.abs(promotion)])
+        if promotion:
+            alg1.append("=")
+            alg1.append(piece_names[np.abs(promotion)])
 
-    return ("".join(alg1), "".join(alg2))
+            alg2.append("=")
+            alg2.append(piece_names[np.abs(promotion)])
+
+        return ("".join(alg1), "".join(alg2))
 
 
 def load_fen(fen):
@@ -935,6 +970,12 @@ def is_in_check(state, color):
     elif king[1] + 1 < 8 and state[king[0] - d, king[1] + 1] == pawn:
         return True
 
+    # Checks if you'd be in check from the opposite king.
+    # This should only trigger on you moving your king into that position.
+    opposite_king = -6 if color.value else 6
+    if opposite_king in state[king[0] - 1:king[0] + 2, king[1] - 1:king[1] + 2]:
+        return True
+
     mult = -1 * mult
     x, y = np.where(state*mult==2)
     x = x.reshape(len(x), 1)
@@ -993,7 +1034,7 @@ def is_in_check(state, color):
     for pos in np.append(bishops, queens, axis=0):
         # First we check that the piece is even on a diagonal from the king.
         slope = pos-king
-        slope = slope / np.max(slope)
+        slope = slope / np.max(np.abs(slope))
         if np.array_equal(np.abs(slope), [1, 1]):
             # Now we have to check that the space between the two is empty.
             for i in range(1, 7):

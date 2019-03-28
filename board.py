@@ -510,8 +510,12 @@ class Board():
             if c.isupper():
                 piece = c
 
+        # Since queenside is the same as kingside with an extra -O on the end
+        # we can just check that the kingside move is in the move.
+        castle_move = "O-O" in move or "0-0" in move
+
         # Updates the castle dict for castling rights.
-        if piece == "K":
+        if piece == "K" or castle_move:
             if self.to_move.value:
                 self.castle_dict["WKR"] = False
                 self.castle_dict["WQR"] = False

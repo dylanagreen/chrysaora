@@ -46,4 +46,8 @@ if __name__ == "__main__":
             print("Saving board pgn.")
             board.save_pgn(current_board)
             break
+    else:
+        print("Game complete!")
+        print("Saving board pgn.")
+        board.save_pgn(current_board)
 

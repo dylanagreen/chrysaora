@@ -73,9 +73,6 @@ class Board():
             self.headers = {}
 
     def generate_moves(self, color):
-        """Generate all possible moves for a given color
-        """
-
         pawns = self.generate_pawn_moves(color)
         knights = self.generate_knight_moves(color)
         rooks = self.generate_rook_moves(color)
@@ -86,20 +83,6 @@ class Board():
 
         total_moves = pawns+knights+rooks+bishops+queens+kings+castling
 
-        # If there are no moves that get us out of check we need to see if
-        # we're in check right now.
-        # If we are that's check mate. If we're not... that's a stalemate.
-        if len(total_moves) == 0:
-            check = is_in_check(self.current_state, color)
-            if check:
-                if self.to_move == Color.WHITE:
-                    self.status = Status.BLACK_VICTORY
-                else:
-                    self.status = Status.WHITE_VICTORY
-                return []
-            else:
-                self.status = Status.DRAW
-                return []
         return total_moves
 
 
@@ -133,7 +116,7 @@ class Board():
         # This has the double bonus of removing moves that don't get you
         # out of check as well. Neat.
         for m in moves:
-            s = self.algebraic_to_boardstate(m)
+            s = self.long_algebraic_to_boardstate(m[1])
             check = is_in_check(s, color)
 
             # I could remove it from the old list, but doing so while iterating
@@ -170,13 +153,23 @@ class Board():
             # is a piece directly in front of our pawn.
             # However, requires the pawn on row 5 (from bottom)
             if pos[0] == 4 + d:
-                if state[pos[0], pos[1] - 1] == -1 and previous_state[pos[0] + 2*d, pos[1] - 1] == -1:
-                    end = [pos[0] + d, pos[1] - 1]
-                    end_states.append(self.row_column_to_algebraic(pos, end, 1))
+                # Don't check en passant on the left if we're on the first file
+                # Similarly don't check to the right if we're on the last file
+                left_allowed = pos[1] > 0
+                right_allowed = pos[1] < 7
+                if left_allowed:
+                    pawn_on_left = state[pos[0], pos[1] - 1] == -1
+                    pawn_moved_two = previous_state[pos[0] + 2*d, pos[1] - 1] == -1
+                    if pawn_on_left and pawn_moved_two:
+                        end = [pos[0] + d, pos[1] - 1]
+                        end_states.append(self.row_column_to_algebraic(pos, end, 1))
 
-                elif state[pos[0], pos[1] + 1] == -1 and previous_state[pos[0] + 2*d, pos[1] + 1] == -1:
-                    end = [pos[0] + d, pos[1] + 1]
-                    end_states.append(self.row_column_to_algebraic(pos, end, 1))
+                if right_allowed:
+                    pawn_on_right = state[pos[0], pos[1] + 1] == -1
+                    pawn_moved_two = previous_state[pos[0] + 2*d, pos[1] + 1] == -1
+                    if pawn_on_right and pawn_moved_two:
+                        end = [pos[0] + d, pos[1] + 1]
+                        end_states.append(self.row_column_to_algebraic(pos, end, 1))
 
             # Makes sure the space in front of us is clear
             elif state[pos[0] + d, pos[1]] == 0:
@@ -220,8 +213,8 @@ class Board():
                 else:
                     end_states.append(self.row_column_to_algebraic(pos, end, 1))
 
-        end_states = self.disambiguate_moves(end_states)
         end_states = self.remove_moves_in_check(end_states, color)
+        end_states = self.disambiguate_moves(end_states)
         return end_states
 
 
@@ -268,8 +261,8 @@ class Board():
                 if cond2:
                     end_states.append(self.row_column_to_algebraic(pos, end2, 3))
 
-        end_states = self.disambiguate_moves(end_states)
         end_states = self.remove_moves_in_check(end_states, color)
+        end_states = self.disambiguate_moves(end_states)
         return end_states
 
 
@@ -336,8 +329,8 @@ class Board():
                         end = [pos[0] + (i * sign), pos[1]]
                     end_states.append(self.row_column_to_algebraic(pos, end, piece_val))
 
-        end_states = self.disambiguate_moves(end_states)
         end_states = self.remove_moves_in_check(end_states, color)
+        end_states = self.disambiguate_moves(end_states)
         return end_states
 
 
@@ -396,8 +389,8 @@ class Board():
 
                     i = i + 1
 
-        end_states = self.disambiguate_moves(end_states)
         end_states = self.remove_moves_in_check(end_states, color)
+        end_states = self.disambiguate_moves(end_states)
         return end_states
 
     def generate_queen_moves(self, color):
@@ -444,8 +437,8 @@ class Board():
                     continue
                 end_states.append(self.row_column_to_algebraic(king, end, 6))
 
-        end_states = self.disambiguate_moves(end_states)
         end_states = self.remove_moves_in_check(end_states, color)
+        end_states = self.disambiguate_moves(end_states)
         return end_states
 
     def generate_castle_moves(self, color):
@@ -510,7 +503,11 @@ class Board():
 
 
     def make_move(self, move):
-        new_state = self.algebraic_to_boardstate(move)
+        move = self.check_move_legality(move)
+        if move is None:
+            raise ValueError("You tried to make an illegal move!")
+            return
+        new_state = self.long_algebraic_to_boardstate(move)
         self.game_states.append(np.copy(self.current_state))
 
         self.current_state = np.copy(new_state)
@@ -518,7 +515,8 @@ class Board():
         piece = ""
         for i, c in enumerate(move):
             # If we have an = then this is the piece the pawn promotes to.
-            if c.isupper():
+            # Pawns can promote to rooks which would fubar the dict.
+            if c.isupper() and not "=" in move:
                 piece = c
 
         # Since queenside is the same as kingside with an extra -O on the end
@@ -547,11 +545,24 @@ class Board():
             elif diff[7, 7] == -2:
                 self.castle_dict["WKR"] = False
 
-        if move.endswith("#"):
-            if self.to_move == Color.WHITE:
-                self.status = Status.WHITE_VICTORY
-            else:
-                self.status = Status.BLACK_VICTORY
+        # The earliest possible checkmate is after 4 plies. No reason
+        # to check if it's check earlier than that.
+        if len(self.move_list) > 3:
+            # If there are no moves that get us out of check we need to see if
+            # we're in check right now.
+            # If we are that's check mate. If we're not... that's a stalemate.
+            color = Color.BLACK if self.to_move.value else Color.WHITE
+            responses = self.generate_moves(color)
+            if len(responses) == 0:
+                check = is_in_check(self.current_state, color)
+                if check:
+                    if self.to_move == Color.WHITE:
+                        self.status = Status.WHITE_VICTORY
+                    else:
+                        self.status = Status.BLACK_VICTORY
+                else:
+                    self.status = Status.DRAW
+                
         self.to_move = Color.BLACK if self.to_move.value else Color.WHITE
         self.move_list.append(move)
 
@@ -568,16 +579,220 @@ class Board():
             check = "WKR" if self.to_move.value else "BKR"
             rank = 7 if self.to_move.value else 0
             if self.castle_dict[check] and np.sum(self.current_state[rank, 5:7])== 0:
-                return True
+                return move
         # Queenside castling
         elif move == "O-O-O" or move == "0-0-0":
             check = "WQR" if self.to_move.value else "BQR"
             rank = 7 if self.to_move.value else 0
             # Need to make sure this is allowed
             if self.castle_dict[check] and np.sum(self.current_state[rank, 1:4])== 0:
-                return True
+                return move
 
-    def algebraic_to_boardstate(self, move):
+        # Reverse piece -> number dictionary
+        piece_number = {v: k for k, v in self.piece_names.items()}
+
+        ranks = []
+        files = []
+        piece = "P"
+        promotion_piece = "P"
+        # This block exists to ensure that more than two locations haven't
+        # been passed in.
+        # If more than one was passed we use it for disambiguation
+        try:
+            for i, c in enumerate(move):
+                # Appends a found [rank] character
+                if c.islower():
+                    # We use a lower case x for taking so I have to exclude it.
+                    if not c == "x":
+                        files.append(c)
+                # A [file] character
+                if c.isdigit():
+                    ranks.append(c)
+                # A [piece] character
+                # If we have an = then this is the piece the pawn promotes to
+                # So we want to ignore that.
+                if c.isupper() and not "=" in move:
+                    piece = c
+                if c.isupper() and "=" in move:
+                    promotion_piece = c
+        except(IndexError):
+            return None
+            
+        # This regex extracts all the locations in the move.
+        locs = re.findall("[a-h]\d+", move)
+        
+        # Ensures your move stays within the 8 ranks of the board.
+        for pos in locs:
+            if int(pos[1:]) > 8:
+                return None
+
+        dest = locs[-1]
+        endfile = ascii_lowercase.index(dest[0]) # End File = x
+        endrank = 8 - int(dest[1]) # End Rank = y
+        end = [endrank, endfile]
+
+        if len(locs) == 0 or len(locs) >= 3:
+            return None
+
+        mult = 1 if self.to_move.value else -1
+        piece_num = piece_number[piece] * mult
+        promotion_piece = piece_number[promotion_piece] * mult
+        pieces = self.find_piece(piece_num)
+        
+        # If we have any sort of disambiguation use that as our starting point.
+        # This allows us to trim the pieces we search through and find the
+        # correct correct one rather than the "first one allowed to make this
+        # move."
+        start = [None, None]
+        if len(locs) == 2:
+            dest = locs[0]
+            startfile = ascii_lowercase.index(dest[0]) # File = x
+            startrank = 8 - int(dest[1]) # Rank = y
+            start = [startrank, startfile]
+        elif len(files) == 2:
+            startfile = ascii_lowercase.index(files[0])
+            start[1] = startfile
+        elif len(ranks) == 2:
+            startrank = 8 - int(ranks[0])
+            start[0] = startrank
+            
+        good = []
+        if not np.array_equal(start, [None, None]):
+            for p in pieces:
+                if start[0] is None and p[1] == start[1]:
+                    good.append(p)
+                elif start[1] is None and p[0] == start[0]:
+                    good.append(p)
+                elif np.array_equal(p, start):
+                    good.append(p)
+                        
+            pieces = good
+
+        # Direction opposite that which the color's pawns move.
+        # So 1 is downwards, opposite White's pawns going upwards.
+        d = -1 if self.to_move.value else 1
+
+        # The starting file for the pawn row, for double move checking
+        pawn_start = 6 if self.to_move.value else 1
+        
+        # The ending rank for pawn promotion
+        pawn_end = 0 if self.to_move.value else 7
+        # Tried to put these in some sort of likelihood order.
+        
+        mult = 1 if self.to_move.value else -1
+        state = np.copy(self.current_state * mult)
+        
+        # This handy line of code prevents you from taking your own pieces.
+        if state[end[0], end[1]] > 0:
+            return None
+        
+        if piece == "P":
+            for pawn in pieces:
+                # First check where the ending position is empty
+                # Second condition is that the pawn is on the same rank
+                if state[end[0], end[1]] == 0 and pawn[1] == end[1]:
+                    promotion = end[0] == pawn_end
+                    if pawn[0] + d == end[0]:
+                        if promotion:
+                            return self.row_column_to_algebraic(pawn, end, piece_num, promotion_piece)[1]
+                        return self.row_column_to_algebraic(pawn, end, piece_num)[1]
+
+                    # Need to check the space between one move and two is empty.
+                    empty = self.current_state[pawn[0] + d, end[1]] == 0
+                    if pawn[0] + 2*d == end[0] and pawn[0] == pawn_start and empty:
+                        return self.row_column_to_algebraic(pawn, end, piece_num)[1]
+                if state[end[0], end[1]] < 0:
+                    if pawn[0] + d == end[0] and pawn[1] - 1 == end[1]:
+                        return self.row_column_to_algebraic(pawn, end, piece_num)[1]
+                    elif pawn[0] + d == end[0] and pawn[1] + 1 == end[1]:
+                        return self.row_column_to_algebraic(pawn, end, piece_num)[1]
+
+        elif piece == "N":
+            for knight in pieces:
+                slope = np.abs(knight - end)
+
+                # Avoids a divide by 0 error. If it's on the same rank or file
+                # it's illegal anyway.
+                if slope[1] == 0 or slope[0] == 0:
+                    continue
+                if np.array_equal(slope, [1, 2]) or np.array_equal(slope, [2, 1]):
+                    return self.row_column_to_algebraic(knight, end, piece_num)[1]
+            # Return None if we make it through all the knights without
+            # a legal move.
+            return None
+        elif piece == "R" or  piece == "Q":
+            for rook in pieces:
+                # Rooks on the same rank
+                if rook[0] == end[0]:
+                    # Checks that the range between the rook and the ending
+                    # is empty so the rook can actually slide there.
+                    if rook[1] > end[1]:
+                        empty = np.sum(self.current_state[end[0], end[1]+1:rook[1]])
+                        if empty == 0:
+                            return self.row_column_to_algebraic(rook, end, piece_num)[1]
+                    if rook[1] < end[1]:
+                        empty = np.sum(self.current_state[end[0], rook[1]+1:end[1]])
+                        if empty == 0:
+                            return self.row_column_to_algebraic(rook, end, piece_num)[1]
+                # Rooks on the same file
+                elif rook[1] == end[1]:
+                    if rook[0] > end[0]:
+                        empty = np.sum(self.current_state[end[0]+1:rook[0], end[1]])
+                        if empty == 0:
+                            return self.row_column_to_algebraic(rook, end, piece_num)[1]
+                    if rook[0] < end[0]:
+                        empty = np.sum(self.current_state[rook[0]+1:end[0], end[1]])
+                        if empty == 0:
+                            return self.row_column_to_algebraic(rook, end, piece_num)[1]
+            # If we make it through all the rooks and didn't find one that has
+            # a straight shot to the end then there isn't a good move.
+            # However we only do this if we entered this block as a Rook
+            # Since queens can still go diagonal.
+            if piece == "R":
+                return None
+        if piece == "B" or piece == "Q":
+            for bishop in pieces:
+                # First we check that the piece is even on a diagonal
+                slope = end-bishop
+                slope = slope / np.max(np.abs(slope))
+                if np.array_equal(np.abs(slope), [1, 1]):
+                    # Now we have to check that the space is empty
+                    for i in range(1, 7):
+                        cur_pos = bishop + i * slope
+                        cur_pos = cur_pos.astype(int)
+                        
+                        if np.array_equal(cur_pos, end):
+                            break
+                        elif self.current_state[cur_pos[0], cur_pos[1]] == 0:
+                            continue
+                        else:
+                            break
+                    # This will execute if the position that caused the break
+                    # is the ending position, otherwise this does not execute.
+                    # Or the queen. Same thing.
+                    if np.array_equal(cur_pos, end):
+                        return self.row_column_to_algebraic(bishop, end, piece_num)[1]
+            # Return None if we make it through all the bishops and queens
+            # without a legal move.
+            return None
+        if piece == "K":
+            for king in pieces:
+                diff = np.abs(king - end)
+                # Need to check either diagonal ([1,1]) or straight (sum = 1)
+                if np.sum(diff) == 1 or np.array_equal(diff, [1, 1]):
+                    return self.row_column_to_algebraic(king, end, piece_num)[1]
+
+        return None
+
+
+    def find_piece(self, piece):
+        x, y = np.where(self.current_state==piece)
+        x = x.reshape(len(x), 1)
+        y = y.reshape(len(y), 1)
+        return np.append(x, y, axis=1)
+
+
+    def long_algebraic_to_boardstate(self, move):
         # Reverse piece -> number dictionary
         piece_number = {v: k for k, v in self.piece_names.items()}
 
@@ -589,57 +804,30 @@ class Board():
 
         # Kingside castling
         if move == "O-O" or move == "0-0":
-            # Need to make sure this is allowed
-            check = "WKR" if self.to_move.value else "BKR"
             rank = 7 if self.to_move.value else 0
-            if self.castle_dict[check]:
-                place((rank, 7), 0)
-                place((rank, 4), 0)
-                place((rank, 6), piece_number["K"])
-                place((rank, 5), piece_number["R"])
-                return new_state
+            place((rank, 7), 0)
+            place((rank, 4), 0)
+            place((rank, 6), piece_number["K"])
+            place((rank, 5), piece_number["R"])
+            return new_state
         # Queenside castling
         elif move == "O-O-O" or move == "0-0-0":
-            check = "WQR" if self.to_move.value else "BQR"
             rank = 7 if self.to_move.value else 0
-            # Need to make sure this is allowed
-            if self.castle_dict[check]:
-                place((rank, 0), 0)
-                place((rank, 4), 0)
-                place((rank, 2), piece_number["K"])
-                place((rank, 3), piece_number["R"])
-                return new_state
+            place((rank, 0), 0)
+            place((rank, 4), 0)
+            place((rank, 2), piece_number["K"])
+            place((rank, 3), piece_number["R"])
+            return new_state
+            
+        piece = "P" # Default to pawn, this generally is changed.
+        for i, c in enumerate(move):
+            # A [piece] character
+            # If we have an = then this is the piece the pawn promotes to.
+            if c.isupper():
+                piece = c
 
-        locs = []
-        ranks = []
-        files = []
-        piece = "P" # Default to pawn, this generally be changed.
-        try:
-            for i, c in enumerate(move):
-                # Appends a found [rank] character
-                if c.islower():
-                    # We use a lower case x for taking so I have to exclude it.
-                    if not c == "x":
-                        files.append(c)
-                        # This is a full move, [rank][file]
-                    if move[i+1].isdigit():
-                        locs.append(move[i:i+2])
-                # A [file] character
-                if c.isdigit():
-                    ranks.append(c)
-                # A [piece] character
-                # If we have an = then this is the piece the pawn promotes to.
-                if c.isupper():
-                    piece = c
-
-        except(IndexError):
-            raise ValueError("You tried to make an illegal move.")
-            return self.current_state
-
-        if len(locs) == 0 or len(locs) >= 3:
-            raise ValueError("You tried to make an illegal move.")
-            return self.current_state
-
+        locs = re.findall("[a-h]\d+", move)
+        
         # Always true, no matter how long locs is at this point (1 or 2)
         # If it's one then that's just the destination
         # If it's two then the first is the start, and the second is the end.
@@ -648,104 +836,26 @@ class Board():
         endrank = 8 - int(dest[1]) # End Rank = y
         end = [endrank, endfile]
 
+        # We know that this is long_algebraic so we can find the start
+        # as well from the move.
+        dest = locs[0]
+        startfile = ascii_lowercase.index(dest[0]) # End File = x
+        startrank = 8 - int(dest[1]) # End Rank = y
+        start = [startrank, startfile]
+        
         # Gets the value of the piece
-        piece = piece_number[piece]
-        mult = 1 if self.to_move.value else -1
-
-        # Internal function that moves a piece, to reduce code duplication.
-        # Additionally updates the self.to_move value.
-        def move_piece(start, end, piece):
-            place((start[0], start[1]), 0)
-            place((end[0], end[1]), piece)
-            #self.to_move = Color.BLACK if self.to_move.value else Color.WHITE
-            return new_state
-
-        # Disambiguation case, don't need to find the pieces in this case
-        # since we know where to start at.
-        if len(locs) > 1:
-            piece = piece * mult
-            dest = locs[0]
-            startfile = ascii_lowercase.index(dest[0]) # End File = x
-            startrank = 8 - int(dest[1]) # End Rank = y
-            start = [startrank, startfile]
-            return move_piece(start, end, piece)
+        end_piece = self.current_state[start[0], start[1]]
+        
+        # In case of promotions we want the pice to change upon moving.
+        if "=" in move:
+            end_piece = piece_number[piece] * np.sign(end_piece)
+        
+        place((start[0], start[1]), 0)
+        place((end[0], end[1]), end_piece)
+        return new_state
 
         state = np.copy(self.current_state * mult)
 
-        start_piece = 1 if "=" in move else piece
-        x, y = np.where(state==start_piece)
-        x = x.reshape(len(x), 1)
-        y = y.reshape(len(y), 1)
-        starts = np.append(x, y, axis=1)
-
-        # Need this to be separate or the if blocks don't trigger.
-        end_piece = piece * mult
-        for s in starts:
-            # Partial disambiguation cases first
-            if len(files) > 1:
-                startfile = ascii_lowercase.index(files[0]) # End File = x
-                if s[1] == startfile:
-                    return move_piece(s, end, end_piece)
-                continue
-            elif len(ranks) > 1:
-                startrank = 8 - int(ranks[0]) # End Rank = y
-                if s[0] == startrank:
-                    return move_piece(s, end, end_piece)
-                continue
-
-            # Pawns
-            if start_piece == 1:
-                # Direction the pawn would move.
-                d = -1 if self.to_move.value else 1
-
-                # The only time we ever need to check for taking since the
-                # piece moves differently. Also if we got here only one
-                # pawn should be able to take, since we dealt with
-                # disambiguation already.
-                if "x" in move:
-                    # Takes going to the right diagonally
-                    if np.array_equal(s[0] + d, end[0]) and s[1] + 1 == end[1]:
-                        return move_piece(s, end, end_piece)
-                    # Takes going to the left diagonally
-                    elif s[0] + d == end[0] and s[1] - 1 == end[1]:
-                        return move_piece(s, end, end_piece)
-                elif  s[0] + d == end[0] and s[1] == end[1]:
-                    return move_piece(s, end, end_piece)
-                elif  s[0] + (2 * d) == end[0] and s[1] == end[1]:
-                    return move_piece(s, end, end_piece)
-            # Rooks (and straight Queens)
-            if start_piece == 2 or start_piece == 5:
-                # If this rook is on the rank or file then it's the correct one
-                if s[0] == end[0] or s[1] == end[1]:
-                    return move_piece(s, end, end_piece)
-
-            # Bishops (and diagonal Queens)
-            if start_piece == 4 or start_piece == 5:
-                # Finds the slope of the line between start and end
-                # If it's 1,1 we know it's a good diagonal.
-                diag = np.abs(s - end)
-                diag = diag / np.max(diag)
-
-                if np.array_equal(diag, [1, 1]):
-                    return move_piece(s, end, end_piece)
-            # Knights
-            if start_piece == 3:
-                # Finds the slope of the line between start and end
-                # If it's 1,2 or 2,1 it's a good knight move
-                slope = np.abs(end-s)
-                if np.array_equal(slope, [1, 2]) or np.array_equal(slope, [2, 1]):
-                    return move_piece(s, end, end_piece)
-            if start_piece == 6:
-                #If the distance between s and end is 1 then the king can
-                # get here. You should only have one king so I don't know why
-                # I check this but if you pass a move where a king tries to
-                # move two spaces then I guess this will catch it.
-                # Used to check the sum of the dist, but diagonals sum to 2
-                # so oops.
-                dist = np.abs(s - end)
-                if dist[0] == 1 or dist[1] == 1:
-                    return move_piece(s, end, end_piece)
-        raise ValueError("You tried to make an illegal move.")
         return self.current_state
 
 
@@ -770,16 +880,14 @@ class Board():
 
 
     def row_column_to_algebraic(self, start, end, piece, promotion=None):
-        piece_names = {1:"P", 2:"R", 3:"N", 4:"B", 5:"Q", 6:"K"}
-
         # Alg2 fully disambiguates
         alg1 = []
         alg2 = []
 
         # Don't need to append pawn name
-        if piece > 1:
-            alg1.append(piece_names[np.abs(piece)]) # Piece Name
-            alg2.append(piece_names[np.abs(piece)])
+        if np.abs(piece) > 1:
+            alg1.append(self.piece_names[np.abs(piece)]) # Piece Name
+            alg2.append(self.piece_names[np.abs(piece)])
 
         # Since alg 2 fully disambiguates we append file and rank to it to start.
         alg2.append(ascii_lowercase[start[1]]) # File = x
@@ -801,10 +909,10 @@ class Board():
 
         if promotion:
             alg1.append("=")
-            alg1.append(piece_names[np.abs(promotion)])
+            alg1.append(self.piece_names[np.abs(promotion)])
 
             alg2.append("=")
-            alg2.append(piece_names[np.abs(promotion)])
+            alg2.append(self.piece_names[np.abs(promotion)])
 
         return ("".join(alg1), "".join(alg2))
 
@@ -897,7 +1005,10 @@ def load_pgn(name, loc="games"):
     # Makes all the moves and then returns the board state at the end.
     b = Board(None, None, None, headers=tags)
     for ply in plies:
-        b.make_move(ply)
+        try:
+            b.make_move(ply)
+        except:
+            return b
 
     return b
 
@@ -944,7 +1055,6 @@ def save_pgn(board):
             f.write("*")
 
     return name
-
 
 
 def is_in_check(state, color):

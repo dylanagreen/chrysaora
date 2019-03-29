@@ -1067,13 +1067,9 @@ def is_in_check(state, color):
 
     mult = 1 if color.value else -1
 
-    x, y = np.where(state*mult==6)
-    x = x.reshape(len(x), 1)
-    y = y.reshape(len(y), 1)
-
     # You shouldn't need a loop, because why would you have more than 1 king?
     # Just reshape instead
-    king = np.append(x,y,axis=1).reshape(2)
+    king = find_piece(state*mult, 6).reshape(2)
 
     # Check pawns first because they're the easiest.
     pawn = -1 if color.value else 1
@@ -1098,15 +1094,8 @@ def is_in_check(state, color):
         return True
 
     mult = -1 * mult
-    x, y = np.where(state*mult==2)
-    x = x.reshape(len(x), 1)
-    y = y.reshape(len(y), 1)
-    rooks = np.append(x,y,axis=1)
-
-    x, y = np.where(state*mult==5)
-    x = x.reshape(len(x), 1)
-    y = y.reshape(len(y), 1)
-    queens = np.append(x,y,axis=1)
+    rooks = find_piece(state*mult, 2)
+    queens = find_piece(state*mult, 5)
 
     # Check rooks next because I seem to do that a lot.
     for pos in np.append(rooks, queens, axis=0):
@@ -1130,10 +1119,7 @@ def is_in_check(state, color):
                 return True
 
     # Knights can hop which is why I'm doing them before bishops
-    x, y = np.where(state*mult==3)
-    x = x.reshape(len(x), 1)
-    y = y.reshape(len(y), 1)
-    knights = np.append(x,y,axis=1)
+    knights = find_piece(state*mult, 3)
 
     for pos in knights:
         slope = np.abs(pos-king)
@@ -1146,11 +1132,7 @@ def is_in_check(state, color):
             return True
 
     # Now bishops and diagonal queens, I guess
-    # Knights can hop which is why I'm doing them before bishops
-    x, y = np.where(state*mult==4)
-    x = x.reshape(len(x), 1)
-    y = y.reshape(len(y), 1)
-    bishops = np.append(x,y,axis=1)
+    bishops = find_piece(state*mult, 4)
 
     for pos in np.append(bishops, queens, axis=0):
         # First we check that the piece is even on a diagonal from the king.

@@ -436,6 +436,7 @@ class Board():
         if self.castle_dict[queenside] and np.sum(self.current_state[rank, 1:4])== 0:
             end_states.append("O-O-O")
 
+        end_states = self.remove_moves_in_check(end_states, color)
         return end_states
 
 

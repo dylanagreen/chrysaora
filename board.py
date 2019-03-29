@@ -119,7 +119,10 @@ class Board():
         # This has the double bonus of removing moves that don't get you
         # out of check as well. Neat.
         for m in moves:
-            s = self.long_algebraic_to_boardstate(m[1])
+            if m == "O-O" or m == "O-O-O":
+                s = self.long_algebraic_to_boardstate(m)
+            else:
+                s = self.long_algebraic_to_boardstate(m[1])
             check = is_in_check(s, color)
 
             # I could remove it from the old list, but doing so while iterating

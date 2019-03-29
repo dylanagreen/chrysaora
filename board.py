@@ -483,11 +483,11 @@ class Board():
 
 
     def make_move(self, move):
-        move = self.short_algebraic_to_long_algebraic(move)
-        if move is None:
+        legal = self.check_move_legality(move)
+        if not legal[0]:
             raise ValueError("You tried to make an illegal move!")
             return
-        new_state = self.long_algebraic_to_boardstate(move)
+        new_state = self.long_algebraic_to_boardstate(legal[1])
         self.game_states.append(np.copy(self.current_state))
 
         self.current_state = np.copy(new_state)
@@ -550,6 +550,19 @@ class Board():
     def unmake_move(self):
         self.current_state = np.copy(self.game_states.pop(-1))
         self.move_list.pop(-1) # Take the last move off the move list as well.
+
+
+    def check_move_legality(self, move):
+        long_move = self.short_algebraic_to_long_algebraic(move)
+        if long_move is None:
+            return (False, move)
+
+        end_state = self.long_algebraic_to_boardstate(long_move)
+
+        check  = is_in_check(end_state, self.to_move)
+        if check:
+            return (False, move)
+        return (True, long_move)
 
 
     def short_algebraic_to_long_algebraic(self, move):
@@ -984,10 +997,7 @@ def load_pgn(name, loc="games"):
     # Makes all the moves and then returns the board state at the end.
     b = Board(None, None, None, headers=tags)
     for ply in plies:
-        try:
-            b.make_move(ply)
-        except:
-            return b
+        b.make_move(ply)
 
     return b
 
@@ -1149,6 +1159,7 @@ def find_piece(state, piece):
     x = x.reshape(len(x), 1)
     y = y.reshape(len(y), 1)
     return np.append(x, y, axis=1)
+
 
 if __name__ == "__main__":
     b = load_pgn("anderssen_kieseritzky_1851.pgn")

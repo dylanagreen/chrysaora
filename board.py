@@ -560,6 +560,8 @@ class Board():
             rank = 7 if self.to_move.value else 0
             if self.castle_dict[check] and np.sum(self.current_state[rank, 5:7])== 0:
                 return move
+            else:
+                return None
         # Queenside castling
         elif move == "O-O-O" or move == "0-0-0":
             check = "WQR" if self.to_move.value else "BQR"
@@ -567,6 +569,8 @@ class Board():
             # Need to make sure this is allowed
             if self.castle_dict[check] and np.sum(self.current_state[rank, 1:4])== 0:
                 return move
+            else:
+                return None
 
         ranks = []
         files = []

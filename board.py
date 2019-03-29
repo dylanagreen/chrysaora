@@ -483,7 +483,7 @@ class Board():
 
 
     def make_move(self, move):
-        move = self.check_move_legality(move)
+        move = self.short_algebraic_to_long_algebraic(move)
         if move is None:
             raise ValueError("You tried to make an illegal move!")
             return
@@ -552,7 +552,7 @@ class Board():
         self.move_list.pop(-1) # Take the last move off the move list as well.
 
 
-    def check_move_legality(self, move):
+    def short_algebraic_to_long_algebraic(self, move):
         # Castling is the easiest to check for legality.
         # Kingside castling
         if move == "O-O" or move == "0-0":
@@ -683,9 +683,12 @@ class Board():
                     if pawn[0] + 2*d == end[0] and pawn[0] == pawn_start and empty:
                         return self.row_column_to_algebraic(pawn, end, piece_num)[1]
                 if state[end[0], end[1]] < 0:
-                    if pawn[0] + d == end[0] and pawn[1] - 1 == end[1]:
-                        return self.row_column_to_algebraic(pawn, end, piece_num)[1]
-                    elif pawn[0] + d == end[0] and pawn[1] + 1 == end[1]:
+                    take_left = pawn[0] + d == end[0] and pawn[1] - 1 == end[1]
+                    take_right = pawn[0] + d == end[0] and pawn[1] + 1 == end[1]
+                    promotion = end[0] == pawn_end
+                    if take_left or take_right:
+                        if promotion:
+                            return self.row_column_to_algebraic(pawn, end, piece_num, promotion_piece)[1]
                         return self.row_column_to_algebraic(pawn, end, piece_num)[1]
 
         elif piece == "N":

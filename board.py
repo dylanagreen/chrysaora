@@ -1077,7 +1077,7 @@ def is_in_check(state, color):
 
     # Check pawns first because they're the easiest.
     pawn = -1 if color.value else 1
-    
+
     # Need to ensure that the king is on any rank but the last one.
     # No pawns can put you in check in the last rank anyway.
     if 0 <= king[0] - d < 8:
@@ -1089,7 +1089,12 @@ def is_in_check(state, color):
     # Checks if you'd be in check from the opposite king.
     # This should only trigger on you moving your king into that position.
     opposite_king = -6 if color.value else 6
-    if opposite_king in state[king[0] - 1:king[0] + 2, king[1] - 1:king[1] + 2]:
+    opposite_loc = find_piece(state, opposite_king).reshape(2)
+    diff = np.abs(opposite_loc - king)
+    # If the other king is vertical or horizontal the sum will be 1
+    # Since it is [0,1] or [1,0]
+    # If it is diagonal diff will be  [1, 1]
+    if np.sum(diff) == 1 or np.array_equal(diff, [1, 1]):
         return True
 
     mult = -1 * mult

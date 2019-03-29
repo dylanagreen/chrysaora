@@ -171,7 +171,7 @@ class Board():
                         end_states.append(self.row_column_to_algebraic(pos, end, 1))
 
             # Makes sure the space in front of us is clear
-            elif state[pos[0] + d, pos[1]] == 0:
+            if state[pos[0] + d, pos[1]] == 0:
                 # Pawn promotion
                 # We do this first because pawns have to promote so we can't
                 # just "move one forward" in this position

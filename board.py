@@ -668,6 +668,8 @@ class Board():
             return None
 
         if piece == "P":
+            if end[0] == pawn_end and not "=" in move:
+                return None
             for pawn in pieces:
                 # First check where the ending position is empty
                 # Second condition is that the pawn is on the same rank

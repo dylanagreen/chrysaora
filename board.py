@@ -617,6 +617,10 @@ class Board():
         except(IndexError):
             return None
 
+        # Easy way to check if you input a capital letter that's not a piece.
+        if not piece in "PRNQKB":
+            return None
+
         # This regex extracts all the locations in the move.
         locs = re.findall("[a-h]\d+", move)
 
@@ -1069,10 +1073,14 @@ def is_in_check(state, color):
 
     # Check pawns first because they're the easiest.
     pawn = -1 if color.value else 1
-    if king[1] - 1 >= 0 and state[king[0] - d, king[1] - 1] == pawn:
-        return True
-    elif king[1] + 1 < 8 and state[king[0] - d, king[1] + 1] == pawn:
-        return True
+    
+    # Need to ensure that the king is on any rank but the last one.
+    # No pawns can put you in check in the last rank anyway.
+    if 0 <= king[0] - d < 8:
+        if king[1] - 1 >= 0 and state[king[0] - d, king[1] - 1] == pawn:
+            return True
+        elif king[1] + 1 < 8 and state[king[0] - d, king[1] + 1] == pawn:
+            return True
 
     # Checks if you'd be in check from the opposite king.
     # This should only trigger on you moving your king into that position.

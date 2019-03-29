@@ -51,6 +51,9 @@ class Board():
         # Dict containing a conversion between the piece num and the piece name.
         self.piece_names = {1:"P", 2:"R", 3:"N", 4:"B", 5:"Q", 6:"K"}
 
+        # Reverse piece -> number dictionary
+        self.piece_number = {v: k for k, v in self.piece_names.items()}
+
         if castle_dict is not None:
             self.castle_dict = castle_dict
         else:
@@ -138,11 +141,7 @@ class Board():
         state = np.copy(self.current_state * mult)
         previous_state = np.copy(self.game_states[-1] * mult)
 
-        x, y = np.where(state==1)
-        x = x.reshape(len(x), 1)
-        y = y.reshape(len(y), 1)
-
-        pawns = np.append(x,y,axis=1)
+        pawns = find_piece(state, self.piece_number["P"])
 
         end_states = []
 
@@ -224,17 +223,13 @@ class Board():
         mult = 1 if color.value else -1
         state = np.copy(self.current_state * mult)
 
-        # This is quick code for finding the position of all knights.
-        x, y = np.where(state == 3)
-        x = x.reshape(len(x), 1)
-        y = y.reshape(len(y), 1)
+        knights = find_piece(state, self.piece_number["N"])
 
-        knight_locs = np.append(x, y, axis=1)
         moves = np.asarray([[2, 1], [2, -1], [-2, 1], [-2, -1]])
 
         end_states = []
 
-        for pos in knight_locs:
+        for pos in knights:
             for m in moves:
                 s1 = np.copy(state)
                 end1 = pos + m
@@ -271,12 +266,7 @@ class Board():
         # allows it to work for black as well.
         mult = 1 if color.value else -1
         state = np.copy(self.current_state * mult)
-
-        x, y = np.where(state == 2)
-        x = x.reshape(len(x), 1)
-        y = y.reshape(len(y), 1)
-
-        rooks = np.append(x, y, axis=1)
+        rooks = find_piece(state, self.piece_number["R"])
 
         return self.generate_straight_moves(color, rooks)
 
@@ -337,12 +327,7 @@ class Board():
     def generate_bishop_moves(self, color):
         mult = 1 if color.value else -1
         state = np.copy(self.current_state * mult)
-
-        x, y = np.where(state==4)
-        x = x.reshape(len(x), 1)
-        y = y.reshape(len(y), 1)
-
-        bishops = np.append(x, y, axis=1)
+        bishops = find_piece(state, self.piece_number["B"])
 
         return self.generate_diagonal_moves(color, bishops)
 
@@ -396,12 +381,7 @@ class Board():
     def generate_queen_moves(self, color):
         mult = 1 if color.value else -1
         state = np.copy(self.current_state * mult)
-
-        x, y = np.where(state==5)
-        x = x.reshape(len(x), 1)
-        y = y.reshape(len(y), 1)
-
-        queens = np.append(x, y, axis=1)
+        queens = find_piece(state, self.piece_number["Q"])
 
         diags = self.generate_diagonal_moves(color, queens, True)
         straights = self.generate_straight_moves(color, queens, True)
@@ -562,7 +542,7 @@ class Board():
                         self.status = Status.BLACK_VICTORY
                 else:
                     self.status = Status.DRAW
-                
+
         self.to_move = Color.BLACK if self.to_move.value else Color.WHITE
         self.move_list.append(move)
 
@@ -587,9 +567,6 @@ class Board():
             # Need to make sure this is allowed
             if self.castle_dict[check] and np.sum(self.current_state[rank, 1:4])== 0:
                 return move
-
-        # Reverse piece -> number dictionary
-        piece_number = {v: k for k, v in self.piece_names.items()}
 
         ranks = []
         files = []
@@ -617,10 +594,10 @@ class Board():
                     promotion_piece = c
         except(IndexError):
             return None
-            
+
         # This regex extracts all the locations in the move.
         locs = re.findall("[a-h]\d+", move)
-        
+
         # Ensures your move stays within the 8 ranks of the board.
         for pos in locs:
             if int(pos[1:]) > 8:
@@ -635,10 +612,10 @@ class Board():
             return None
 
         mult = 1 if self.to_move.value else -1
-        piece_num = piece_number[piece] * mult
-        promotion_piece = piece_number[promotion_piece] * mult
-        pieces = self.find_piece(piece_num)
-        
+        piece_num = self.piece_number[piece] * mult
+        promotion_piece = self.piece_number[promotion_piece] * mult
+        pieces = find_piece(self.current_state, piece_num)
+
         # If we have any sort of disambiguation use that as our starting point.
         # This allows us to trim the pieces we search through and find the
         # correct correct one rather than the "first one allowed to make this
@@ -655,7 +632,7 @@ class Board():
         elif len(ranks) == 2:
             startrank = 8 - int(ranks[0])
             start[0] = startrank
-            
+
         good = []
         if not np.array_equal(start, [None, None]):
             for p in pieces:
@@ -665,7 +642,7 @@ class Board():
                     good.append(p)
                 elif np.array_equal(p, start):
                     good.append(p)
-                        
+
             pieces = good
 
         # Direction opposite that which the color's pawns move.
@@ -674,18 +651,18 @@ class Board():
 
         # The starting file for the pawn row, for double move checking
         pawn_start = 6 if self.to_move.value else 1
-        
+
         # The ending rank for pawn promotion
         pawn_end = 0 if self.to_move.value else 7
         # Tried to put these in some sort of likelihood order.
-        
+
         mult = 1 if self.to_move.value else -1
         state = np.copy(self.current_state * mult)
-        
+
         # This handy line of code prevents you from taking your own pieces.
         if state[end[0], end[1]] > 0:
             return None
-        
+
         if piece == "P":
             for pawn in pieces:
                 # First check where the ending position is empty
@@ -760,7 +737,7 @@ class Board():
                     for i in range(1, 7):
                         cur_pos = bishop + i * slope
                         cur_pos = cur_pos.astype(int)
-                        
+
                         if np.array_equal(cur_pos, end):
                             break
                         elif self.current_state[cur_pos[0], cur_pos[1]] == 0:
@@ -783,13 +760,6 @@ class Board():
                     return self.row_column_to_algebraic(king, end, piece_num)[1]
 
         return None
-
-
-    def find_piece(self, piece):
-        x, y = np.where(self.current_state==piece)
-        x = x.reshape(len(x), 1)
-        y = y.reshape(len(y), 1)
-        return np.append(x, y, axis=1)
 
 
     def long_algebraic_to_boardstate(self, move):
@@ -818,7 +788,7 @@ class Board():
             place((rank, 2), piece_number["K"])
             place((rank, 3), piece_number["R"])
             return new_state
-            
+
         piece = "P" # Default to pawn, this generally is changed.
         for i, c in enumerate(move):
             # A [piece] character
@@ -827,7 +797,7 @@ class Board():
                 piece = c
 
         locs = re.findall("[a-h]\d+", move)
-        
+
         # Always true, no matter how long locs is at this point (1 or 2)
         # If it's one then that's just the destination
         # If it's two then the first is the start, and the second is the end.
@@ -842,14 +812,14 @@ class Board():
         startfile = ascii_lowercase.index(dest[0]) # End File = x
         startrank = 8 - int(dest[1]) # End Rank = y
         start = [startrank, startfile]
-        
+
         # Gets the value of the piece
         end_piece = self.current_state[start[0], start[1]]
-        
+
         # In case of promotions we want the pice to change upon moving.
         if "=" in move:
             end_piece = piece_number[piece] * np.sign(end_piece)
-        
+
         place((start[0], start[1]), 0)
         place((end[0], end[1]), end_piece)
         return new_state
@@ -1162,6 +1132,14 @@ def is_in_check(state, color):
                 return True
 
     return False
+
+
+# Quickly finds all the locations of given piece in state.
+def find_piece(state, piece):
+    x, y = np.where(state==piece)
+    x = x.reshape(len(x), 1)
+    y = y.reshape(len(y), 1)
+    return np.append(x, y, axis=1)
 
 if __name__ == "__main__":
     b = load_pgn("anderssen_kieseritzky_1851.pgn")

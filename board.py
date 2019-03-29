@@ -566,6 +566,11 @@ class Board():
 
 
     def short_algebraic_to_long_algebraic(self, move):
+        # A move is minimum two characters (a rank and a file for pawns)
+        # So if it's shorter it's not a good move.
+        if len(move) < 2:
+            return None
+
         # Castling is the easiest to check for legality.
         # Kingside castling
         if move == "O-O" or move == "0-0":

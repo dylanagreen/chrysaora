@@ -808,21 +808,29 @@ class Board():
         new_state = np.copy(self.current_state)
         place = new_state.itemset
 
+        king = self.piece_number["K"]
+        rook = self.piece_number["R"]
+
+        # Flips the piece to negative if we're castling for black.
+        if not color.value:
+            king = king * -1
+            rook = rook * -1
+
         # Kingside castling
         if move == "O-O" or move == "0-0":
             rank = 7 if color.value else 0
             place((rank, 7), 0)
             place((rank, 4), 0)
-            place((rank, 6), self.piece_number["K"])
-            place((rank, 5), self.piece_number["R"])
+            place((rank, 6), king)
+            place((rank, 5), rook)
             return new_state
         # Queenside castling
         elif move == "O-O-O" or move == "0-0-0":
             rank = 7 if color.value else 0
             place((rank, 0), 0)
             place((rank, 4), 0)
-            place((rank, 2), self.piece_number["K"])
-            place((rank, 3), self.piece_number["R"])
+            place((rank, 2), king)
+            place((rank, 3), rook)
             return new_state
 
 

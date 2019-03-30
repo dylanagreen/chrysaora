@@ -111,8 +111,8 @@ class Board():
         # This has the double bonus of removing moves that don't get you
         # out of check as well. Neat.
         for m in moves:
-            if m == "O-O" or m == "O-O-O":
-                s = self.long_algebraic_to_boardstate(m)
+            if "O-O" in m or "0-0" in m:
+                s = self.castle_algebraic_to_boardstate(m, color)
             else:
                 s = self.long_algebraic_to_boardstate(m[1])
             check = is_in_check(s, color)
@@ -489,7 +489,15 @@ class Board():
         if not legal[0]:
             raise ValueError("You tried to make an illegal move!")
             return
-        new_state = self.long_algebraic_to_boardstate(legal[1])
+
+        # Since queenside is the same as kingside with an extra -O on the end
+        # we can just check that the kingside move is in the move.
+        castle_move = "O-O" in legal[1] or "0-0" in legal[1]
+
+        if castle_move:
+            new_state = self.castle_algebraic_to_boardstate(legal[1])
+        else:
+            new_state = self.long_algebraic_to_boardstate(legal[1])
         self.game_states.append(np.copy(self.current_state))
 
         self.current_state = np.copy(new_state)
@@ -500,10 +508,6 @@ class Board():
             # Pawns can promote to rooks which would fubar the dict.
             if c.isupper() and not "=" in move:
                 piece = c
-
-        # Since queenside is the same as kingside with an extra -O on the end
-        # we can just check that the kingside move is in the move.
-        castle_move = "O-O" in move or "0-0" in move
 
         # Updates the castle dict for castling rights.
         if piece == "K" or castle_move:
@@ -559,7 +563,10 @@ class Board():
         if long_move is None:
             return (False, move)
 
-        end_state = self.long_algebraic_to_boardstate(long_move)
+        if "O-O" in long_move or "0-0" in long_move:
+            end_state = self.castle_algebraic_to_boardstate(long_move)
+        else:
+            end_state = self.long_algebraic_to_boardstate(long_move)
 
         check  = is_in_check(end_state, self.to_move)
         if check:
@@ -572,7 +579,6 @@ class Board():
         # So if it's shorter it's not a good move.
         if len(move) < 2:
             return None
-
         # Castling is the easiest to check for legality.
         # Kingside castling
         if move == "O-O" or move == "0-0":
@@ -690,7 +696,6 @@ class Board():
         # This handy line of code prevents you from taking your own pieces.
         if state[end[0], end[1]] > 0:
             return None
-
         if piece == "P":
             if end[0] == pawn_end and not "=" in move:
                 return None
@@ -741,7 +746,7 @@ class Board():
                     if rook[1] < end[1]:
                         f = state[end[0], rook[1] + 1:end[1]]
                     # This avoids same pieces of opposite color canceling
-                    f = f != 0 
+                    f = f != 0
                     if np.sum(f) == 0:
                         return self.row_column_to_algebraic(rook, end, piece_num)[1]
                 # Rooks on the same file
@@ -750,7 +755,7 @@ class Board():
                         f = state[end[0] + 1:rook[0], end[1]]
                     if rook[0] < end[0]:
                         f = state[rook[0] + 1:end[0], end[1]]
-                    f = f != 0 
+                    f = f != 0
                     if np.sum(f) == 0:
                         return self.row_column_to_algebraic(rook, end, piece_num)[1]
             # If we make it through all the rooks and didn't find one that has
@@ -794,10 +799,9 @@ class Board():
         return None
 
 
-    def long_algebraic_to_boardstate(self, move):
-        # Reverse piece -> number dictionary
-        piece_number = {v: k for k, v in self.piece_names.items()}
-
+    def castle_algebraic_to_boardstate(self, move, color=None):
+        if color is None:
+            color = self.to_move
         # This puts in a piece at the given location using np.ndarray.itemset
         # This is marginally faster than new_state[pos[0], pos[1]] = piece.
         # Saves about .5ms on average.
@@ -806,20 +810,29 @@ class Board():
 
         # Kingside castling
         if move == "O-O" or move == "0-0":
-            rank = 7 if self.to_move.value else 0
+            rank = 7 if color.value else 0
             place((rank, 7), 0)
             place((rank, 4), 0)
-            place((rank, 6), piece_number["K"])
-            place((rank, 5), piece_number["R"])
+            place((rank, 6), self.piece_number["K"])
+            place((rank, 5), self.piece_number["R"])
             return new_state
         # Queenside castling
         elif move == "O-O-O" or move == "0-0-0":
-            rank = 7 if self.to_move.value else 0
+            rank = 7 if color.value else 0
             place((rank, 0), 0)
             place((rank, 4), 0)
-            place((rank, 2), piece_number["K"])
-            place((rank, 3), piece_number["R"])
+            place((rank, 2), self.piece_number["K"])
+            place((rank, 3), self.piece_number["R"])
             return new_state
+
+
+    def long_algebraic_to_boardstate(self, move):
+
+        # This puts in a piece at the given location using np.ndarray.itemset
+        # This is marginally faster than new_state[pos[0], pos[1]] = piece.
+        # Saves about .5ms on average.
+        new_state = np.copy(self.current_state)
+        place = new_state.itemset
 
         piece = "P" # Default to pawn, this generally is changed.
         for i, c in enumerate(move):
@@ -850,7 +863,7 @@ class Board():
 
         # In case of promotions we want the pice to change upon moving.
         if "=" in move:
-            end_piece = piece_number[piece] * np.sign(end_piece)
+            end_piece = self.piece_number[piece] * np.sign(end_piece)
 
         place((start[0], start[1]), 0)
         place((end[0], end[1]), end_piece)
@@ -1105,7 +1118,7 @@ def is_in_check(state, color):
             else:
                 f = state[king[0], king[1] + 1:pos[1]]
             # This avoids pieces of the same type but opposite color canceling
-            f = f != 0 
+            f = f != 0
             if np.sum(f) == 0:
                 return True
         elif pos[1] == king[1]:

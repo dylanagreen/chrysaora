@@ -634,7 +634,7 @@ class Board():
 
         # Ensures your move stays within the 8 ranks of the board.
         for pos in locs:
-            if int(pos[1:]) > 8:
+            if not 0 < int(pos[1:]) < 9:
                 return None
 
         dest = locs[-1]

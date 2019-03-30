@@ -89,30 +89,22 @@ class Board():
         return total_moves
 
 
-    def disambiguate_moves(self, moves):
+    def remove_moves_in_check(self, moves, color):
         # Shortcut for if there's no possible moves being disambiguated.
         if len(moves) == 0:
             return []
-        moves = np.asarray(moves)
-        unique, counts = np.unique(moves[...,0], return_counts=True)
+
+        new_moves = []
+
+        # This is for disambiguating
+        moves2 = np.asarray(moves)
+        unique, counts = np.unique(moves2[...,0], return_counts=True)
 
         # By using advanced indexing we receive a list of items that appear
         # more than once in the ambiguous case list (the first item of the
         # moves tuples)
         duplicates = unique[counts > 1]
 
-        moves2 = []
-        for i, m in enumerate(moves):
-            if m[0] in duplicates:
-                moves2.append(m[1])
-            else:
-                moves2.append(m[0])
-
-        return moves2
-
-
-    def remove_moves_in_check(self, moves, color):
-        new_moves = []
         # M for move, s for state
         # This removes moves where the ending state is in check.
         # Becuase you're not allowed to move into check.
@@ -129,7 +121,13 @@ class Board():
             # is dangerous. Plus, remove() requires a search, which increases
             # the run time much more than an append.
             if not check:
-                new_moves.append(m)
+                if m == "O-O" or m == "O-O-O":
+                    new_moves.append(m)
+                elif m[0] in duplicates:
+                    new_moves.append(m[1])
+                else:
+                    new_moves.append(m[0])
+
         return new_moves
 
 
@@ -216,7 +214,7 @@ class Board():
                     end_states.append(self.row_column_to_algebraic(pos, end, 1))
 
         end_states = self.remove_moves_in_check(end_states, color)
-        end_states = self.disambiguate_moves(end_states)
+        #end_states = self.disambiguate_moves(end_states)
         return end_states
 
 
@@ -260,7 +258,7 @@ class Board():
                     end_states.append(self.row_column_to_algebraic(pos, end2, 3))
 
         end_states = self.remove_moves_in_check(end_states, color)
-        end_states = self.disambiguate_moves(end_states)
+        #end_states = self.disambiguate_moves(end_states)
         return end_states
 
 
@@ -323,7 +321,7 @@ class Board():
                     end_states.append(self.row_column_to_algebraic(pos, end, piece_val))
 
         end_states = self.remove_moves_in_check(end_states, color)
-        end_states = self.disambiguate_moves(end_states)
+        #end_states = self.disambiguate_moves(end_states)
         return end_states
 
 
@@ -378,7 +376,7 @@ class Board():
                     i = i + 1
 
         end_states = self.remove_moves_in_check(end_states, color)
-        end_states = self.disambiguate_moves(end_states)
+        #end_states = self.disambiguate_moves(end_states)
         return end_states
 
     def generate_queen_moves(self, color):
@@ -421,7 +419,7 @@ class Board():
                 end_states.append(self.row_column_to_algebraic(king, end, 6))
 
         end_states = self.remove_moves_in_check(end_states, color)
-        end_states = self.disambiguate_moves(end_states)
+        #end_states = self.disambiguate_moves(end_states)
         return end_states
 
     def generate_castle_moves(self, color):

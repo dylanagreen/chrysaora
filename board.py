@@ -637,13 +637,13 @@ class Board():
             if not 0 < int(pos[1:]) < 9:
                 return None
 
+        if len(locs) == 0 or len(locs) >= 3:
+            return None
+
         dest = locs[-1]
         endfile = ascii_lowercase.index(dest[0]) # End File = x
         endrank = 8 - int(dest[1]) # End Rank = y
         end = [endrank, endfile]
-
-        if len(locs) == 0 or len(locs) >= 3:
-            return None
 
         mult = 1 if self.to_move.value else -1
         piece_num = self.piece_number[piece] * mult

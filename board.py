@@ -626,7 +626,7 @@ class Board():
             return None
 
         # Easy way to check if you input a capital letter that's not a piece.
-        if not piece in "PRNQKB":
+        if not piece in "PRNQKB" or not promotion_piece in "PRNQKB":
             return None
 
         # This regex extracts all the locations in the move.

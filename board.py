@@ -686,6 +686,9 @@ class Board():
         # The starting file for the pawn row, for double move checking
         pawn_start = 6 if self.to_move.value else 1
 
+        # The file the pawn needs to be on to take en passant.
+        ep_file = 3 if self.to_move.value else 4
+
         # The ending rank for pawn promotion
         pawn_end = 0 if self.to_move.value else 7
         # Tried to put these in some sort of likelihood order.
@@ -721,6 +724,15 @@ class Board():
                         if promotion:
                             return self.row_column_to_algebraic(pawn, end, piece_num, promotion_piece)[1]
                         return self.row_column_to_algebraic(pawn, end, piece_num)[1]
+
+                # Interestingly d happens to correspond to "pawn of the
+                # opposite color"
+                ep_left = pawn[1] == end[1] - 1 and self.current_state[pawn[0], pawn[1] + 1] == d
+                ep_right = pawn[1] == end[1] + 1 and self.current_state[pawn[0], pawn[1] - 1] == d
+
+                if state[end[0], end[1]] == 0 and (ep_left or ep_right):
+                    long_alg = self.row_column_to_algebraic(pawn, end, piece_num)[1]
+                    return long_alg + "e.p."
 
         elif piece == "N":
             for knight in pieces:
@@ -835,7 +847,6 @@ class Board():
 
 
     def long_algebraic_to_boardstate(self, move):
-
         # This puts in a piece at the given location using np.ndarray.itemset
         # This is marginally faster than new_state[pos[0], pos[1]] = piece.
         # Saves about .5ms on average.
@@ -875,11 +886,13 @@ class Board():
 
         place((start[0], start[1]), 0)
         place((end[0], end[1]), end_piece)
+
+        # Turns the pawn that gets taken en passant to 0. This pawn is on the
+        # same rank as the pawn moving, and the same file as where the pawn
+        # ends.
+        if  "e.p." in move:
+            place((start[0], end[1]), 0)
         return new_state
-
-        state = np.copy(self.current_state * mult)
-
-        return self.current_state
 
 
     def __str__(self):

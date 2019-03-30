@@ -737,23 +737,22 @@ class Board():
                     # Checks that the range between the rook and the ending
                     # is empty so the rook can actually slide there.
                     if rook[1] > end[1]:
-                        empty = np.sum(self.current_state[end[0], end[1]+1:rook[1]])
-                        if empty == 0:
-                            return self.row_column_to_algebraic(rook, end, piece_num)[1]
+                        f = state[end[0], end[1] + 1:rook[1]]
                     if rook[1] < end[1]:
-                        empty = np.sum(self.current_state[end[0], rook[1]+1:end[1]])
-                        if empty == 0:
-                            return self.row_column_to_algebraic(rook, end, piece_num)[1]
+                        f = state[end[0], rook[1] + 1:end[1]]
+                    # This avoids same pieces of opposite color canceling
+                    f = f != 0 
+                    if np.sum(f) == 0:
+                        return self.row_column_to_algebraic(rook, end, piece_num)[1]
                 # Rooks on the same file
                 elif rook[1] == end[1]:
                     if rook[0] > end[0]:
-                        empty = np.sum(self.current_state[end[0]+1:rook[0], end[1]])
-                        if empty == 0:
-                            return self.row_column_to_algebraic(rook, end, piece_num)[1]
+                        f = state[end[0] + 1:rook[0], end[1]]
                     if rook[0] < end[0]:
-                        empty = np.sum(self.current_state[rook[0]+1:end[0], end[1]])
-                        if empty == 0:
-                            return self.row_column_to_algebraic(rook, end, piece_num)[1]
+                        f = state[rook[0] + 1:end[0], end[1]]
+                    f = f != 0 
+                    if np.sum(f) == 0:
+                        return self.row_column_to_algebraic(rook, end, piece_num)[1]
             # If we make it through all the rooks and didn't find one that has
             # a straight shot to the end then there isn't a good move.
             # However we only do this if we entered this block as a Rook
@@ -1094,7 +1093,6 @@ def is_in_check(state, color):
     mult = -1 * mult
     rooks = find_piece(state*mult, 2)
     queens = find_piece(state*mult, 5)
-
     # Check rooks next because I seem to do that a lot.
     for pos in np.append(rooks, queens, axis=0):
         # Rook needs to be on the same file or rank to be able to put the king
@@ -1106,6 +1104,8 @@ def is_in_check(state, color):
                 f = state[king[0], pos[1] + 1:king[1]]
             else:
                 f = state[king[0], king[1] + 1:pos[1]]
+            # This avoids pieces of the same type but opposite color canceling
+            f = f != 0 
             if np.sum(f) == 0:
                 return True
         elif pos[1] == king[1]:
@@ -1113,6 +1113,7 @@ def is_in_check(state, color):
                 f = state[pos[0] + 1:king[0], king[1]]
             else:
                 f = state[king[0] + 1:pos[0], king[1]]
+            f = f != 0
             if np.sum(f) == 0:
                 return True
 

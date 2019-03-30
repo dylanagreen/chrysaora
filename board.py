@@ -771,7 +771,7 @@ class Board():
                 slope = slope / np.max(np.abs(slope))
                 if np.array_equal(np.abs(slope), [1, 1]):
                     # Now we have to check that the space is empty
-                    for i in range(1, 7):
+                    for i in range(1, 8):
                         cur_pos = bishop + i * slope
                         cur_pos = cur_pos.astype(int)
 
@@ -1152,7 +1152,7 @@ def is_in_check(state, color):
         slope = slope / np.max(np.abs(slope))
         if np.array_equal(np.abs(slope), [1, 1]):
             # Now we have to check that the space between the two is empty.
-            for i in range(1, 7):
+            for i in range(1, 8):
                 cur_pos = king + i * slope
                 cur_pos = cur_pos.astype(int)
 

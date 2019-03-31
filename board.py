@@ -428,6 +428,11 @@ class Board():
         # the rook are clear, then return the castling algebraic (O-O or O-O-O)
         end_states = []
 
+        # You're not allowed to castle out of check so if you're in check
+        # don't generate it as a legal move.
+        if is_in_check(self.current_state, color):
+            return end_states
+
         rank = 7 if color.value else 0 # 0 for Black, 7 for White
         king = 6 if color.value else -6
         kingside = "WKR" if color.value else "BKR"
@@ -613,6 +618,12 @@ class Board():
         # So if it's shorter it's not a good move.
         if len(move) < 2:
             return None
+
+        # You're not allowed to castle out of check.
+        check = is_in_check(self.current_state, self.to_move)
+        if ("O-O" in move or "0-0" in move) and check:
+            return None
+
         # Castling is the easiest to check for legality.
         # Kingside castling
         if move == "O-O" or move == "0-0":

@@ -429,17 +429,36 @@ class Board():
         end_states = []
 
         rank = 7 if color.value else 0 # 0 for Black, 7 for White
+        king = 6 if color.value else -6
         kingside = "WKR" if color.value else "BKR"
         between = self.current_state[rank, 5:7]
         between = between != 0
         if self.castle_dict[kingside] and np.sum(between)== 0:
-            end_states.append("O-O")
+            # Before we go ahead and append the move is legal we need to verify
+            # that we don't castle through check. Since we remove moves
+            # that end in check, and the king moves two during castling,
+            # it is sufficient therefore to simply check that moving the king
+            # one space in the kingside direction doesn't put us in check.
+            s = np.copy(self.current_state)
+            s.itemset((rank, 4), 0)
+            s.itemset((rank, 5), king)
+
+            check = is_in_check(s, color)
+            if not check:
+                end_states.append("O-O")
 
         queenside = "WQR" if color.value else "BQR"
         between = self.current_state[rank, 1:4]
         between = between != 0
         if self.castle_dict[queenside] and np.sum(between)== 0:
-            end_states.append("O-O-O")
+            # See reasoning above in kingside.
+            s = np.copy(self.current_state)
+            s.itemset((rank, 4), 0)
+            s.itemset((rank, 3), king)
+
+            check = is_in_check(s, color)
+            if not check:
+                end_states.append("O-O-O")
 
         end_states = self.remove_moves_in_check(end_states, color)
         return end_states
@@ -599,17 +618,41 @@ class Board():
         if move == "O-O" or move == "0-0":
             check = "WKR" if self.to_move.value else "BKR"
             rank = 7 if self.to_move.value else 0
-            if self.castle_dict[check] and np.sum(self.current_state[rank, 5:7])== 0:
-                return move
+            king = 6 if self.to_move.value else -6
+            between = self.current_state[rank, 5:7]
+            between = between != 0
+            if self.castle_dict[check] and np.sum(between)== 0:
+                # Need to check that we don't castle through check here.
+                s = np.copy(self.current_state)
+                s.itemset((rank, 4), 0)
+                s.itemset((rank, 5), king)
+
+                check = is_in_check(s, self.to_move)
+                if not check:
+                    return move
+                else:
+                    return None
             else:
                 return None
         # Queenside castling
         elif move == "O-O-O" or move == "0-0-0":
             check = "WQR" if self.to_move.value else "BQR"
             rank = 7 if self.to_move.value else 0
+            king = 6 if self.to_move.value else -6
+            between = self.current_state[rank, 1:4]
+            between = between != 0
             # Need to make sure this is allowed
-            if self.castle_dict[check] and np.sum(self.current_state[rank, 1:4])== 0:
-                return move
+            if self.castle_dict[check] and np.sum(between)== 0:
+                # Need to check that we don't castle through check here.
+                s = np.copy(self.current_state)
+                s.itemset((rank, 4), 0)
+                s.itemset((rank, 3), king)
+
+                check = is_in_check(s, self.to_move)
+                if not check:
+                    return move
+                else:
+                    return None
             else:
                 return None
 
@@ -746,7 +789,7 @@ class Board():
                 ep_right = pawn[1] == end[1] + 1 and self.current_state[pawn[0], pawn[1] - 1] == d
 
                 previous_state = np.copy(self.game_states[-1] * mult)
-                
+
                 if state[end[0], end[1]] == 0 and (ep_left or ep_right):
                     # Checks that in the previous state the pawn actually moved
                     # two spaces. THis prevents trying an en passant move

@@ -430,11 +430,15 @@ class Board():
 
         rank = 7 if color.value else 0 # 0 for Black, 7 for White
         kingside = "WKR" if color.value else "BKR"
-        if self.castle_dict[kingside] and np.sum(self.current_state[rank, 5:7])== 0:
+        between = self.current_state[rank, 5:7]
+        between = between != 0
+        if self.castle_dict[kingside] and np.sum(between)== 0:
             end_states.append("O-O")
 
         queenside = "WQR" if color.value else "BQR"
-        if self.castle_dict[queenside] and np.sum(self.current_state[rank, 1:4])== 0:
+        between = self.current_state[rank, 1:4]
+        between = between != 0
+        if self.castle_dict[queenside] and np.sum(between)== 0:
             end_states.append("O-O-O")
 
         end_states = self.remove_moves_in_check(end_states, color)

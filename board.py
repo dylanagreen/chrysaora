@@ -518,18 +518,29 @@ class Board():
                 self.castle_dict["BKR"] = False
                 self.castle_dict["BQR"] = False
         elif piece == "R":
-            diff = self.game_states[-1] - self.current_state
-            # If the rook position is nonzero in the difference we know that
-            # the rook moved off that position. And hence castling that side
-            # Is no longer allowed.
-            if diff[0, 0] == -2:
+            # We can get the position the rook started from using slicing in
+            # the legal move, since legal returns a long algebraic move
+            # which fully disambiguates and gives us the starting square.
+            # So once the rook moves then we set it to false.
+            if legal[1][1:3] == "a8":
                 self.castle_dict["BQR"] = False
-            elif diff[0, 7] == -2:
+            elif legal[1][1:3] == "h8":
                 self.castle_dict["BKR"] = False
-            elif diff[7, 0] == -2:
+            elif legal[1][1:3] == "a1":
                 self.castle_dict["WQR"] = False
-            elif diff[7, 7] == -2:
+            elif legal[1][1:3] == "h1":
                 self.castle_dict["WKR"] = False
+
+        # We need to update castling this side if the rook gets taken without
+        # ever moving. We can't castle with a rook that doesn't exist.
+        if "xa8" in legal[1]:
+            self.castle_dict["BQR"] = False
+        elif "xh8" in legal[1]:
+            self.castle_dict["BKR"] = False
+        elif "xa1" in legal[1]:
+            self.castle_dict["WQR"] = False
+        elif "xh1" in legal[1]:
+            self.castle_dict["WKR"] = False
 
         # The earliest possible checkmate is after 4 plies. No reason
         # to check if it's check earlier than that.

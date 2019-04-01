@@ -46,7 +46,6 @@ class Board():
                                             [1, 1, 1, 1, 1, 1, 1, 1],
                                             [2, 3, 4, 5, 6, 4, 3, 2]])
         self.game_states = []
-        self.game_states.append(np.copy(self.current_state))
 
         # Dict containing a conversion between the piece num and the piece name.
         self.piece_names = {1:"P", 2:"R", 3:"N", 4:"B", 5:"Q", 6:"K"}

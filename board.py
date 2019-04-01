@@ -604,10 +604,15 @@ class Board():
 
         if "O-O" in long_move or "0-0" in long_move:
             end_state = self.castle_algebraic_to_boardstate(long_move)
+            check  = is_in_check(end_state, self.to_move)
         else:
+            # short_algebraic_to_long checks if moving ends you in check
+            # and hence it is redundant to check again if we make
+            # it this far, since if it did it would have returned
+            # None and we wouldn't even be here.
             end_state = self.long_algebraic_to_boardstate(long_move)
+            check = False
 
-        check  = is_in_check(end_state, self.to_move)
         if check:
             return (False, move)
         return (True, long_move)
@@ -765,6 +770,12 @@ class Board():
         mult = 1 if self.to_move.value else -1
         state = np.copy(self.current_state * mult)
 
+        def good_move(start, end, piece_num):
+            s = np.copy(self.current_state)
+            s.itemset((start[0], start[1]), 0)
+            s.itemset((end[0], end[1]), piece_num)
+            return not is_in_check(s, self.to_move)
+
         # This handy line of code prevents you from taking your own pieces.
         if state[end[0], end[1]] > 0:
             return None
@@ -772,6 +783,8 @@ class Board():
             if end[0] == pawn_end and not "=" in move:
                 return None
             for pawn in pieces:
+                found = []
+                promotion = False
                 # Ensures that this pawn would actually have to move forward
                 # and not backward to get to the ending square.
                 direc = pawn[0] < end[0] if self.to_move.value else pawn[0] > end[0]
@@ -783,27 +796,24 @@ class Board():
                 if state[end[0], end[1]] == 0 and pawn[1] == end[1]:
                     promotion = end[0] == pawn_end
                     if pawn[0] + d == end[0]:
-                        if promotion:
-                            return self.row_column_to_algebraic(pawn, end, piece_num, promotion_piece)[1]
-                        return self.row_column_to_algebraic(pawn, end, piece_num)[1]
+                        found = pawn
 
                     # Need to check the space between one move and two is empty.
                     empty = self.current_state[pawn[0] + d, end[1]] == 0
                     if pawn[0] + 2*d == end[0] and pawn[0] == pawn_start and empty:
-                        return self.row_column_to_algebraic(pawn, end, piece_num)[1]
+                        found = pawn
                 if state[end[0], end[1]] < 0:
                     take_left = pawn[0] + d == end[0] and pawn[1] - 1 == end[1]
                     take_right = pawn[0] + d == end[0] and pawn[1] + 1 == end[1]
                     promotion = end[0] == pawn_end
                     if take_left or take_right:
-                        if promotion:
-                            return self.row_column_to_algebraic(pawn, end, piece_num, promotion_piece)[1]
-                        return self.row_column_to_algebraic(pawn, end, piece_num)[1]
+                        found = pawn
 
                 # Interestingly d happens to correspond to "pawn of the
                 # opposite color"
                 ep_left = pawn[1] == end[1] - 1 and self.current_state[pawn[0], pawn[1] + 1] == d
                 ep_right = pawn[1] == end[1] + 1 and self.current_state[pawn[0], pawn[1] - 1] == d
+                ep_append = False
 
                 # Can't en passant on turn 1 (or anything less than turn 3 I
                 # think) so if you got this far it's not a legal pawn move.
@@ -814,24 +824,39 @@ class Board():
                         # moved two spaces. This prevents trying an en passant
                         # move three moves after the pawn moved.
                         if previous_state[end[0] + d, end[1]] == d:
-                            long_alg = self.row_column_to_algebraic(pawn, end, piece_num)[1]
-                            return long_alg + "e.p."
+                            found = pawn
+                            ep_append = True
+
+                # Ensures that moving this piece doesn't end in check.
+                # In theory it could end in a promotion, but if moving this
+                # piece leaves us in check then it won't matter what
+                # piece it promotes to so I can just check as a pawn.
+                if not np.array_equal(found, []) and good_move(found, end, piece_num):
+                    if promotion:
+                        return self.row_column_to_algebraic(pawn, end, piece_num, promotion_piece)[1]
+                    if ep_append:
+                        return self.row_column_to_algebraic(found, end, piece_num)[1] + "e.p."
+                    return self.row_column_to_algebraic(found, end, piece_num)[1]
 
         elif piece == "N":
             for knight in pieces:
-                slope = np.abs(knight - end)
+                found = []
 
+                slope = np.abs(knight - end)
                 # Avoids a divide by 0 error. If it's on the same rank or file
                 # it's illegal anyway.
                 if slope[1] == 0 or slope[0] == 0:
                     continue
                 if np.array_equal(slope, [1, 2]) or np.array_equal(slope, [2, 1]):
-                    return self.row_column_to_algebraic(knight, end, piece_num)[1]
-            # Return None if we make it through all the knights without
-            # a legal move.
-            return None
+                    found = knight
+
+                # Ensures that moving this piece doesn't end in check.
+                if not np.array_equal(found, []) and good_move(found, end, piece_num):
+                    return self.row_column_to_algebraic(found, end, piece_num)[1]
+
         elif piece == "R" or  piece == "Q":
             for rook in pieces:
+                found = []
                 # Rooks on the same rank
                 if rook[0] == end[0]:
                     # Checks that the range between the rook and the ending
@@ -843,7 +868,7 @@ class Board():
                     # This avoids same pieces of opposite color canceling
                     f = f != 0
                     if np.sum(f) == 0:
-                        return self.row_column_to_algebraic(rook, end, piece_num)[1]
+                        found = rook
                 # Rooks on the same file
                 elif rook[1] == end[1]:
                     if rook[0] > end[0]:
@@ -852,7 +877,10 @@ class Board():
                         f = state[rook[0] + 1:end[0], end[1]]
                     f = f != 0
                     if np.sum(f) == 0:
-                        return self.row_column_to_algebraic(rook, end, piece_num)[1]
+                        found = rook
+                # Ensures that moving this piece doesn't end in check.
+                if not np.array_equal(found, []) and good_move(found, end, piece_num):
+                    return self.row_column_to_algebraic(found, end, piece_num)[1]
             # If we make it through all the rooks and didn't find one that has
             # a straight shot to the end then there isn't a good move.
             # However we only do this if we entered this block as a Rook
@@ -861,6 +889,7 @@ class Board():
                 return None
         if piece == "B" or piece == "Q":
             for bishop in pieces:
+                found = []
                 # First we check that the piece is even on a diagonal
                 slope = end-bishop
                 slope = slope / np.max(np.abs(slope))
@@ -880,16 +909,22 @@ class Board():
                     # is the ending position, otherwise this does not execute.
                     # Or the queen. Same thing.
                     if np.array_equal(cur_pos, end):
-                        return self.row_column_to_algebraic(bishop, end, piece_num)[1]
-            # Return None if we make it through all the bishops and queens
-            # without a legal move.
-            return None
+                        found = bishop
+                # Ensures that moving this piece doesn't end in check.
+                if not np.array_equal(found, []) and good_move(found, end, piece_num):
+                    return self.row_column_to_algebraic(found, end, piece_num)[1]
+
         if piece == "K":
             for king in pieces:
+                found = []
                 diff = np.abs(king - end)
                 # Need to check either diagonal ([1,1]) or straight (sum = 1)
                 if np.sum(diff) == 1 or np.array_equal(diff, [1, 1]):
-                    return self.row_column_to_algebraic(king, end, piece_num)[1]
+                    found = king
+
+                # Ensures that moving this piece doesn't end in check.
+                if not np.array_equal(found, []) and good_move(found, end, piece_num):
+                    return self.row_column_to_algebraic(found, end, piece_num)[1]
 
         return None
 
@@ -1124,7 +1159,11 @@ def load_pgn(name, loc="games"):
     # Makes all the moves and then returns the board state at the end.
     b = Board(None, None, None, headers=tags)
     for ply in plies:
-        b.make_move(ply)
+        try:
+            b.make_move(ply)
+        except(ValueError):
+            print(ply)
+            return b
 
     return b
 
@@ -1206,7 +1245,6 @@ def is_in_check(state, color):
     # If it is diagonal diff will be  [1, 1]
     if np.sum(diff) == 1 or np.array_equal(diff, [1, 1]):
         return True
-
     mult = -1 * mult
     rooks = find_piece(state*mult, 2)
     queens = find_piece(state*mult, 5)

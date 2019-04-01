@@ -589,7 +589,7 @@ class Board():
                     self.status = Status.DRAW
 
         self.to_move = Color.BLACK if self.to_move.value else Color.WHITE
-        self.move_list.append(move)
+        self.move_list.append(legal[1])
 
 
     def unmake_move(self):

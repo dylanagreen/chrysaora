@@ -675,7 +675,7 @@ class Board():
         ranks = []
         files = []
         piece = "P"
-        promotion_piece = "P"
+        promotion_piece = "Q"
         # This block exists to ensure that more than two locations haven't
         # been passed in.
         # If more than one was passed we use it for disambiguation
@@ -700,7 +700,7 @@ class Board():
             return None
 
         # Easy way to check if you input a capital letter that's not a piece.
-        if not piece in "PRNQKB" or not promotion_piece in "PRNQKB":
+        if not piece in "PRNQKB" or not promotion_piece in "RNQB":
             return None
 
         # This regex extracts all the locations in the move.
@@ -1159,11 +1159,7 @@ def load_pgn(name, loc="games"):
     # Makes all the moves and then returns the board state at the end.
     b = Board(None, None, None, headers=tags)
     for ply in plies:
-        try:
-            b.make_move(ply)
-        except(ValueError):
-            print(ply)
-            return b
+        b.make_move(ply)
 
     return b
 

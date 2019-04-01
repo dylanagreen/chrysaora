@@ -139,7 +139,6 @@ class Board():
         # Positive is going downwards, negative is going upwards.
         d = -1 * mult
         state = np.copy(self.current_state * mult)
-        previous_state = np.copy(self.game_states[-1] * mult)
 
         pawns = find_piece(state, self.piece_number["P"])
 
@@ -151,7 +150,9 @@ class Board():
             # En Passant first since we can take En Passant if there
             # is a piece directly in front of our pawn.
             # However, requires the pawn on row 5 (from bottom)
-            if pos[0] == 4 + d:
+            # Can't en passant if there's no other game states to check either.
+            if len(self.game_states) > 1 and pos[0] == 4 + d:
+                previous_state = np.copy(self.game_states[-1] * mult)
                 # Don't check en passant on the left if we're on the first file
                 # Similarly don't check to the right if we're on the last file
                 left_allowed = pos[1] > 0
@@ -771,6 +772,13 @@ class Board():
             if end[0] == pawn_end and not "=" in move:
                 return None
             for pawn in pieces:
+
+                # Ensures that this pawn would actually have to move forward
+                # and not backward to get to the ending square.
+                direc = pawn[0] < end[0] if self.to_move.value else pawn[0] > end[0]
+                if direc:
+                    continue
+
                 # First check where the ending position is empty
                 # Second condition is that the pawn is on the same rank
                 if state[end[0], end[1]] == 0 and pawn[1] == end[1]:
@@ -802,7 +810,6 @@ class Board():
                 # think) so if you got this far it's not a legal pawn move.
                 if len(self.game_states) > 1:
                     previous_state = np.copy(self.game_states[-1] * mult)
-
                     if state[end[0], end[1]] == 0 and (ep_left or ep_right):
                         # Checks that in the previous state the pawn actually
                         # moved two spaces. This prevents trying an en passant
@@ -1118,7 +1125,7 @@ def load_pgn(name, loc="games"):
     # Makes all the moves and then returns the board state at the end.
     b = Board(None, None, None, headers=tags)
     for ply in plies:
-        b.make_move(ply)
+            b.make_move(ply)
 
     return b
 

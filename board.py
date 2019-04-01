@@ -798,15 +798,18 @@ class Board():
                 ep_left = pawn[1] == end[1] - 1 and self.current_state[pawn[0], pawn[1] + 1] == d
                 ep_right = pawn[1] == end[1] + 1 and self.current_state[pawn[0], pawn[1] - 1] == d
 
-                previous_state = np.copy(self.game_states[-1] * mult)
+                # Can't en passant on turn 1 (or anything less than turn 3 I
+                # think) so if you got this far it's not a legal pawn move.
+                if len(self.game_states) > 1:
+                    previous_state = np.copy(self.game_states[-1] * mult)
 
-                if state[end[0], end[1]] == 0 and (ep_left or ep_right):
-                    # Checks that in the previous state the pawn actually moved
-                    # two spaces. THis prevents trying an en passant move
-                    # three moves after the pawn moved.
-                    if previous_state[end[0] + d, end[1]] == d:
-                        long_alg = self.row_column_to_algebraic(pawn, end, piece_num)[1]
-                        return long_alg + "e.p."
+                    if state[end[0], end[1]] == 0 and (ep_left or ep_right):
+                        # Checks that in the previous state the pawn actually
+                        # moved two spaces. This prevents trying an en passant
+                        # move three moves after the pawn moved.
+                        if previous_state[end[0] + d, end[1]] == d:
+                            long_alg = self.row_column_to_algebraic(pawn, end, piece_num)[1]
+                            return long_alg + "e.p."
 
         elif piece == "N":
             for knight in pieces:

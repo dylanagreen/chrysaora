@@ -160,14 +160,20 @@ class Board():
                 if left_allowed:
                     pawn_on_left = state[pos[0], pos[1] - 1] == -1
                     pawn_moved_two = previous_state[pos[0] + 2*d, pos[1] - 1] == -1
-                    if pawn_on_left and pawn_moved_two:
+
+                    # Need to ensure this doesn't trigger if a different pawn
+                    # Is hanging out there. Thanks Lc0 for playing
+                    # a move that necessitated this against KomodoMCTS
+                    different_pawn = not state[pos[0] + 2*d, pos[1] - 1] == -1
+                    if pawn_on_left and pawn_moved_two and different_pawn:
                         end = [pos[0] + d, pos[1] - 1]
                         end_states.append(self.row_column_to_algebraic(pos, end, 1))
 
                 if right_allowed:
                     pawn_on_right = state[pos[0], pos[1] + 1] == -1
                     pawn_moved_two = previous_state[pos[0] + 2*d, pos[1] + 1] == -1
-                    if pawn_on_right and pawn_moved_two:
+                    different_pawn = not state[pos[0] + 2*d, pos[1] + 1] == -1
+                    if pawn_on_right and pawn_moved_two and different_pawn:
                         end = [pos[0] + d, pos[1] + 1]
                         end_states.append(self.row_column_to_algebraic(pos, end, 1))
 
@@ -517,7 +523,6 @@ class Board():
         if not legal[0]:
             raise ValueError("You tried to make an illegal move!")
             return
-
         # Since queenside is the same as kingside with an extra -O on the end
         # we can just check that the kingside move is in the move.
         castle_move = "O-O" in legal[1] or "0-0" in legal[1]
@@ -1159,7 +1164,12 @@ def load_pgn(name, loc="games"):
     # Makes all the moves and then returns the board state at the end.
     b = Board(None, None, None, headers=tags)
     for ply in plies:
-        b.make_move(ply)
+        #try:
+            b.make_move(ply)
+        #except Exception as e:
+         #   print(e)
+          #  print(ply)
+           # return b
 
     return b
 

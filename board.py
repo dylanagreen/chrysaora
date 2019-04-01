@@ -772,7 +772,6 @@ class Board():
             if end[0] == pawn_end and not "=" in move:
                 return None
             for pawn in pieces:
-
                 # Ensures that this pawn would actually have to move forward
                 # and not backward to get to the ending square.
                 direc = pawn[0] < end[0] if self.to_move.value else pawn[0] > end[0]
@@ -809,7 +808,7 @@ class Board():
                 # Can't en passant on turn 1 (or anything less than turn 3 I
                 # think) so if you got this far it's not a legal pawn move.
                 if len(self.game_states) > 1:
-                    previous_state = np.copy(self.game_states[-1] * mult)
+                    previous_state = np.copy(self.game_states[-1])
                     if state[end[0], end[1]] == 0 and (ep_left or ep_right):
                         # Checks that in the previous state the pawn actually
                         # moved two spaces. This prevents trying an en passant
@@ -1125,7 +1124,7 @@ def load_pgn(name, loc="games"):
     # Makes all the moves and then returns the board state at the end.
     b = Board(None, None, None, headers=tags)
     for ply in plies:
-            b.make_move(ply)
+        b.make_move(ply)
 
     return b
 

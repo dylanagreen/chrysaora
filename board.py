@@ -634,6 +634,11 @@ class Board():
         if ("O-O" in move or "0-0" in move) and check:
             return None
 
+        # Slices off the checkmate character. This is largely so that
+        # castling into putting the opponent in check parses correctly.
+        if move.endswith("+") or move.endswith("#"):
+            move = move[:-1]
+
         # Castling is the easiest to check for legality.
         # Kingside castling
         if move == "O-O" or move == "0-0":
@@ -1083,6 +1088,94 @@ class Board():
             alg2.append(self.piece_names[np.abs(promotion)])
 
         return ("".join(alg1), "".join(alg2))
+
+
+    # Converts the current board state to FEN.
+    def to_fen(self):
+
+        fen = []
+        # Loops over the board and gets the item at each location.
+        for y in range(0, 8):
+            for x in range(0, 8):
+                # Adds pieces to the FEN. Lower case for black, and upper
+                # for white. Since the dict is in uppercase we don't have
+                # do to anything for that.
+                piece = self.current_state[y, x]
+                if piece < 0:
+                    fen.append(self.piece_names[-piece].lower())
+                elif piece > 0:
+                    fen.append(self.piece_names[piece])
+                # Empty spaces are represented by the number of blank spaces
+                # between pieces. If the previous item is a piece or the list
+                # is empty we add a 1, if the previous space is a number we
+                # increment it by one for this empty space.
+                else:
+                    if len(fen) == 0 or not fen[-1].isdigit():
+                        fen.append("1")
+                    else:
+                        fen[-1] = str(int(fen[-1]) + 1)
+
+            # At the end of each row we need to add a "/" to indicate that
+            # the row has ended and we are moving to the next.
+            fen.append("/")
+
+        # The next field is the next person to move.
+        fen.append(" ")
+        if self.to_move == Color.WHITE:
+            fen.append("w")
+        else:
+            fen.append("b")
+
+        # The next field is castling rights.
+        fen.append(" ")
+        castle_names = {"WKR" : "K", "WQR" : "Q", "BKR" : "k", "BQR" : "q"}
+        for key, val in self.castle_dict.items():
+            if val:
+                fen.append(castle_names[key])
+
+        # En passant target square next. From wikipedia: If a pawn has just
+        # made a two-square move, this is the position "behind" the pawn.
+        fen.append(" ")
+        last_move = self.move_list[-1]
+
+        # If any piece is in the move, it obviously wasn't a pawn, so we have
+        # no en passant square. Even if it's a pawn promotion. You can't
+        # move two into a promotion.
+        found = False
+        pieces = "RNQBK"
+        for p in pieces:
+            if p in last_move:
+                fen.append("-")
+                found = True
+
+        if not found:
+            # Moves in move list are always in long algebraic, so if we get
+            # here we know that the first two characters are the start,
+            # and the second two are the end. If the difference is 2 then
+            # we can add the place in between to the fen.
+            endfile = ascii_lowercase.index(last_move[-1]) # End File = x
+            endrank = 8 - int(last_move[-2]) # End Rank = y
+            end = [endrank, endfile]
+
+            startfile = ascii_lowercase.index(last_move[0]) # End File = x
+            startrank = 8 - int(last_move[1]) # End Rank = y
+            start = [startrank, startfile]
+
+            diff = np.abs(end - start)
+            if np.array_equals(diff, [2, 0]):
+                fen.append(ascii_lowercase[end[0] + start[0] / 2])
+                fen.append(8 - startrank)
+
+        # Then the half move clock for the 50 move rule. Set to - for now
+        # until I implement the 50 move rule.
+        fen.append(" ")
+        fen.append("-")
+
+        # And finally the move number.
+        fen.append(" ")
+        fen.append(str(len(self.move_list) // 2))
+
+        return "".join(str(p) for p in fen)
 
 
 def load_fen(fen):

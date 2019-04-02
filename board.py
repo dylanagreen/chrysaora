@@ -775,10 +775,14 @@ class Board():
         mult = 1 if self.to_move.value else -1
         state = np.copy(self.current_state * mult)
 
-        def good_move(start, end, piece_num):
+        def good_move(start, end, piece_num, ep=False):
             s = np.copy(self.current_state)
             s.itemset((start[0], start[1]), 0)
             s.itemset((end[0], end[1]), piece_num)
+            
+            if ep:
+                s.itemset((start[0], end[1]), 0)
+            
             return not is_in_check(s, self.to_move)
 
         # This handy line of code prevents you from taking your own pieces.
@@ -818,7 +822,7 @@ class Board():
                 # opposite color"
                 ep_left = pawn[1] == end[1] - 1 and self.current_state[pawn[0], pawn[1] + 1] == d
                 ep_right = pawn[1] == end[1] + 1 and self.current_state[pawn[0], pawn[1] - 1] == d
-                ep_append = False
+                ep = False
 
                 # Can't en passant on turn 1 (or anything less than turn 3 I
                 # think) so if you got this far it's not a legal pawn move.
@@ -830,16 +834,16 @@ class Board():
                         # move three moves after the pawn moved.
                         if previous_state[end[0] + d, end[1]] == d:
                             found = pawn
-                            ep_append = True
+                            ep = True
 
                 # Ensures that moving this piece doesn't end in check.
                 # In theory it could end in a promotion, but if moving this
                 # piece leaves us in check then it won't matter what
                 # piece it promotes to so I can just check as a pawn.
-                if not np.array_equal(found, []) and good_move(found, end, piece_num):
+                if not np.array_equal(found, []) and good_move(found, end, piece_num, ep):
                     if promotion:
                         return self.row_column_to_algebraic(pawn, end, piece_num, promotion_piece)[1]
-                    if ep_append:
+                    if ep:
                         return self.row_column_to_algebraic(found, end, piece_num)[1] + "e.p."
                     return self.row_column_to_algebraic(found, end, piece_num)[1]
 
@@ -1165,12 +1169,7 @@ def load_pgn(name, loc="games"):
     # Makes all the moves and then returns the board state at the end.
     b = Board(None, None, None, headers=tags)
     for ply in plies:
-        #try:
-            b.make_move(ply)
-        #except Exception as e:
-         #   print(e)
-          #  print(ply)
-           # return b
+        b.make_move(ply)
 
     return b
 

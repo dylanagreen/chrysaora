@@ -1187,7 +1187,8 @@ def save_pgn(board):
         name = headers["White"] + "vs" + headers["Black"] + headers["Date"] + ".pgn"
     else:
         name = "???vs???" + str(date.today()) + ".pgn"
-    loc = "results/"
+
+    loc = os.path.join(os.path.dirname(__file__), "results")
 
     if not os.path.exists(loc):
         os.makedirs(loc)

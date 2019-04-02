@@ -758,6 +758,16 @@ class Board():
 
             pieces = good
 
+        def good_move(start, end, piece_num, ep=False):
+            s = np.copy(self.current_state)
+            s.itemset((start[0], start[1]), 0)
+            s.itemset((end[0], end[1]), piece_num)
+
+            if ep:
+                s.itemset((start[0], end[1]), 0)
+
+            return not is_in_check(s, self.to_move)
+
         # Direction opposite that which the color's pawns move.
         # So 1 is downwards, opposite White's pawns going upwards.
         d = -1 if self.to_move.value else 1
@@ -774,16 +784,6 @@ class Board():
 
         mult = 1 if self.to_move.value else -1
         state = np.copy(self.current_state * mult)
-
-        def good_move(start, end, piece_num, ep=False):
-            s = np.copy(self.current_state)
-            s.itemset((start[0], start[1]), 0)
-            s.itemset((end[0], end[1]), piece_num)
-            
-            if ep:
-                s.itemset((start[0], end[1]), 0)
-            
-            return not is_in_check(s, self.to_move)
 
         # This handy line of code prevents you from taking your own pieces.
         if state[end[0], end[1]] > 0:
@@ -820,19 +820,24 @@ class Board():
 
                 # Interestingly d happens to correspond to "pawn of the
                 # opposite color"
-                ep_left = pawn[1] == end[1] - 1 and self.current_state[pawn[0], pawn[1] + 1] == d
-                ep_right = pawn[1] == end[1] + 1 and self.current_state[pawn[0], pawn[1] - 1] == d
+                ep_left = pawn[1] == end[1] - 1 and self.current_state[pawn[0], end[1]] == d
+                ep_right = pawn[1] == end[1] + 1 and self.current_state[pawn[0], end[1]] == d
+
+                # We need to start on the correct file for en passant.
+                good_start = pawn[0] == ep_file
+                # Makes sure the ending far enough for a good en passant.
+                good_end = 0 < end[0] < 7
                 ep = False
 
                 # Can't en passant on turn 1 (or anything less than turn 3 I
                 # think) so if you got this far it's not a legal pawn move.
                 if len(self.game_states) > 1:
                     previous_state = np.copy(self.game_states[-1])
-                    if state[end[0], end[1]] == 0 and (ep_left or ep_right):
+                    if state[end[0], end[1]] == 0 and (ep_left or ep_right) and good_start:
                         # Checks that in the previous state the pawn actually
                         # moved two spaces. This prevents trying an en passant
                         # move three moves after the pawn moved.
-                        if previous_state[end[0] + d, end[1]] == d:
+                        if good_end and previous_state[end[0] + d, end[1]] == d:
                             found = pawn
                             ep = True
 

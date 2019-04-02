@@ -1116,7 +1116,8 @@ def load_pgn(name, loc="games"):
     if not name.endswith(".pgn"):
         name = name + ".pgn"
 
-    loc = os.path.join(loc, name)
+    loc = os.path.join(os.path.dirname(__file__),*[loc, name])
+
     if not os.path.isfile(loc):
         print("PGN not found!")
         return

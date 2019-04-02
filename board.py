@@ -544,7 +544,7 @@ class Board():
 
         # Updates the castle dict for castling rights.
         if piece == "K" or castle_move:
-            if self.to_move.value:
+            if self.to_move == Color.WHITE:
                 self.castle_dict["WKR"] = False
                 self.castle_dict["WQR"] = False
             else:
@@ -581,7 +581,7 @@ class Board():
             # If there are no moves that get us out of check we need to see if
             # we're in check right now.
             # If we are that's check mate. If we're not... that's a stalemate.
-            color = Color.BLACK if self.to_move.value else Color.WHITE
+            color = Color.BLACK if self.to_move == Color.WHITE else Color.WHITE
             responses = self.generate_moves(color)
             if len(responses) == 0:
                 check = is_in_check(self.current_state, color)
@@ -593,7 +593,7 @@ class Board():
                 else:
                     self.status = Status.DRAW
 
-        self.to_move = Color.BLACK if self.to_move.value else Color.WHITE
+        self.to_move = Color.BLACK if self.to_move == Color.WHITE else Color.WHITE
         self.move_list.append(legal[1])
 
 
@@ -637,9 +637,9 @@ class Board():
         # Castling is the easiest to check for legality.
         # Kingside castling
         if move == "O-O" or move == "0-0":
-            check = "WKR" if self.to_move.value else "BKR"
-            rank = 7 if self.to_move.value else 0
-            king = 6 if self.to_move.value else -6
+            check = "WKR" if self.to_move == Color.WHITE else "BKR"
+            rank = 7 if self.to_move == Color.WHITE else 0
+            king = 6 if self.to_move == Color.WHITE else -6
             between = self.current_state[rank, 5:7]
             between = between != 0
             if self.castle_dict[check] and np.sum(between)== 0:
@@ -657,9 +657,9 @@ class Board():
                 return None
         # Queenside castling
         elif move == "O-O-O" or move == "0-0-0":
-            check = "WQR" if self.to_move.value else "BQR"
-            rank = 7 if self.to_move.value else 0
-            king = 6 if self.to_move.value else -6
+            check = "WQR" if self.to_move == Color.WHITE else "BQR"
+            rank = 7 if self.to_move == Color.WHITE else 0
+            king = 6 if self.to_move == Color.WHITE else -6
             between = self.current_state[rank, 1:4]
             between = between != 0
             # Need to make sure this is allowed
@@ -724,7 +724,7 @@ class Board():
         endrank = 8 - int(dest[1]) # End Rank = y
         end = [endrank, endfile]
 
-        mult = 1 if self.to_move.value else -1
+        mult = 1 if self.to_move == Color.WHITE else -1
         piece_num = self.piece_number[piece] * mult
         promotion_piece = self.piece_number[promotion_piece] * mult
         pieces = find_piece(self.current_state, piece_num)
@@ -770,19 +770,19 @@ class Board():
 
         # Direction opposite that which the color's pawns move.
         # So 1 is downwards, opposite White's pawns going upwards.
-        d = -1 if self.to_move.value else 1
+        d = -1 if self.to_move == Color.WHITE else 1
 
         # The starting file for the pawn row, for double move checking
-        pawn_start = 6 if self.to_move.value else 1
+        pawn_start = 6 if self.to_move == Color.WHITE else 1
 
         # The file the pawn needs to be on to take en passant.
-        ep_file = 3 if self.to_move.value else 4
+        ep_file = 3 if self.to_move == Color.WHITE else 4
 
         # The ending rank for pawn promotion
-        pawn_end = 0 if self.to_move.value else 7
+        pawn_end = 0 if self.to_move == Color.WHITE else 7
         # Tried to put these in some sort of likelihood order.
 
-        mult = 1 if self.to_move.value else -1
+        mult = 1 if self.to_move == Color.WHITE else -1
         state = np.copy(self.current_state * mult)
 
         # This handy line of code prevents you from taking your own pieces.
@@ -796,7 +796,7 @@ class Board():
                 promotion = False
                 # Ensures that this pawn would actually have to move forward
                 # and not backward to get to the ending square.
-                direc = pawn[0] < end[0] if self.to_move.value else pawn[0] > end[0]
+                direc = pawn[0] < end[0] if self.to_move == Color.WHITE else pawn[0] > end[0]
                 if direc:
                     continue
 

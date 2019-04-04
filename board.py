@@ -74,6 +74,8 @@ class Board():
         else:
             self.headers = {}
 
+        self.half_move_clock = 0
+
     def generate_moves(self, color):
         pawns = self.generate_pawn_moves(color)
         knights = self.generate_knight_moves(color)
@@ -535,7 +537,7 @@ class Board():
 
         self.current_state = np.copy(new_state)
 
-        piece = ""
+        piece = "P"
         for i, c in enumerate(move):
             # If we have an = then this is the piece the pawn promotes to.
             # Pawns can promote to rooks which would fubar the dict.
@@ -563,6 +565,12 @@ class Board():
                 self.castle_dict["WQR"] = False
             elif legal[1][1:3] == "h1":
                 self.castle_dict["WKR"] = False
+
+
+        if piece == "P" or "x" in legal[1]:
+            self.half_move_clock = 0
+        else:
+            self.half_move_clock += 1
 
         # We need to update castling this side if the rook gets taken without
         # ever moving. We can't castle with a rook that doesn't exist.
@@ -1169,7 +1177,7 @@ class Board():
         # Then the half move clock for the 50 move rule. Set to - for now
         # until I implement the 50 move rule.
         fen.append(" ")
-        fen.append("-")
+        fen.append(str(self.half_move_clock))
 
         # And finally the move number.
         fen.append(" ")

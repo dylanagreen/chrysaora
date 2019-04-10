@@ -74,7 +74,12 @@ if __name__ == "__main__":
     cmd = input()
 
     # Initiliazes the log.
-    log_name = os.path.join(os.path.dirname(__file__),*["logs", str(time.time()) + ".log"])
+    log_folder = os.path.join(os.path.dirname(__file__), "logs")
+    if not os.path.exists(log_folder):
+        os.makedirs(log_folder)
+
+    log_name = os.path.join(log_folder, str(time.time()) + ".log")
+
     logging.basicConfig(filename=log_name, level=logging.DEBUG)
     logging.debug(cmd)
 

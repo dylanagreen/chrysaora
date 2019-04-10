@@ -41,10 +41,8 @@ def run_cli():
     headers["Black"] = "Chrysaora 0.002"
     headers["Date"] = str(date.today())
 
-
-    print(str(current_board))
-
     current_board = board.Board(None, None, None, headers=headers)
+    ai = engine.Engine(current_board)
     while current_board.status == board.Status.IN_PROGRESS:
         try:
             m = input("Make a move: ")

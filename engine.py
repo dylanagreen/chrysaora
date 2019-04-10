@@ -1,4 +1,5 @@
 import random
+import os
 
 import numpy as np
 import torch
@@ -112,12 +113,17 @@ class SkipNet(nn.Module):
 
 class Engine():
 
-    def __init__(self, color, new_board, impl="net"):
-        self.color = color
+    def __init__(self, new_board, impl="net"):
         self.board = new_board
 
+        # Time dictionary for time management code.
+        self.time_params = {"wtime" : None, "btime" : None, "winc" : None,
+                            "binc" : None}
+
         self.brain = SkipNet()
-        self.brain.load_state_dict(torch.load("SkipNet-49.pt", map_location="cpu"))
+
+        weights = os.path.join(os.path.dirname(__file__),"SkipNet-89.pt")
+        self.brain.load_state_dict(torch.load(weights, map_location="cpu"))
 
         # Sets the network to evaluation mode.
         # There's a batch normalization layer which runs differently in
@@ -127,12 +133,14 @@ class Engine():
         # Keeping that random implemenation around for testing.
         if impl == "random":
             self.eval = self.random_move
+        elif impl == "greedy":
+            self.eval = self.greedy_move
         else:
             self.eval = self.evaluate_moves
 
 
     def find_move(self):
-        moves = self.board.generate_moves(self.color)
+        moves = self.board.generate_moves(self.board.to_move)
 
         return self.eval(moves)
 
@@ -144,7 +152,7 @@ class Engine():
 
         # Transformation object, converts to a tensor then normalizes.
         normalize = transforms.Normalize(mean=[0.485], std=[0.229])
-        trans = transforms.Compose([transforms.ToTensor(), normalize])
+        trans = transforms.Compose([transforms.ToTensor()])#, normalize])
 
         # Goes through each moves, converts it to a long move, and then
         # gets the board state for that long algebraic.
@@ -159,8 +167,8 @@ class Engine():
 
             # Once we have the state, we run the same conversions on it that
             # were run when the network was trained.
-            s = s.astype("uint8")
-            s = np.where(s == 0, 128, s)
+            #s = s.astype("uint8")
+            #s = np.where(s == 0, 128, s)
             s = s.reshape((8, 8, 1))
             s = trans(s)
             s.resize_((1, 1, 8, 8))
@@ -171,7 +179,7 @@ class Engine():
         # Runs the boards through the network, and then gets their label.
         # Remember:
         # 0 = draw, 1 = black win, 2 = white win.
-        outputs = self.brain(states)
+        outputs = self.brain(states.float())
         _, label = torch.max(outputs.data, 1)
 
         # Shifts the outputs to numpy ndarrays.
@@ -179,7 +187,7 @@ class Engine():
         labels = label.numpy()
 
         # The liklihood values for wins and draws.
-        win_index = 2 if self.color == board.Color.WHITE else 1
+        win_index = 2 if self.board.to_move == board.Color.WHITE else 1
         wins = outs[labels == win_index]
         draws = outs[labels == 0]
 
@@ -209,3 +217,15 @@ class Engine():
     def random_move(self, moves):
         return random.choice(moves)
 
+    def greedy_move(self, moves):
+        moves = self.board.generate_moves(self.board.to_move)
+
+        captures = []
+        for move in moves:
+            if "x" in move:
+                captures.append(move)
+
+        if captures:
+            return random.choice(captures)
+        else:
+            return random.choice(moves)

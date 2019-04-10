@@ -90,6 +90,8 @@ class UCI():
             self.set_up_position(cmd)
         elif cmd[0].lower() == "isready":
             self.send_command("readyok")
+        elif cmd[0].lower() == "quit":
+            sys.exit()
         elif cmd[0].lower() == "go":
             # This is when the engine will actaully compute.
             self.compute(cmd)

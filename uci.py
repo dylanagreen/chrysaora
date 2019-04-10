@@ -137,7 +137,7 @@ class UCI():
         self.board = board.Board(None, None, None, None)
 
         # If we load from a fen just load the board from the fen.
-        if cmd[1].lower() == "fen":
+        if "fen" in cmd:
             self.board = board.load_fen(" ".join(cmd[2:]))
         # We only run this if we start from start pos and then get
         # given moves.

@@ -141,10 +141,11 @@ class UCI():
             self.board = board.load_fen(" ".join(cmd[2:]))
         # We only run this if we start from start pos and then get
         # given moves.
-        elif "moves" in cmd:
+        if "moves" in cmd:
             # Strips out the moves, then converts them to algebraic and then
             # Makes them.
-            for move in cmd[3:]:
+            start = cmd.index("moves")
+            for move in cmd[start+1:]:
                 algebraic = self.uci_to_algebraic(move)
                 self.board.make_move(algebraic)
 

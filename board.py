@@ -6,7 +6,12 @@ import os.path
 import re
 
 import numpy as np
-from IPython.display import SVG
+
+try:
+    from IPython.display import SVG
+    svg_support = True
+except ImportError:
+    svg_support = False
 
 
 # Enum for white or black.
@@ -478,6 +483,9 @@ class Board():
 
 
     def get_board_svg(self):
+        if not svg_support:
+            print("IPython not found.")
+            return None
         # Parses the board in first as a background.
         tree = ET.ElementTree()
         tree.parse("pieces/board.svg")

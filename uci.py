@@ -10,7 +10,7 @@ import engine
 
 class UCI():
     def __init__(self):
-        self.id = {"name" : "Chrysaora 0.002", "author" : "Dylan Green"}
+        self.id = {"name" : "Chrysaora 0.003", "author" : "Dylan Green"}
         self.options = {}
 
         # An internal representation of the board that will get passed to the
@@ -20,6 +20,13 @@ class UCI():
         # The engine instance. Defaults to start of the game and playing as
         # white. As the board is updated the engine will be as well.
         self.engine = engine.Engine(self.board)
+
+        # A record of the previous "position" command.
+        # I use this to compare to the current one, allowing the engine to
+        # only make the two new moves.
+        # This avoids a slow down when the list of moves becomes unmanagably
+        # long.
+        self.previous_pos = []
 
     def uci_to_algebraic(self, move):
         # Promotions are in the form say a7a8q so length 5
@@ -95,6 +102,9 @@ class UCI():
         elif cmd[0].lower() == "go":
             # This is when the engine will actaully compute.
             self.compute(cmd)
+        #elif cmd[0].lower() == "ucinewgame":
+         #   self.board = board.Board(None, None, None, None)
+          #  self.previous_pos = []
 
 
     # The method that tells the engine to analyze and then returns the best
@@ -133,21 +143,46 @@ class UCI():
 
 
     def set_up_position(self, cmd):
-        # Starts with a clean board.
-        self.board = board.Board(None, None, None, None)
 
         # If we load from a fen just load the board from the fen.
         if "fen" in cmd:
             self.board = board.load_fen(" ".join(cmd[2:]))
-        # We only run this if we start from start pos and then get
-        # given moves.
+        # We only run this if we get given moves.
         if "moves" in cmd:
-            # Strips out the moves, then converts them to algebraic and then
-            # Makes them.
+            # Default starting index.
             start = cmd.index("moves")
+            # Checks that all the moves except the last two are identical
+            # to the previous position command. If they are then we
+            # can start the moves from the last two.
+            # Need to ensure the lengths of the two even match up to try.
+            if len(self.previous_pos) == len(cmd) - 2:
+                equal = np.asarray(self.previous_pos)==np.asarray(cmd[:-2])
+                same = np.sum(equal) == len(self.previous_pos)
+            else:
+                same = False
+
+            # If we only have one move then setting the start to do the "final
+            # two moves" make it try pass "moves" as a move.
+            if same and len(cmd) > 4:
+                start = -3
+            # If they're not the same we'll have to start over.
+            else:
+                self.board = board.Board(None, None, None, None)
+
+            # Strips out the moves, then converts them to algebraic and then
+            # makes them.
             for move in cmd[start+1:]:
+                logging.debug("Move: " + str(move))
                 algebraic = self.uci_to_algebraic(move)
                 self.board.make_move(algebraic)
+
+        # When the command is just start post we should reset the board to the
+        # start pos.
+        if "startpos" in cmd and not "moves" in cmd:
+            logging.debug("Reset Board")
+            self.board = board.Board(None, None, None, None)
+
+        self.previous_pos = cmd
 
 
     def identify(self):

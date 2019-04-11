@@ -143,27 +143,30 @@ class UCI():
 
 
     def set_up_position(self, cmd):
+        # Checks that all the moves except the last two are identical
+        # to the previous position command. If they are then we
+        # can start the moves from the last two.
+        # Need to ensure the lengths of the two even match up to try.
+        if len(self.previous_pos) == len(cmd) - 2:
+            equal = np.asarray(self.previous_pos)==np.asarray(cmd[:-2])
+            same = np.sum(equal) == len(self.previous_pos)
+        else:
+            same = False
 
         # If we load from a fen just load the board from the fen.
-        if "fen" in cmd:
+        # We don't want to load the fen again if we're skipping moves.
+        if "fen" in cmd and not same:
             self.board = board.load_fen(" ".join(cmd[2:]))
         # We only run this if we get given moves.
         if "moves" in cmd:
             # Default starting index.
             start = cmd.index("moves")
-            # Checks that all the moves except the last two are identical
-            # to the previous position command. If they are then we
-            # can start the moves from the last two.
-            # Need to ensure the lengths of the two even match up to try.
-            if len(self.previous_pos) == len(cmd) - 2:
-                equal = np.asarray(self.previous_pos)==np.asarray(cmd[:-2])
-                same = np.sum(equal) == len(self.previous_pos)
-            else:
-                same = False
 
             # If we only have one move then setting the start to do the "final
             # two moves" make it try pass "moves" as a move.
-            if same and len(cmd) > 4:
+            # start + 2 < len(command) ensures that there are at least
+            # two moves to be made so setting it to -3 works.
+            if same and start + 2 < len(cmd):
                 start = -3
             # If they're not the same we'll have to start over.
             else:
@@ -172,7 +175,6 @@ class UCI():
             # Strips out the moves, then converts them to algebraic and then
             # makes them.
             for move in cmd[start+1:]:
-                logging.debug("Move: " + str(move))
                 algebraic = self.uci_to_algebraic(move)
                 self.board.make_move(algebraic)
 

@@ -1133,7 +1133,9 @@ class Board():
 
             # At the end of each row we need to add a "/" to indicate that
             # the row has ended and we are moving to the next.
-            fen.append("/")
+            # Don't want an ending / though.
+            if y < 7:
+                fen.append("/")
 
         # The next field is the next person to move.
         fen.append(" ")
@@ -1169,16 +1171,16 @@ class Board():
             # here we know that the first two characters are the start,
             # and the second two are the end. If the difference is 2 then
             # we can add the place in between to the fen.
-            endfile = ascii_lowercase.index(last_move[-1]) # End File = x
-            endrank = 8 - int(last_move[-2]) # End Rank = y
+            endfile = ascii_lowercase.index(last_move[-2]) # End File = x
+            endrank = 8 - int(last_move[-1]) # End Rank = y
             end = [endrank, endfile]
 
             startfile = ascii_lowercase.index(last_move[0]) # End File = x
             startrank = 8 - int(last_move[1]) # End Rank = y
             start = [startrank, startfile]
 
-            diff = np.abs(end - start)
-            if np.array_equals(diff, [2, 0]):
+            diff = np.abs(np.asarray(end) - np.asarray(start))
+            if np.array_equal(diff, [2, 0]):
                 fen.append(ascii_lowercase[end[0] + start[0] / 2])
                 fen.append(8 - startrank)
 

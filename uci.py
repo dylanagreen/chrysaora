@@ -169,8 +169,10 @@ class UCI():
             if same and start + 2 < len(cmd):
                 start = -3
             # If they're not the same we'll have to start over.
+            elif "fen" in cmd:
+                self.board = board.load_fen(" ".join(cmd[2:]))
             else:
-                self.board = board.Board(None, None, None, None)
+                self.board = board.Board(None, None, None)
 
             # Strips out the moves, then converts them to algebraic and then
             # makes them.

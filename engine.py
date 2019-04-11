@@ -180,6 +180,7 @@ class Engine():
         # Remember:
         # 0 = draw, 1 = black win, 2 = white win.
         outputs = self.brain(states.float())
+        outputs = F.softmax(outputs, dim=1)
         _, label = torch.max(outputs.data, 1)
 
         # Shifts the outputs to numpy ndarrays.
@@ -192,8 +193,8 @@ class Engine():
         draws = outs[labels == 0]
 
         if len(wins) > 0:
-            # Looks for the move evaluation with the highest liklihood of
-            # being a black win.
+            # Looks for the move evaluation with the highest probability of
+            # being a win for the engine's side.
             best = np.argmax(wins[..., win_index])
 
             # This reduces the moves array to just the moves that correspond
@@ -201,7 +202,9 @@ class Engine():
             b_moves = np.asarray(moves)[labels == win_index]
             return b_moves[best]
         elif len(draws) > 0:
-            best = np.argmax(draws[..., 0])
+            # Looks for the move evaluation with the highest probability of
+            # being a win for the engine's side.
+            best = np.argmax(draws[..., win_index])
             # This reduces the moves array to just the moves that correspond
             # with the draw evaluations.
             b_moves = np.asarray(moves)[labels == 0]

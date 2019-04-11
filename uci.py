@@ -63,6 +63,20 @@ class UCI():
 
 
     def algebraic_to_uci(self, move):
+        # Converts the castling move.
+        if "O-" in move:
+            long_algebraic = ["e"]
+            rank = "1" if self.board.to_move == board.Color.WHITE else "8"
+            long_algebraic.append(rank)
+            if move == "O-O":
+                long_algebraic.append("g")
+
+            elif move == "O-O-O":
+                long_algebraic.append("c")
+
+            long_algebraic.append(rank)
+            return "".join(long_algebraic)
+
         long_algebraic = self.board.short_algebraic_to_long_algebraic(move)
 
         # No capture x in uci format.

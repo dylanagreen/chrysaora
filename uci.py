@@ -102,9 +102,9 @@ class UCI():
         elif cmd[0].lower() == "go":
             # This is when the engine will actaully compute.
             self.compute(cmd)
-        #elif cmd[0].lower() == "ucinewgame":
-         #   self.board = board.Board(None, None, None, None)
-          #  self.previous_pos = []
+        elif cmd[0].lower() == "ucinewgame":
+            self.board = board.Board(None, None, None, None)
+            self.previous_pos = []
 
 
     # The method that tells the engine to analyze and then returns the best

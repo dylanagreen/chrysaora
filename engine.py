@@ -1,5 +1,6 @@
 import random
 import os
+import logging
 
 import numpy as np
 import torch
@@ -142,11 +143,14 @@ class Engine():
     def find_move(self):
         moves = self.board.generate_moves(self.board.to_move)
 
-        return self.eval(moves)
+        evals = self.eval(moves)
+
+        best = np.argmax(eval)
+        return moves[best]
 
 
     # Evaluates and returns the best move for now.
-    # TODO refactor to return move evaluations, use find move to run search
+    # TODO refactor to return move evaluations, use search move to run search and find move to pick one.
     def evaluate_moves(self, moves):
         states = []
 
@@ -187,34 +191,16 @@ class Engine():
         outs = outputs.data.numpy()
         labels = label.numpy()
 
-        # The liklihood values for wins and draws.
-        win_index = 2 if self.board.to_move == board.Color.WHITE else 1
-        wins = outs[labels == win_index]
-        draws = outs[labels == 0]
+        weights = [0, 0, 1] if self.board.to_move == board.Color.WHITE else [0, 1, 0]
+        vals = np.dot(outs[...,:3], weights)
 
-        if len(wins) > 0:
-            # Looks for the move evaluation with the highest probability of
-            # being a win for the engine's side.
-            best = np.argmax(wins[..., win_index])
+        logging.debug(str(vals))
+        logging.debug(str(moves))
+        return vals
 
-            # This reduces the moves array to just the moves that correspond
-            # with the win evaluations.
-            b_moves = np.asarray(moves)[labels == win_index]
-            return b_moves[best]
-        elif len(draws) > 0:
-            # Looks for the move evaluation with the highest probability of
-            # being a win for the engine's side.
-            best = np.argmax(draws[..., win_index])
-            # This reduces the moves array to just the moves that correspond
-            # with the draw evaluations.
-            b_moves = np.asarray(moves)[labels == 0]
-            return b_moves[best]
 
-        # If for some reason every move is winning for the opposite side
-        # just return the first move.
-        # This is lazy.
-        # TODO evaluation for all opposite win moves.
-        return moves[0]
+    def search_moves(self, moves, depth=2):
+
 
 
     def random_move(self, moves):

@@ -141,9 +141,8 @@ class Engine():
 
 
     def find_move(self):
-        moves = self.board.generate_moves(self.board.to_move)
-
-        evals = self.eval(moves)
+        moves, states = self.search_moves()
+        evals = self.eval(states)
 
         best = np.argmax(eval)
         return moves[best]
@@ -151,7 +150,7 @@ class Engine():
 
     # Evaluates and returns the best move for now.
     # TODO refactor to return move evaluations, use search move to run search and find move to pick one.
-    def evaluate_moves(self, moves):
+    def evaluate_moves(self, board_states):
         states = []
 
         # Transformation object, converts to a tensor then normalizes.
@@ -160,15 +159,7 @@ class Engine():
 
         # Goes through each moves, converts it to a long move, and then
         # gets the board state for that long algebraic.
-        for m in moves:
-            long_move = self.board.short_algebraic_to_long_algebraic(m)
-
-            if "O-O" in long_move or "0-0" in long_move:
-                s = self.board.castle_algebraic_to_boardstate(long_move)
-
-            else:
-                s = self.board.long_algebraic_to_boardstate(long_move)
-
+        for s in board_states:
             # Once we have the state, we run the same conversions on it that
             # were run when the network was trained.
             #s = s.astype("uint8")
@@ -194,13 +185,28 @@ class Engine():
         weights = [0, 0, 1] if self.board.to_move == board.Color.WHITE else [0, 1, 0]
         vals = np.dot(outs[...,:3], weights)
 
-        logging.debug(str(vals))
-        logging.debug(str(moves))
         return vals
 
 
-    def search_moves(self, moves, depth=2):
+    # Depth in plies.
+    def search_moves(self):
+        moves = self.board.generate_moves(self.board.to_move)
 
+        states = []
+        # Goes through each moves, converts it to a long move, and then
+        # gets the board state for that long algebraic.
+        for m in moves:
+            long_move = self.board.short_algebraic_to_long_algebraic(m)
+
+            if "O-O" in long_move or "0-0" in long_move:
+                s = self.board.castle_algebraic_to_boardstate(long_move)
+
+            else:
+                s = self.board.long_algebraic_to_boardstate(long_move)
+
+            states.append(s)
+
+        return (moves, states)
 
 
     def random_move(self, moves):

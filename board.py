@@ -616,6 +616,7 @@ class Board():
     def unmake_move(self):
         self.current_state = np.copy(self.game_states.pop(-1))
         self.move_list.pop(-1) # Take the last move off the move list as well.
+        self.to_move = Color.WHITE if self.to_move == Color.BLACK else Color.BLACK
 
 
     def check_move_legality(self, move):

@@ -141,7 +141,7 @@ class Board():
         # Mult required to simplify finding algorithm.
         # Could use piece here instead, but in the end there are the
         # same amount of multiplications done.
-        mult = 1 if color.value else -1
+        mult = 1 if color == Color.WHITE else -1
         # Direction of travel, reverse for black and white.
         # Positive is going downwards, negative is going upwards.
         d = -1 * mult
@@ -234,7 +234,7 @@ class Board():
     def generate_knight_moves(self, color):
         # This code was written from white point of view but flipping piece sign
         # allows it to work for black as well.
-        mult = 1 if color.value else -1
+        mult = 1 if color == Color.WHITE else -1
         state = np.copy(self.current_state * mult)
 
         knights = find_piece(state, self.piece_number["N"])
@@ -278,7 +278,7 @@ class Board():
     def generate_rook_moves(self, color):
         # This code was written from white point of view but flipping piece sign
         # allows it to work for black as well.
-        mult = 1 if color.value else -1
+        mult = 1 if color == Color.WHITE else -1
         state = np.copy(self.current_state * mult)
         rooks = find_piece(state, self.piece_number["R"])
 
@@ -288,7 +288,7 @@ class Board():
     def generate_straight_moves(self, color, starts, queen=False):
         # This code was written from white point of view but flipping piece sign
         # allows it to work for black as well.
-        mult = 1 if color.value else -1
+        mult = 1 if color == Color.WHITE else -1
         state = np.copy(self.current_state * mult)
 
         piece_val = 5 if queen else 2
@@ -339,7 +339,7 @@ class Board():
 
 
     def generate_bishop_moves(self, color):
-        mult = 1 if color.value else -1
+        mult = 1 if color == Color.WHITE else -1
         state = np.copy(self.current_state * mult)
         bishops = find_piece(state, self.piece_number["B"])
 
@@ -347,7 +347,7 @@ class Board():
 
 
     def generate_diagonal_moves(self, color, starts, queen=False):
-        mult = 1 if color.value else -1
+        mult = 1 if color == Color.WHITE else -1
         state = np.copy(self.current_state * mult)
 
         piece_val = 5 if queen else 4
@@ -393,7 +393,7 @@ class Board():
         return end_states
 
     def generate_queen_moves(self, color):
-        mult = 1 if color.value else -1
+        mult = 1 if color == Color.WHITE else -1
         state = np.copy(self.current_state * mult)
         queens = find_piece(state, self.piece_number["Q"])
 
@@ -406,7 +406,7 @@ class Board():
 
 
     def generate_king_moves(self, color):
-        mult = 1 if color.value else -1
+        mult = 1 if color == Color.WHITE else -1
         state = np.copy(self.current_state * mult)
 
         x, y = np.where(state==6)
@@ -446,9 +446,9 @@ class Board():
         if is_in_check(self.current_state, color):
             return end_states
 
-        rank = 7 if color.value else 0 # 0 for Black, 7 for White
-        king = 6 if color.value else -6
-        kingside = "WKR" if color.value else "BKR"
+        rank = 7 if color == Color.WHITE else 0 # 0 for Black, 7 for White
+        king = 6 if color == Color.WHITE else -6
+        kingside = "WKR" if color == Color.WHITE else "BKR"
         between = self.current_state[rank, 5:7]
         between = between != 0
         if self.castle_dict[kingside] and np.sum(between)== 0:
@@ -465,7 +465,7 @@ class Board():
             if not check:
                 end_states.append("O-O")
 
-        queenside = "WQR" if color.value else "BQR"
+        queenside = "WQR" if color == Color.WHITE else "BQR"
         between = self.current_state[rank, 1:4]
         between = between != 0
         if self.castle_dict[queenside] and np.sum(between)== 0:
@@ -978,13 +978,13 @@ class Board():
         rook = self.piece_number["R"]
 
         # Flips the piece to negative if we're castling for black.
-        if not color.value:
+        if not color == Color.WHITE:
             king = king * -1
             rook = rook * -1
 
         # Kingside castling
         if move == "O-O" or move == "0-0":
-            rank = 7 if color.value else 0
+            rank = 7 if color == Color.WHITE else 0
             place((rank, 7), 0)
             place((rank, 4), 0)
             place((rank, 6), king)
@@ -992,7 +992,7 @@ class Board():
             return new_state
         # Queenside castling
         elif move == "O-O-O" or move == "0-0-0":
-            rank = 7 if color.value else 0
+            rank = 7 if color == Color.WHITE else 0
             place((rank, 0), 0)
             place((rank, 4), 0)
             place((rank, 2), king)
@@ -1340,16 +1340,16 @@ def is_in_check(state, color):
     # The direction a pawn must travel to take this color's king.
     # I.e. Black pawns must travel in the positive y (downward) direction
     # To take a white king.
-    d = 1 if color.value else -1
+    d = 1 if color == Color.WHITE else -1
 
-    mult = 1 if color.value else -1
+    mult = 1 if color == Color.WHITE else -1
 
     # You shouldn't need a loop, because why would you have more than 1 king?
     # Just reshape instead
     king = find_piece(state*mult, 6).reshape(2)
 
     # Check pawns first because they're the easiest.
-    pawn = -1 if color.value else 1
+    pawn = -1 if color == Color.WHITE else 1
 
     # Need to ensure that the king is on any rank but the last one.
     # No pawns can put you in check in the last rank anyway.
@@ -1361,7 +1361,7 @@ def is_in_check(state, color):
 
     # Checks if you'd be in check from the opposite king.
     # This should only trigger on you moving your king into that position.
-    opposite_king = -6 if color.value else 6
+    opposite_king = -6 if color == Color.WHITE else 6
     opposite_loc = find_piece(state, opposite_king).reshape(2)
     diff = np.abs(opposite_loc - king)
     # If the other king is vertical or horizontal the sum will be 1

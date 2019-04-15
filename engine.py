@@ -2,6 +2,7 @@ import random
 import os
 import logging
 import copy
+import time
 
 import numpy as np
 import torch
@@ -10,6 +11,7 @@ import torch.nn.functional as F
 import torchvision.transforms as transforms
 
 import board
+import uci
 
 
 # Original chess network
@@ -193,11 +195,20 @@ class Engine():
 
     # Depth in plies.
     def search_moves(self):
+        start_time = time.time()
         moves = self.board.generate_moves(self.board.to_move)
+        #logging.debug(moves)
 
-        logging.debug(moves)
+        depth_time = time.time()
+        diff = depth_time - start_time
+        nps = round(len(moves) / diff)
+        diff = round(diff * 1000) # Converts seconds to ms
+
+        info = "info depth 1 time {} nps {} nodes {}".format(str(diff), str(nps), str(len(moves)))
+        logging.debug(info)
 
         evals = []
+        nodes = 0
         # Goes through each moves, converts it to a long move, and then
         # gets the board state for that long algebraic.
         for m in moves:
@@ -223,9 +234,17 @@ class Engine():
             # Evaluate all the board states and append the minimum eval value.
             vals = self.evaluate_moves(states)
             evals.append(np.min(vals))
+            nodes += len(states)
 
-        #evals = self.eval(states)
-        logging.debug(evals)
+        depth_time = time.time()
+        diff = depth_time - start_time
+        nps = round(nodes / diff)
+        diff = round(diff * 1000)
+
+        info = "info depth 2 time {} nps {} nodes {}".format(str(diff), str(nps), str(nodes))
+        logging.debug(info)
+
+        #logging.debug(evals)
 
         return (moves, evals)
 

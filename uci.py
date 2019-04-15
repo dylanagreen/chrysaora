@@ -96,21 +96,13 @@ class UCI():
             return long_algebraic[1:]
 
 
-    def send_command(self, cmd):
-        # Logs the output
-        logging.debug("Output: " + cmd)
-
-        sys.stdout.write(cmd + "\n")
-        sys.stdout.flush()
-
-
     def decrypt_uci(self, cmd):
         cmd = cmd.split(" ")
 
         if cmd[0].lower() == "position":
             self.set_up_position(cmd)
         elif cmd[0].lower() == "isready":
-            self.send_command("readyok")
+            send_command("readyok")
         elif cmd[0].lower() == "quit":
             sys.exit()
         elif cmd[0].lower() == "go":
@@ -153,7 +145,7 @@ class UCI():
         uci_move = self.algebraic_to_uci(move)
 
         # Sends the move to the gui.
-        self.send_command("bestmove " + uci_move)
+        send_command("bestmove " + uci_move)
 
 
     def set_up_position(self, cmd):
@@ -206,7 +198,15 @@ class UCI():
     def identify(self):
         # Sends all the identification commands.
         for key, value in self.id.items():
-            self.send_command(" ".join(["id", key, value]))
+            send_command(" ".join(["id", key, value]))
 
         # Writes the ok command at the end.
-        self.send_command("uciok")
+        send_command("uciok")
+
+
+def send_command(cmd):
+    # Logs the output
+    logging.debug("Output: " + cmd)
+
+    sys.stdout.write(cmd + "\n")
+    sys.stdout.flush()

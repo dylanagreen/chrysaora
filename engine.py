@@ -147,7 +147,8 @@ class Engine():
 
         moves, evals = self.search_moves()
 
-        best = np.argmax(eval)
+        best = np.argmax(evals)
+        logging.debug(best)
         return moves[best]
 
 
@@ -194,6 +195,8 @@ class Engine():
     def search_moves(self):
         moves = self.board.generate_moves(self.board.to_move)
 
+        logging.debug(moves)
+
         evals = []
         # Goes through each moves, converts it to a long move, and then
         # gets the board state for that long algebraic.
@@ -222,6 +225,7 @@ class Engine():
             evals.append(np.min(vals))
 
         #evals = self.eval(states)
+        logging.debug(evals)
 
         return (moves, evals)
 

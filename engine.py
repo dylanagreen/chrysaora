@@ -140,9 +140,9 @@ class Engine():
 
     def find_move(self):
         # Shortcuts for weird implementations.
-        if impl == "random":
+        if self.impl == "random":
             return self.random_move()
-        elif impl == "greedy":
+        elif self.impl == "greedy":
             return self.greedy_move()
 
         moves, evals = self.search_moves()

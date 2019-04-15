@@ -1,6 +1,7 @@
 import random
 import os
 import logging
+import copy
 
 import numpy as np
 import torch
@@ -141,15 +142,13 @@ class Engine():
 
 
     def find_move(self):
-        moves, states = self.search_moves()
-        evals = self.eval(states)
+        moves, evals = self.search_moves()
 
         best = np.argmax(eval)
         return moves[best]
 
 
-    # Evaluates and returns the best move for now.
-    # TODO refactor to return move evaluations, use search move to run search and find move to pick one.
+    # Returns evaluations of the given board states.
     def evaluate_moves(self, board_states):
         states = []
 
@@ -192,21 +191,36 @@ class Engine():
     def search_moves(self):
         moves = self.board.generate_moves(self.board.to_move)
 
-        states = []
+        evals = []
         # Goes through each moves, converts it to a long move, and then
         # gets the board state for that long algebraic.
         for m in moves:
-            long_move = self.board.short_algebraic_to_long_algebraic(m)
+            b1 = copy.deepcopy(self.board)
+            b1.make_move(m)
 
-            if "O-O" in long_move or "0-0" in long_move:
-                s = self.board.castle_algebraic_to_boardstate(long_move)
+            deep_moves = b1.generate_moves(b1.to_move)
 
-            else:
-                s = self.board.long_algebraic_to_boardstate(long_move)
+            # For each move that they could make in response, find the board
+            # state after that move.
+            states = []
+            for m1 in deep_moves:
+                long_move = b1.short_algebraic_to_long_algebraic(m1)
 
-            states.append(s)
+                if "O-O" in long_move:
+                    s = b1.castle_algebraic_to_boardstate(long_move)
 
-        return (moves, states)
+                else:
+                    s = b1.long_algebraic_to_boardstate(long_move)
+
+                states.append(s)
+
+            # Evaluate all the board states and append the minimum eval value.
+            vals = self.evaluate_moves(states)
+            evals.append(np.min(vals))
+
+        #evals = self.eval(states)
+
+        return (moves, evals)
 
 
     def random_move(self, moves):

@@ -124,8 +124,10 @@ class Engine():
 
         self.brain = SkipNet()
 
-        weights = os.path.join(os.path.dirname(__file__),"SkipNet-89.pt")
+        net = "SkipNet-89.pt"
+        weights = os.path.join(os.path.dirname(__file__), net)
         self.brain.load_state_dict(torch.load(weights, map_location="cpu"))
+        logging.debug("Loaded: " + net)
 
         # Sets the network to evaluation mode.
         # There's a batch normalization layer which runs differently in
@@ -133,15 +135,16 @@ class Engine():
         self.brain.eval()
 
         # Keeping that random implemenation around for testing.
-        if impl == "random":
-            self.eval = self.random_move
-        elif impl == "greedy":
-            self.eval = self.greedy_move
-        else:
-            self.eval = self.evaluate_moves
+        self.impl = impl
 
 
     def find_move(self):
+        # Shortcuts for weird implementations.
+        if impl == "random":
+            return self.random_move()
+        elif impl == "greedy":
+            return self.greedy_move()
+
         moves, evals = self.search_moves()
 
         best = np.argmax(eval)
@@ -223,10 +226,11 @@ class Engine():
         return (moves, evals)
 
 
-    def random_move(self, moves):
+    def random_move(self):
+        moves = self.board.generate_moves(self.board.to_move)
         return random.choice(moves)
 
-    def greedy_move(self, moves):
+    def greedy_move(self):
         moves = self.board.generate_moves(self.board.to_move)
 
         captures = []

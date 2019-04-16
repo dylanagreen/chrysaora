@@ -140,6 +140,7 @@ class Engine():
         self.impl = impl
 
         self.max_depth = 3
+        self.compute = True
 
 
     def find_move(self):
@@ -197,6 +198,12 @@ class Engine():
         if color is None:
             color = self.board.to_move
 
+        # If we recieve the stop command don't go any deeper just return our
+        # best move.
+        cmd = uci.receive_command()
+        if cmd == "stop":
+            self.compute = False
+
         if depth == 1:
             mult = 1 if color == self.board.to_move else -1
             moves = search_board.generate_moves(search_board.to_move)
@@ -241,6 +248,9 @@ class Engine():
                 else:
                     best_move, val = self.minimax_search(new_board, depth-1, new_board.to_move)
                     vals.append(val)
+
+                if not self.compute:
+                    break
 
             # Inverts the evaluations from the next lower depth.
             vals = np.asarray(vals)

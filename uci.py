@@ -1,6 +1,7 @@
 import sys
 import re
 import logging
+import select
 from string import ascii_lowercase
 
 import numpy as np
@@ -140,6 +141,7 @@ class UCI():
         # Sets the engine's internal board to the current board state.
         self.engine.board = self.board
         self.engine.time_params = parameters
+        self.engine.compute = True
 
         logging.debug("Finding move.")
         move = self.engine.find_move()
@@ -226,3 +228,13 @@ def send_command(cmd):
 
     sys.stdout.write(cmd + "\n")
     sys.stdout.flush()
+
+def receive_command():
+    # Returns the empty string if there's nothing in stdin.
+    if not select.select([sys.stdin,],[],[],0.0)[0]:
+        return ""
+
+    # Returns the command if there's something in stdin.
+    line = sys.stdin.readline().rstrip()
+    logging.debug("Input: " + line)
+    return line

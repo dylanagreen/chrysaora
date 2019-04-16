@@ -147,11 +147,8 @@ class Engine():
         elif self.impl == "greedy":
             return self.greedy_move()
 
-        moves, evals = self.search_moves()
-
-        best = np.argmax(evals)
-        logging.debug(best)
-        return moves[best]
+        move, val = self.minimax_search(self.board, depth=3)
+        return move
 
 
     # Returns evaluations of the given board states.
@@ -187,66 +184,67 @@ class Engine():
         outs = outputs.data.numpy()
         labels = label.numpy()
 
-        weights = [0, 0, 1] if self.board.to_move == board.Color.WHITE else [0, 1, 0]
+        color = self.board.to_move
+        weights = [0, 0, 1] if color == board.Color.WHITE else [0, 1, 0]
         vals = np.dot(outs[...,:3], weights)
 
         return vals
 
 
-    # Depth in plies.
-    def search_moves(self):
-        start_time = time.time()
-        moves = self.board.generate_moves(self.board.to_move)
-        #logging.debug(moves)
+    def minimax_search(self, search_board, depth=1, color=None):
+        if color is None:
+            color = self.board.to_move
 
-        depth_time = time.time()
-        diff = depth_time - start_time
-        nps = round(len(moves) / diff)
-        diff = round(diff * 1000) # Converts seconds to ms
+        if depth == 1:
+            mult = 1 if color == self.board.to_move else -1
+            moves = search_board.generate_moves(search_board.to_move)
 
-        info = "info depth 1 time {} nps {} nodes {}".format(str(diff), str(nps), str(len(moves)))
-        logging.debug(info)
-
-        evals = []
-        nodes = 0
-        # Goes through each moves, converts it to a long move, and then
-        # gets the board state for that long algebraic.
-        for m in moves:
-            b1 = copy.deepcopy(self.board)
-            b1.make_move(m)
-
-            deep_moves = b1.generate_moves(b1.to_move)
-
-            # For each move that they could make in response, find the board
-            # state after that move.
             states = []
-            for m1 in deep_moves:
-                long_move = b1.short_algebraic_to_long_algebraic(m1)
+            for m in moves:
+                # Turns the short algebraic move into a long algebraic'
+                # So that it can be turned into a search_board state.
+                long_move = search_board.short_algebraic_to_long_algebraic(m)
 
+                # Turns the move into a search_board state
                 if "O-O" in long_move:
-                    s = b1.castle_algebraic_to_boardstate(long_move)
-
+                    s = search_board.castle_algebraic_to_boardstate(long_move)
                 else:
-                    s = b1.long_algebraic_to_boardstate(long_move)
+                    s = search_board.long_algebraic_to_boardstate(long_move)
 
                 states.append(s)
 
-            # Evaluate all the board states and append the minimum eval value.
             vals = self.evaluate_moves(states)
-            evals.append(np.min(vals))
-            nodes += len(states)
+            vals *= mult
+            i = np.argmax(vals)
 
-        depth_time = time.time()
-        diff = depth_time - start_time
-        nps = round(nodes / diff)
-        diff = round(diff * 1000)
+            # Returns the best move and its evaluation.
+            return (moves[i], vals[i])
 
-        info = "info depth 2 time {} nps {} nodes {}".format(str(diff), str(nps), str(nodes))
-        logging.debug(info)
+        else:
+            moves = search_board.generate_moves(search_board.to_move)
 
-        #logging.debug(evals)
+            vals = []
+            for m in moves:
+                new_board = copy.deepcopy(search_board)
+                new_board.make_move(m)
 
-        return (moves, evals)
+                # Check to see if making this move checkmates one of the sides.
+                if not new_board.status == board.Status.IN_PROGRESS:
+                    # In this situation we were the ones to get checkmated
+                    # (or stalemated)
+                    if new_board.to_move == self.board.to_move:
+                        vals.append(-1)
+                    else:
+                        vals.append(1)
+                else:
+                    best_move, val = self.minimax_search(new_board, depth-1, new_board.to_move)
+                    vals.append(val)
+
+            # Inverts the evaluations from the next lower depth.
+            vals = np.asarray(vals)
+            vals *= -1
+            i = np.argmax(vals)
+            return (moves[i], vals[i])
 
 
     def random_move(self):

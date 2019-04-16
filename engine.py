@@ -117,7 +117,7 @@ class SkipNet(nn.Module):
 
 class Engine():
 
-    def __init__(self, new_board, impl="net"):
+    def __init__(self, new_board, impl="net", max_depth=3):
         self.board = new_board
 
         # Time dictionary for time management code.
@@ -139,6 +139,8 @@ class Engine():
         # Keeping that random implemenation around for testing.
         self.impl = impl
 
+        self.max_depth = 3
+
 
     def find_move(self):
         # Shortcuts for weird implementations.
@@ -147,7 +149,7 @@ class Engine():
         elif self.impl == "greedy":
             return self.greedy_move()
 
-        move, val = self.minimax_search(self.board, depth=3)
+        move, val = self.minimax_search(self.board, depth=self.max_depth)
         return move
 
 

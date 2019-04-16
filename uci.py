@@ -111,6 +111,8 @@ class UCI():
         elif cmd[0].lower() == "ucinewgame":
             self.board = board.Board(None, None, None, None)
             self.previous_pos = []
+        elif cmd[0].lower() == "setoption":
+            self.set_option(cmd)
 
 
     # The method that tells the engine to analyze and then returns the best
@@ -195,11 +197,25 @@ class UCI():
         self.previous_pos = cmd
 
 
+    def set_option(self, cmd):
+        name_index = cmd.index("name")
+        value_index = cmd.index("value")
+
+        # Use slice instead of a single index in case I set an option to have
+        # multiple word names.
+        option = " ".join(cmd[name_index + 1 : value_index])
+
+        if option == "max_depth":
+            self.engine.max_depth = int(cmd[value_index + 1])
+            logging.debug("Engine: Set max depth to " + str(self.engine.max_depth))
+
+
     def identify(self):
         # Sends all the identification commands.
         for key, value in self.id.items():
             send_command(" ".join(["id", key, value]))
 
+        send_command("option name max_depth type spin default 3 min 1 max 6")
         # Writes the ok command at the end.
         send_command("uciok")
 

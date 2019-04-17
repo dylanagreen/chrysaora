@@ -209,6 +209,18 @@ class Engine():
             mult = 1 if color == self.board.to_move else -1
             moves = np.asarray(search_board.generate_moves(search_board.to_move))
 
+            # If there are no moves then someone either got checkmated or
+            # they got stalemated.
+            if len(moves) == 0:
+                # In this situation we were the ones to get checkmated
+                # (or stalemated) so set the eval to -1 cuz we really don't
+                # want this.
+                if search_board.to_move == self.board.to_move:
+                    return ("", -1)
+                # Otherwise we found a checkmate and we really want this!
+                else:
+                    return ("", 1)
+
             alg = moves[...,0]
             states = moves[...,1]
 
@@ -228,17 +240,8 @@ class Engine():
             for m in moves:
                 new_board = self.bypass_make_move(search_board, m[0], m[1])
 
-                # Check to see if making this move checkmates one of the sides.
-                if not new_board.status == board.Status.IN_PROGRESS:
-                    # In this situation we were the ones to get checkmated
-                    # (or stalemated)
-                    if new_board.to_move == self.board.to_move:
-                        vals.append(-1)
-                    else:
-                        vals.append(1)
-                else:
-                    best_move, val = self.minimax_search(new_board, depth-1, new_board.to_move)
-                    vals.append(val)
+                best_move, val = self.minimax_search(new_board, depth-1, new_board.to_move)
+                vals.append(val)
 
                 if not self.compute:
                     break

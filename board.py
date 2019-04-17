@@ -1429,7 +1429,7 @@ def is_in_check(state, color):
         if np.array_equal(slope, [1, 2]) or np.array_equal(slope, [2, 1]):
             return True
 
-    # Now bishops and diagonal queens, I guess
+    # Now bishops and diagonal queens
     bishops = find_piece(state*mult, 4)
 
     for pos in np.append(bishops, queens, axis=0):
@@ -1453,6 +1453,25 @@ def is_in_check(state, color):
                 return True
 
     return False
+
+
+def is_checkmate(state, color):
+    check = is_in_check(state, color)
+    if not check:
+        return False
+
+    # If color has no possible moves that get out of check then yes, it's
+    # a checkmate.
+    # Can't castle out of check so no point in checking those.
+    castle = {"WQR" : False, "WKR" : False,
+            "BQR" : False, "BKR" : False}
+    b = Board(state, castle, color)
+    responses = b.generate_moves(color)
+    if len(responses) == 0:
+        return True
+
+    return False
+
 
 
 # Quickly finds all the locations of given piece in state.

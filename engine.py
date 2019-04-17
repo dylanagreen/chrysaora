@@ -156,8 +156,9 @@ class Engine():
 
 
     # Returns evaluations of the given board states.
-    def evaluate_moves(self, board_states):
-        states = []
+    def evaluate_moves(self, board_states, color):
+        run_states = []
+        vals = np.zeros(len(board_states))
 
         # Transformation object, converts to a tensor then normalizes.
         normalize = transforms.Normalize(mean=[0.485], std=[0.229])
@@ -165,22 +166,31 @@ class Engine():
 
         # Goes through each moves, converts it to a long move, and then
         # gets the board state for that long algebraic.
-        for s in board_states:
-            # Once we have the state, we run the same conversions on it that
-            # were run when the network was trained.
-            #s = s.astype("uint8")
-            #s = np.where(s == 0, 128, s)
-            s = s.reshape((8, 8, 1))
-            s = trans(s)
-            s.resize_((1, 1, 8, 8))
-            states.append(s)
+        for i, s in enumerate(board_states):
+            # Slight addition of time by checking if each state is a checkmate
+            # However if it is we do not need to run it through the network,
+            # returning the time lost as time saved there.
 
-        states = torch.cat(states, 0)
+            mate = board.is_checkmate(s, color)
+
+            # This will get multiplied by 1 or -1 depending on what color this
+            # terminal node is.
+            if mate:
+                vals[i] = 1
+            else:
+                # Once we have the state, we run the same conversions on it that
+                # were run when the network was trained.
+                s = s.reshape((8, 8, 1))
+                s = trans(s)
+                s.resize_((1, 1, 8, 8))
+                run_states.append(s)
+
+        run_states = torch.cat(run_states, 0)
 
         # Runs the boards through the network, and then gets their label.
         # Remember:
         # 0 = draw, 1 = black win, 2 = white win.
-        outputs = self.brain(states.float())
+        outputs = self.brain(run_states.float())
         outputs = F.softmax(outputs, dim=1)
         _, label = torch.max(outputs.data, 1)
 
@@ -190,7 +200,11 @@ class Engine():
 
         color = self.board.to_move
         weights = [0, 0, 1] if color == board.Color.WHITE else [0, 1, 0]
-        vals = np.dot(outs[...,:3], weights)
+        net_vals = np.dot(outs[...,:3], weights)
+
+        # This places the network evaluations into the vals array where the
+        # 0s were left for them.
+        np.place(vals, vals==0, net_vals)
 
         return vals
 
@@ -221,16 +235,20 @@ class Engine():
             elif not check:
                 return ("", 0)
             # Otherwise we found a checkmate and we really want this
+            # Negative one because when it gets bumped up to the next depth
+            # it gets negated due to negamax.
+            # Multiply by depths so that closer checkmates are preferred.
             else:
-                return ("", 1)
+                return ("", -depth)
 
         # Strips the algebraic moves and states out
-        alg = moves[...,0]
-        states = moves[...,1]
+        alg = moves[..., 0]
+        states = moves[..., 1]
         if depth == 1:
             mult = 1 if color == self.board.to_move else -1
 
-            vals = self.evaluate_moves(states)
+            run_color = Color.WHITE if color == Color.BLACK else Color.BLACK
+            vals = self.evaluate_moves(states, run_color)
             vals *= mult
             i = np.argmax(vals)
 

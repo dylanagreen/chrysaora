@@ -24,11 +24,14 @@ def run_uci():
         # Waits for an input command and then parses it through the uci
         # interpreter.
         cmd = input()
+        try:
+            # Logs the command.
+            logging.debug("Input: " + cmd)
 
-        # Logs the command.
-        logging.debug("Input: " + cmd)
-
-        interpreter.decrypt_uci(cmd)
+            interpreter.decrypt_uci(cmd)
+        except Exception as e:
+            logging.error(e)
+            raise e
 
 
 # Runs the command line interface instead.

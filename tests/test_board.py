@@ -8,7 +8,10 @@ class MoveGenerationTestCase(unittest.TestCase):
     def test_knight_moves(self):
         # Base state board checking
         self.board = board.Board(None, None, None)
-        moves = set(self.board.generate_knight_moves(board.Color.WHITE))
+
+        # Need to extract the list of moves whih is the first column.
+        moves = np.asarray(self.board.generate_knight_moves(board.Color.WHITE))
+        moves = set(moves[...,0])
         expected = set(["Na3", "Nc3", "Nf3", "Nh3"])
         self.assertSetEqual(moves, expected)
 
@@ -22,7 +25,10 @@ class MoveGenerationTestCase(unittest.TestCase):
                                 [1, 1, 1, 1, 1, 1, 1, 1],
                                 [2, 0, 4, 5, 6, 4, 0, 2]])
         self.board = board.Board(complicated, None, None)
-        moves = set(self.board.generate_knight_moves(board.Color.WHITE))
+
+        # Need to extract the list of moves whih is the first column.
+        moves = np.asarray(self.board.generate_knight_moves(board.Color.WHITE))
+        moves = set(moves[...,0])
         expected = set(["Nb6", "Nxc7", "Nxe7", "Nf6", "Ne3", "Nc3", "Nb4",
                         "Ne6", "Ng6", "Nh5", "Nh3", "Nd3"])
         self.assertSetEqual(moves, expected)
@@ -44,10 +50,14 @@ class MoveGenerationTestCase(unittest.TestCase):
                                 [1, 1, 1, 1, 1, 1, 1, 1],
                                 [2, 3, 4, 5, 6, 4, 3, 2]])
         self.board = board.Board(complicated, None, None)
-        moves = set(self.board.generate_rook_moves(board.Color.WHITE))
+
+        # Need to extract the list of moves whih is the first column.
+        moves = np.asarray(self.board.generate_rook_moves(board.Color.WHITE))
+        moves = set(moves[...,0])
         expected = set(["Rb3", "Rb5", "Rb6", "Rxb7", "Ra4", "Rc4", "Rd4",
                         "Re4", "Rf4", "Rg4", "Rh4", "Rd4", "Rxc7", "Rxd8",
                         "Rxb8"])
+
         self.assertSetEqual(moves, expected)
 
     def test_bishop_moves(self):
@@ -67,7 +77,10 @@ class MoveGenerationTestCase(unittest.TestCase):
                                 [1, 1, 1, 1, 1, 1, 1, 1],
                                 [2, 3, 4, 5, 6, 4, 3, 2]])
         self.board = board.Board(complicated, None, None)
-        moves = set(self.board.generate_bishop_moves(board.Color.WHITE))
+
+        # Need to extract the list of moves whih is the first column.
+        moves = np.asarray(self.board.generate_bishop_moves(board.Color.WHITE))
+        moves = set(moves[...,0])
         expected = set(["Ba3", "Ba5", "Bc3", "Bc5", "Bd6", "Bb4xe7", "Bf8xe7",
                         "Bxg7"])
         self.assertSetEqual(moves, expected)
@@ -89,7 +102,11 @@ class MoveGenerationTestCase(unittest.TestCase):
                                 [1, 1, 1, 1, 1, 1, 1, 1],
                                 [2, 3, 4, 5, 6, 4, 3, 2]])
         self.board = board.Board(complicated, None, None)
-        moves = set(self.board.generate_queen_moves(board.Color.WHITE))
+
+        # Need to extract the list of moves whih is the first column.
+        moves = np.asarray(self.board.generate_queen_moves(board.Color.WHITE))
+        moves = set(moves[...,0])
+
         expected = set(["Qa3", "Qa5", "Qc3", "Qc5", "Qd6", "Qxe7", "Qxc7",
                         "Qxd8", "Qb3", "Qb5", "Qb6", "Qxb7", "Qa4", "Qc4", "Qd4",
                         "Qe4", "Qf4", "Qg4", "Qh4", "Qd4", "Qxb8", "Qxd8", "Qxd7"])
@@ -112,14 +129,21 @@ class MoveGenerationTestCase(unittest.TestCase):
                                 [1, 1, 1, 1, 1, 1, 1, 1],
                                 [2, 3, 4, 5, 0, 4, 3, 2]])
         self.board = board.Board(complicated, None, None)
-        moves = set(self.board.generate_king_moves(board.Color.WHITE))
+
+        # Need to extract the list of moves whih is the first column.
+        moves = np.asarray(self.board.generate_king_moves(board.Color.WHITE))
+        moves = set(moves[...,0])
         expected = set(["Kf5", "Ke5", "Kd5"])
         self.assertSetEqual(moves, expected)
 
     def test_pawn_moves(self):
         # Base state board checking
         self.board = board.Board(None, None, None)
-        moves = set(self.board.generate_pawn_moves(board.Color.WHITE))
+
+        # Need to extract the list of moves whih is the first column.
+        moves = np.asarray(self.board.generate_pawn_moves(board.Color.WHITE))
+        moves = set(moves[...,0])
+
         expected = set(["a3", "a4", "b3", "b4", "c3", "c4", "d3", "d4", "e3",
                         "e4", "f3", "f4", "g3", "g4", "h3", "h4"])
         self.assertSetEqual(moves, expected)
@@ -135,7 +159,11 @@ class MoveGenerationTestCase(unittest.TestCase):
                                 [1, 1, 1, 1, 1, 1, 1, 1],
                                 [2, 3, 4, 5, 6, 4, 3, 2]])
         self.board = board.Board(complicated, None, None)
-        moves = set(self.board.generate_pawn_moves(board.Color.WHITE))
+
+        # Need to extract the list of moves whih is the first column.
+        moves = np.asarray(self.board.generate_pawn_moves(board.Color.WHITE))
+        moves = set(moves[...,0])
+
         expected = set(["bxa3", "b3", "b4", "c3", "c4", "cxd3", "exd3", "e3",
                         "e4", "f3", "f4", "g3", "g4", "h3", "h4", "a8=Q",
                         "a8=R", "a8=B", "a8=N", "axb8=Q", "axb8=R", "axb8=B", "axb8=N"])
@@ -151,7 +179,11 @@ class MoveGenerationTestCase(unittest.TestCase):
                            [0, 0, 0, 0, 0, 0, -6, 0],
                            [2, 3, 0, 0, 0, 0, 3, 0]])
         self.board = board.Board(crash, None, None)
-        moves = set(self.board.generate_pawn_moves(board.Color.BLACK))
+
+        # Need to extract the list of moves whih is the first column.
+        moves = np.asarray(self.board.generate_pawn_moves(board.Color.BLACK))
+        moves = set(moves[...,0])
+
         expected = set(['b2', 'e2', 'h2'])
         self.assertSetEqual(moves, expected)
 
@@ -493,14 +525,22 @@ class MoveGenerationTestCase(unittest.TestCase):
 
     def test_all_moves(self):
         self.board = board.Board(None, None, None)
-        moves = set(self.board.generate_moves(board.Color.WHITE))
+
+        # Need to extract the list of moves whih is the first column.
+        moves = np.asarray(self.board.generate_moves(board.Color.WHITE))
+        moves = set(moves[...,0])
+
         expected = set(["Na3", "Nc3", "Nf3", "Nh3", "a3", "a4", "b3", "b4",
                         "c3", "c4", "d3", "d4", "e3", "e4", "f3", "f4", "g3",
                         "g4", "h3", "h4"])
         self.assertSetEqual(moves, expected)
 
         self.board = board.Board(None, None, to_move=board.Color.BLACK)
-        moves = set(self.board.generate_moves(board.Color.BLACK))
+
+        # Need to extract the list of moves whih is the first column.
+        moves = np.asarray(self.board.generate_moves(board.Color.BLACK))
+        moves = set(moves[...,0])
+
         expected = set(["Na6", "Nc6", "Nf6", "Nh6", "a5", "a6", "b5", "b6",
                         "c5", "c6", "d5", "d6", "e5", "e6", "f5", "f6", "g5",
                         "g6", "h5", "h6"])
@@ -510,13 +550,24 @@ class MoveGenerationTestCase(unittest.TestCase):
         # move! It puts you in check!
         # The checkmate sequence is 34 ... Qh4 35 Kg1 Ne2#
         self.board = board.load_fen("5r1k/6pp/p1Q5/2p1B3/5n2/6q1/PPP3P1/5R1K b - - 0 34")
-        moves = set(self.board.generate_moves(board.Color.BLACK))
+
+        # Need to extract the list of moves whih is the first column.
+        moves = np.asarray(self.board.generate_moves(board.Color.BLACK))
+        moves = set(moves[...,0])
+
         expected = set(["h5", "h6", "a5", "c4", "Ra8", "Rb8", "Rc8",
                         "Rd8", "Re8", "Rg8", "Rf7", "Rf6", "Rf5", "Qa3", "Qb3",
                         "Qc3", "Qd3", "Qe3", "Qf3", "Qh3", "Qxg2", "Qg4", "Qg5",
                         "Qg6", "Qh4", "Qh2", "Qe1", "Qf2", "Kg8", "Nd5", "Nh5",
                         "Ne6", "Ng6", "Ne2", "Nxg2", "Nh3", "Nd3"])
         self.assertSetEqual(moves, expected)
+
+
+    def test_returning_fen(self):
+        expected = "5r1k/6pp/p1Q5/2p1B3/5n2/6q1/PPP3P1/5R1K b - - 0 34"
+        self.board = board.load_fen(expected)
+
+        self.assertEqual(self.board.to_fen(), expected)
 
 
     def test_checkmate(self):
@@ -591,19 +642,17 @@ class MoveGenerationTestCase(unittest.TestCase):
 
         castle_dict = {"WQR" : False, "WKR" : False, "BQR" : False, "BKR" : False}
         self.board = board.Board(crash, castle_dict, None)
-        moves = set(self.board.generate_moves(board.Color.WHITE))
+
+        # Need to extract the list of moves whih is the first column.
+        moves = np.asarray(self.board.generate_moves(board.Color.WHITE))
+        moves = set(moves[...,0])
+
         expected = set(['d7', 'c4', 'cxb4', 'e4', 'a3', 'g3', 'g4', 'Ng1',
                         'Ne2g3', 'Ne2f4', 'Nd4', 'Rb1', 'Bb2', 'Ba3', 'Bd2',
                         'Qxf6', 'Qh6', 'Qh4', 'Qf4', 'Qg6', 'Qg7', 'Qg8',
                         'Qg4', 'Qg3', 'Kh2', 'Kg1'])
 
         self.assertSetEqual(moves, expected)
-
-
-    #def test_castles_upon_rook_removal(self):
-        #self.board = board.load_pgn("test5vsChrysaora 0.0012019-03-30.pgn")
-        #expected = {'WQR': False, 'WKR': False, 'BQR': False, 'BKR': False}
-        #self.assertDictEqual(self.board.castle_dict, expected)
 
 
     def test_en_passant(self):

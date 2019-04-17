@@ -206,21 +206,10 @@ class Engine():
 
         if depth == 1:
             mult = 1 if color == self.board.to_move else -1
-            moves = search_board.generate_moves(search_board.to_move)
+            moves = np.asarray(search_board.generate_moves(search_board.to_move))
 
-            states = []
-            for m in moves:
-                # Turns the short algebraic move into a long algebraic'
-                # So that it can be turned into a search_board state.
-                long_move = search_board.short_algebraic_to_long_algebraic(m)
-
-                # Turns the move into a search_board state
-                if "O-O" in long_move:
-                    s = search_board.castle_algebraic_to_boardstate(long_move)
-                else:
-                    s = search_board.long_algebraic_to_boardstate(long_move)
-
-                states.append(s)
+            alg = moves[...,0]
+            states = moves[...,1]
 
             vals = self.evaluate_moves(states)
             vals *= mult
@@ -230,10 +219,12 @@ class Engine():
             return (moves[i], vals[i])
 
         else:
-            moves = search_board.generate_moves(search_board.to_move)
+            # Strips the algebraic moves.
+            moves = np.asarray(search_board.generate_moves(search_board.to_move))
+            alg = moves[...,0]
 
             vals = []
-            for m in moves:
+            for m in alg:
                 new_board = copy.deepcopy(search_board)
                 new_board.make_move(m)
 
@@ -256,7 +247,7 @@ class Engine():
             vals = np.asarray(vals)
             vals *= -1
             i = np.argmax(vals)
-            return (moves[i], vals[i])
+            return (alg[i], vals[i])
 
 
     def random_move(self):

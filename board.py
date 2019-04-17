@@ -117,22 +117,19 @@ class Board():
         # This has the double bonus of removing moves that don't get you
         # out of check as well. Neat.
         for m in moves:
-            if "O-O" in m or "0-0" in m:
-                s = self.castle_algebraic_to_boardstate(m, color)
-            else:
-                s = self.long_algebraic_to_boardstate(m[1])
-            check = is_in_check(s, color)
+            # m[2] is the end state corresponding to the move.
+            check = is_in_check(m[2], color)
 
             # I could remove it from the old list, but doing so while iterating
             # is dangerous. Plus, remove() requires a search, which increases
             # the run time much more than an append.
             if not check:
-                if m == "O-O" or m == "O-O-O":
-                    new_moves.append(m)
+                if m[0] == "O-O" or m[0] == "O-O-O":
+                    new_moves.append([m[0], m[2]])
                 elif m[0] in duplicates:
-                    new_moves.append(m[1])
+                    new_moves.append([m[1], m[2]])
                 else:
-                    new_moves.append(m[0])
+                    new_moves.append([m[0], m[2]])
 
         return new_moves
 
@@ -226,8 +223,11 @@ class Board():
                 else:
                     end_states.append(self.row_column_to_algebraic(pos, end, 1))
 
-        end_states = self.remove_moves_in_check(end_states, color)
-        #end_states = self.disambiguate_moves(end_states)
+        new_states = []
+        for m in end_states:
+            s = self.long_algebraic_to_boardstate(m[1])
+            new_states.append([m[0], m[1], s])
+        end_states = self.remove_moves_in_check(new_states, color)
         return end_states
 
 
@@ -249,7 +249,8 @@ class Board():
                 end1 = pos + m
                 end2 = pos + np.flip(m)
 
-                # If at least one coordinate goes above 7 or below 0 this will be False
+                # If at least one coordinate goes above 7 or below 0 this is
+                # False
                 cond1 = np.sum(end1 > 7) == 0 and np.sum(end1 < 0) == 0
                 cond2 = np.sum(end2 > 7) == 0 and np.sum(end2 < 0) == 0
 
@@ -270,8 +271,11 @@ class Board():
                 if cond2:
                     end_states.append(self.row_column_to_algebraic(pos, end2, 3))
 
-        end_states = self.remove_moves_in_check(end_states, color)
-        #end_states = self.disambiguate_moves(end_states)
+        new_states = []
+        for m in end_states:
+            s = self.long_algebraic_to_boardstate(m[1])
+            new_states.append([m[0], m[1], s])
+        end_states = self.remove_moves_in_check(new_states, color)
         return end_states
 
 
@@ -333,8 +337,11 @@ class Board():
                         end = [pos[0] + (i * sign), pos[1]]
                     end_states.append(self.row_column_to_algebraic(pos, end, piece_val))
 
-        end_states = self.remove_moves_in_check(end_states, color)
-        #end_states = self.disambiguate_moves(end_states)
+        new_states = []
+        for m in end_states:
+            s = self.long_algebraic_to_boardstate(m[1])
+            new_states.append([m[0], m[1], s])
+        end_states = self.remove_moves_in_check(new_states, color)
         return end_states
 
 
@@ -360,7 +367,8 @@ class Board():
                             'ur' : np.array([-1, 1]),
                             'lr' : np.array([1, 1]),
                             'll' : np.array([1, -1])}
-            # This dict contains the maximum the loop will travel in each diagonal direction
+            # This dict contains the maximum the loop will travel in each
+            # diagonal direction
             # Subtracting from 7 is necessary for the edges that are the maximum
             max_dict = {'ul' : np.min(pos),
                        'ur' : np.min(np.abs([0, 7] - pos)),
@@ -388,8 +396,11 @@ class Board():
 
                     i = i + 1
 
-        end_states = self.remove_moves_in_check(end_states, color)
-        #end_states = self.disambiguate_moves(end_states)
+        new_states = []
+        for m in end_states:
+            s = self.long_algebraic_to_boardstate(m[1])
+            new_states.append([m[0], m[1], s])
+        end_states = self.remove_moves_in_check(new_states, color)
         return end_states
 
     def generate_queen_moves(self, color):
@@ -431,8 +442,11 @@ class Board():
                     continue
                 end_states.append(self.row_column_to_algebraic(king, end, 6))
 
-        end_states = self.remove_moves_in_check(end_states, color)
-        #end_states = self.disambiguate_moves(end_states)
+        new_states = []
+        for m in end_states:
+            s = self.long_algebraic_to_boardstate(m[1])
+            new_states.append([m[0], m[1], s])
+        end_states = self.remove_moves_in_check(new_states, color)
         return end_states
 
     def generate_castle_moves(self, color):
@@ -478,7 +492,11 @@ class Board():
             if not check:
                 end_states.append("O-O-O")
 
-        end_states = self.remove_moves_in_check(end_states, color)
+        new_states = []
+        for m in end_states:
+            s = self.castle_algebraic_to_boardstate(m, color)
+            new_states.append([m, m, s])
+        end_states = self.remove_moves_in_check(new_states, color)
         return end_states
 
 
@@ -1017,18 +1035,17 @@ class Board():
         locs = re.findall("[a-h]\d+", move)
 
         # Always true, no matter how long locs is at this point (1 or 2)
-        # If it's one then that's just the destination
-        # If it's two then the first is the start, and the second is the end.
+        # Since this is long algebraic it should be 2.
         dest = locs[-1]
-        endfile = ascii_lowercase.index(dest[0]) # End File = x
-        endrank = 8 - int(dest[1]) # End Rank = y
+        endfile = ascii_lowercase.index(dest[0]) # File = x
+        endrank = 8 - int(dest[1]) # Rank = y
         end = [endrank, endfile]
 
         # We know that this is long_algebraic so we can find the start
         # as well from the move.
         dest = locs[0]
-        startfile = ascii_lowercase.index(dest[0]) # End File = x
-        startrank = 8 - int(dest[1]) # End Rank = y
+        startfile = ascii_lowercase.index(dest[0]) # File = x
+        startrank = 8 - int(dest[1]) # Rank = y
         start = [startrank, startfile]
 
         # Gets the value of the piece
@@ -1155,17 +1172,20 @@ class Board():
         # En passant target square next. From wikipedia: If a pawn has just
         # made a two-square move, this is the position "behind" the pawn.
         fen.append(" ")
-        last_move = self.move_list[-1]
-
-        # If any piece is in the move, it obviously wasn't a pawn, so we have
-        # no en passant square. Even if it's a pawn promotion. You can't
-        # move two into a promotion.
-        found = False
-        pieces = "RNQBK"
-        for p in pieces:
-            if p in last_move:
-                fen.append("-")
-                found = True
+        if len(self.move_list) == 0:
+            fen.append("-")
+            found = True
+        else:
+            last_move = self.move_list[-1]
+            # If any piece is in the move, it obviously wasn't a pawn, so we
+            # have no en passant square. Even if it's a pawn promotion. You
+            # can't move two into a promotion.
+            found = False
+            pieces = "RNQBK"
+            for p in pieces:
+                if p in last_move:
+                    fen.append("-")
+                    found = True
 
         if not found:
             # Moves in move list are always in long algebraic, so if we get

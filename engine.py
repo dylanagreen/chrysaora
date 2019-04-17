@@ -205,24 +205,30 @@ class Engine():
         if cmd == "stop":
             self.compute = False
 
+        # Generate the moves first to reduce code duplication.
+        moves = np.asarray(search_board.generate_moves(search_board.to_move))
+        # If there are no moves then someone either got checkmated or
+        # they got stalemated.
+        if len(moves) == 0:
+            check = board.is_in_check(search_board.current_state, search_board.to_move)
+            # In this situation we were the ones to get checkmated
+            # (or stalemated) so set the eval to 0 cuz we really don't
+            # want this.
+            if search_board.to_move == self.board.to_move:
+                return ("", 0)
+            # If it's not us to move, but we found a stalemate that means we
+            # stalemated the other person and we don't want that either.
+            elif not check:
+                return ("", 0)
+            # Otherwise we found a checkmate and we really want this
+            else:
+                return ("", 1)
+
+        # Strips the algebraic moves and states out
+        alg = moves[...,0]
+        states = moves[...,1]
         if depth == 1:
             mult = 1 if color == self.board.to_move else -1
-            moves = np.asarray(search_board.generate_moves(search_board.to_move))
-
-            # If there are no moves then someone either got checkmated or
-            # they got stalemated.
-            if len(moves) == 0:
-                # In this situation we were the ones to get checkmated
-                # (or stalemated) so set the eval to -1 cuz we really don't
-                # want this.
-                if search_board.to_move == self.board.to_move:
-                    return ("", -1)
-                # Otherwise we found a checkmate and we really want this!
-                else:
-                    return ("", 1)
-
-            alg = moves[...,0]
-            states = moves[...,1]
 
             vals = self.evaluate_moves(states)
             vals *= mult
@@ -232,10 +238,6 @@ class Engine():
             return (alg[i], vals[i])
 
         else:
-            # Strips the algebraic moves.
-            moves = np.asarray(search_board.generate_moves(search_board.to_move))
-            alg = moves[...,0]
-
             vals = []
             for m in moves:
                 new_board = self.bypass_make_move(search_board, m[0], m[1])

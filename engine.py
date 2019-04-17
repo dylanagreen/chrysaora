@@ -222,6 +222,7 @@ class Engine():
         else:
             # Strips the algebraic moves.
             moves = np.asarray(search_board.generate_moves(search_board.to_move))
+            alg = moves[...,0]
 
             vals = []
             for m in moves:

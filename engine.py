@@ -118,7 +118,7 @@ class SkipNet(nn.Module):
 
 class Engine():
 
-    def __init__(self, new_board, impl="net", max_depth=3):
+    def __init__(self, new_board, impl="net"):
         self.board = new_board
 
         # Time dictionary for time management code.
@@ -229,7 +229,7 @@ class Engine():
             i = np.argmax(vals)
 
             # Returns the best move and its evaluation.
-            return (moves[i], vals[i])
+            return (alg[i], vals[i])
 
         else:
             # Strips the algebraic moves.

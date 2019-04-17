@@ -90,6 +90,9 @@ class UCI():
             long_algebraic = long_algebraic.replace("=", "")
             return long_algebraic.lower()
 
+        if "e.p." in long_algebraic:
+            return long_algebraic[:-4]
+
         if len(long_algebraic) == 4:
             return long_algebraic
         # Slicing off the piece character at the start of the move.

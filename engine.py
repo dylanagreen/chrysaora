@@ -12,6 +12,7 @@ import torchvision.transforms as transforms
 
 import board
 import uci
+from board import Color
 
 
 # Original chess network
@@ -221,12 +222,10 @@ class Engine():
         else:
             # Strips the algebraic moves.
             moves = np.asarray(search_board.generate_moves(search_board.to_move))
-            alg = moves[...,0]
 
             vals = []
-            for m in alg:
-                new_board = copy.deepcopy(search_board)
-                new_board.make_move(m)
+            for m in moves:
+                new_board = self.bypass_make_move(search_board, m[0], m[1])
 
                 # Check to see if making this move checkmates one of the sides.
                 if not new_board.status == board.Status.IN_PROGRESS:
@@ -248,6 +247,53 @@ class Engine():
             vals *= -1
             i = np.argmax(vals)
             return (alg[i], vals[i])
+
+
+    # Bypasses making a move using board.make_move by updating the castle
+    # dict manually and then setting the board state to state.
+    def bypass_make_move(self, old_board, move, state):
+        to_move = Color.BLACK if old_board.to_move == Color.WHITE else Color.WHITE
+
+        # Copy the old castle dict and update it.
+        new_castle = copy.copy(old_board.castle_dict)
+
+        castle_move = "O-O" in move or "0-0" in move
+
+        # The following code is designed to update the castle dict.
+        piece = "P"
+        for i, c in enumerate(move):
+            # If we have an = then this is the piece the pawn promotes to.
+            # Pawns can promote to rooks which would fubar the dict.
+            if c.isupper() and not "=" in move:
+                piece = c
+
+        # Updates the castle dict for castling rights.
+        if piece == "K" or castle_move:
+            if old_board.to_move == Color.WHITE:
+                new_castle["WKR"] = False
+                new_castle["WQR"] = False
+            else:
+                new_castle["BKR"] = False
+                new_castle["BQR"] = False
+        elif piece == "R":
+            # This line of code means that this method takes approximately
+            # the same length of time as make_move for Rook moves only.
+            # All other moves bypass going to long algebraic.
+            legal = old_board.short_algebraic_to_long_algebraic(move)
+            # We can get the position the rook started from using slicing in
+            # the long move.
+            # So once the rook moves then we set it to false.
+            if legal[1:3] == "a8":
+                new_castle["BQR"] = False
+            elif legal[1:3] == "h8":
+                new_castle["BKR"] = False
+            elif legal[1:3] == "a1":
+                new_castle["WQR"] = False
+            elif legal[1:3] == "h1":
+                new_castle["WKR"] = False
+
+        new_board = board.Board(state, new_castle, to_move)
+        return new_board
 
 
     def random_move(self):

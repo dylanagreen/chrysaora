@@ -209,7 +209,7 @@ class Engine():
         return vals
 
 
-    def minimax_search(self, search_board, depth=1, color=None):
+    def minimax_search(self, search_board, alpha=-10, beta=10, depth=1, color=None):
         if color is None:
             color = self.board.to_move
 
@@ -218,6 +218,10 @@ class Engine():
         cmd = uci.receive_command()
         if cmd == "stop":
             self.compute = False
+
+        # The decision between if we are doing an alpha cutoff or a beta cutoff.
+        cutoff = alpha if color == self.board.to_move else beta
+        cutoff_type = "alpha" if color == self.board.to_move else "beta"
 
         # Generate the moves first to reduce code duplication.
         moves = np.asarray(search_board.generate_moves(search_board.to_move))
@@ -239,7 +243,7 @@ class Engine():
             # it gets negated due to negamax.
             # Multiply by depths so that closer checkmates are preferred.
             else:
-                return ("", -depth)
+                return ("", depth)
 
         # Strips the algebraic moves and states out
         alg = moves[..., 0]
@@ -250,27 +254,46 @@ class Engine():
             run_color = Color.WHITE if color == Color.BLACK else Color.BLACK
             vals = self.evaluate_moves(states, run_color)
             vals *= mult
-            i = np.argmax(vals)
+
+            if cutoff_type == "alpha":
+                i = np.argmax(vals)
+            else:
+                i = np.argmin(vals)
 
             # Returns the best move and its evaluation.
             return (alg[i], vals[i])
 
         else:
-            vals = []
+            val = -10 if color == self.board.to_move else 10
+            best_move = moves[0][0]
             for m in moves:
                 new_board = self.bypass_make_move(search_board, m[0], m[1])
 
-                best_move, val = self.minimax_search(new_board, depth-1, new_board.to_move)
-                vals.append(val)
+                _, net_val = self.minimax_search(new_board, alpha, beta, depth-1, new_board.to_move)
+
+                # Updates the alpha or beta variable depending on which cutoff
+                # we are using this iteration.
+                if cutoff_type == "alpha":
+                    if val < net_val:
+                        best_move = m[0]
+                        val = net_val
+                    alpha = np.amax([alpha, val])
+                else:
+                    if val > net_val:
+                        best_move = m[0]
+                        val = net_val
+                    beta = np.amin([beta, val])
 
                 if not self.compute:
                     break
 
-            # Inverts the evaluations from the next lower depth.
-            vals = np.asarray(vals)
-            vals *= -1
-            i = np.argmax(vals)
-            return (alg[i], vals[i])
+                # Once alpha exceeds beta, i.e. once the minimum score that
+                # the engine will receieve on a node (alpha) exceeds the
+                # maximum score that the engine predicts for the opponent (beta)
+                if alpha >= beta:
+                    break
+
+            return (best_move, val)
 
 
     # Bypasses making a move using board.make_move by updating the castle

@@ -90,7 +90,11 @@ class Board():
         kings = self.generate_king_moves(color)
         castling = self.generate_castle_moves(color)
 
-        total_moves = pawns+knights+rooks+bishops+queens+kings+castling
+        #total_moves = pawns+knights+rooks+bishops+queens+kings+castling
+
+        # A more optimal move ordering that should cause alpha or beta
+        # cutoffs sooner.
+        total_moves = castling+queens+rooks+bishops+knights+pawns+kings
 
         return total_moves
 

@@ -344,11 +344,24 @@ class Engine():
 
 
     def random_move(self):
-        moves = self.board.generate_moves(self.board.to_move)
+        moves = np.asarray(self.board.generate_moves(self.board.to_move))
+        moves = moves[..., 0]
         return random.choice(moves)
 
     def greedy_move(self):
-        moves = self.board.generate_moves(self.board.to_move)
+        moves = np.asarray(self.board.generate_moves(self.board.to_move))
+        moves = moves[..., 0]
+
+        for move in moves:
+            self.board.make_move(move)
+
+            checkmate = (not self.board.generate_moves(self.board.to_move) and
+                         board.is_in_check(self.board.current_state, self.board.to_move))
+
+            self.board.unmake_move()
+
+            if checkmate:
+                return move
 
         captures = []
         for move in moves:

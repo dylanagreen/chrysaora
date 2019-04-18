@@ -249,19 +249,39 @@ class Engine():
         alg = moves[..., 0]
         states = moves[..., 1]
         if depth == 1:
-            mult = 1 if color == self.board.to_move else -1
+            val = -10 if color == self.board.to_move else 10
+            best_move = moves[0][0]
 
             run_color = Color.WHITE if color == Color.BLACK else Color.BLACK
-            vals = self.evaluate_moves(states, run_color)
-            vals *= mult
+            mult = 1 if color == self.board.to_move else -1
 
-            if cutoff_type == "alpha":
-                i = np.argmax(vals)
-            else:
-                i = np.argmin(vals)
+            for i in range(0, len(states), 5):
 
-            # Returns the best move and its evaluation.
-            return (alg[i], vals[i])
+                net_vals = self.evaluate_moves(states[i: i+5], run_color)
+                net_vals *= mult
+
+                for j, v in enumerate(net_vals):
+                    # Updates alpha or beta variable depending on which cutoff
+                    # we are using this iteration.
+                    if cutoff_type == "alpha":
+                        if val < v:
+                            best_move = moves[j+i][0]
+                            val = v
+                        alpha = np.amax([alpha, val])
+                    else:
+                        if val > v:
+                            best_move = moves[j+i][0]
+                            val = v
+                        beta = np.amin([beta, val])
+
+                    # Once alpha exceeds beta, i.e. once the minimum score that
+                    # the engine will receieve on a node (alpha) exceeds the
+                    # maximum score that the engine predicts for the opponent
+                    # (beta)
+                    if alpha >= beta:
+                        return (best_move, val)
+
+            return (best_move, val)
 
         else:
             val = -10 if color == self.board.to_move else 10
@@ -271,7 +291,7 @@ class Engine():
 
                 _, net_val = self.minimax_search(new_board, alpha, beta, depth-1, new_board.to_move)
 
-                # Updates the alpha or beta variable depending on which cutoff
+                # Updates alpha or beta variable depending on which cutoff
                 # we are using this iteration.
                 if cutoff_type == "alpha":
                     if val < net_val:

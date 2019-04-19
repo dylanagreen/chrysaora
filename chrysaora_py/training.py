@@ -85,7 +85,7 @@ def train():
     # Transformation object, converts to a tensor then normalizes.
     trans = transforms.Compose([transforms.ToTensor()])#, normalize])
 
-    loc = os.path.join("network", *["train"])
+    loc = os.path.join(os.path.dirname(__file__), *["network", "train"])
     games = os.listdir(loc)
 
     # Macs still dumb.
@@ -155,7 +155,7 @@ def train():
 
     print('Finished Training')
 
-    loc = os.path.join("network", *["val"])
+    loc = os.path.join(os.path.dirname(__file__), *["network", "val"])
     games = os.listdir(loc)
 
     # Macs still dumb.

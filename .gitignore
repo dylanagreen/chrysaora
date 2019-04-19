@@ -1,4 +1,9 @@
-results/
-__pycache__/
-tests/__pycache__/
-logs/
+# I/O files for Chrysaora
+chrysaora_py/results/
+chrysaora_py/__pycache__/
+chrysaora_py/tests/__pycache__/
+chrysaora_py/logs/
+
+# Training data for the network
+chrysaora_py/split
+chrysaora_py/network

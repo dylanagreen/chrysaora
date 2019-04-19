@@ -11,7 +11,7 @@ import engine
 
 class UCI():
     def __init__(self):
-        self.id = {"name" : "Chrysaora 0.003", "author" : "Dylan Green"}
+        self.id = {"name" : "Chrysaora 0.004", "author" : "Dylan Green"}
         self.options = {}
 
         # An internal representation of the board that will get passed to the
@@ -214,13 +214,19 @@ class UCI():
             self.engine.max_depth = int(cmd[value_index + 1])
             logging.debug("Engine: Set max depth to " + str(self.engine.max_depth))
 
+        elif option == "impl":
+            self.engine.impl = cmd[value_index + 1]
+            logging.debug("Engine: Set implementation to " + self.engine.impl)
+
 
     def identify(self):
         # Sends all the identification commands.
         for key, value in self.id.items():
             send_command(" ".join(["id", key, value]))
 
-        send_command("option name max_depth type spin default 3 min 1 max 6")
+        default_depth = self.engine.max_depth
+        send_command("option name max_depth type spin default " + str(default_depth) + " min 1 max 6")
+        send_command("option name impl type combo default none var greedy var none")
         # Writes the ok command at the end.
         send_command("uciok")
 

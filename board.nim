@@ -52,9 +52,9 @@ proc new_board*(): Board =
 
 
 # Finds the piece in the board state.
-proc find_piece(self: Board, piece: int): seq[tuple[y, x:int]]=
-
-  for coords, piece_num in self.current_state:
+proc find_piece(state: Tensor[int], piece: int): seq[tuple[y, x:int]]=
+  # Loop through and find the required piece positions.
+  for coords, piece_num in state:
     if piece_num == piece:
       result.add((coords[0], coords[1]))
 
@@ -192,7 +192,8 @@ proc generate_knight_moves*(self: Board, color: Color): seq[tuple[alg: string, s
     # All possible knight moves, ignore flips.
     moves:array[4, tuple[y, x: int]] = [(2, 1), (2, -1), (-2, 1), (-2, -1)]
     # Find the knights
-    knights = self.find_piece(3)
+    knight_num = piece_numbers['N']
+    knights = state.find_piece(knight_num)
 
     # End_states will be a seuqnce of tuples returned by row_column_to_algebraic
     end_states:seq[tuple[short: string, long: string]] = @[]
@@ -217,10 +218,10 @@ proc generate_knight_moves*(self: Board, color: Color): seq[tuple[alg: string, s
       # The following code blocks only run if the ending positions are actually
       # on the board.
       if legal1:
-        end_states.add(self.row_column_to_algebraic(pos, end1, 3))
+        end_states.add(self.row_column_to_algebraic(pos, end1, knight_num))
 
       if legal2:
-        end_states.add(self.row_column_to_algebraic(pos, end2, 3))
+        end_states.add(self.row_column_to_algebraic(pos, end2, knight_num))
 
   # Build a sequence of new_states that will get pruned by remove_moves_in_check
   var new_states: seq[tuple[short: string, long: string, state: Tensor[int]]] = @[]
@@ -244,7 +245,42 @@ proc generate_knight_moves*(self: Board, color: Color): seq[tuple[alg: string, s
 
 #proc generate_queen_moves(self: Board, color: Color): tuple[alg: string, state: Tensor[int]]=
 
-#proc generate_king_moves(self: Board, color: Color): tuple[alg: string, state: Tensor[int]]=
+proc generate_king_moves*(self: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
+  var
+    # Color flipping for black instead of white.
+    mult:int = if color == Color.WHITE : 1 else: -1
+    state = self.current_state * mult
+
+    # Find the kings
+    king_num = piece_numbers['K']
+    kings = state.find_piece(king_num)
+
+    # All possible king moves
+    moves:array[8, tuple[y, x: int]] = [(-1, -1), (-1, 0), (-1, 1), (0, -1),
+                                        (0, 1), (1, -1), (1, 0), (1, 1)]
+
+    # End_states will be a seuqnce of tuples returned by row_column_to_algebraic
+    end_states:seq[tuple[short: string, long: string]] = @[]
+
+  for pos in kings:
+    for m in moves:
+      var fin: tuple[y, x: int] = (pos.y + m.y, pos.x + m.x)
+
+      # Ensures that the ending position is inside the board and that we
+      # don't try to take our own piece.
+      if fin.x in 0..7 and fin.y in 0..7 and state[fin.y, fin.x] <= 0:
+        end_states.add(self.row_column_to_algebraic(pos, fin, king_num))
+
+  # Build a sequence of new_states that will get pruned by remove_moves_in_check
+  var new_states: seq[tuple[short: string, long: string, state: Tensor[int]]] = @[]
+  for i, move in end_states:
+      var s = self.long_algebraic_to_boardstate(move[1])
+      new_states.add((move[0], move[1], s))
+
+  # Removes the illegal moves that leave you in check.
+  result = self.remove_moves_in_check(new_states, color)
+
+  return result
 
 #proc generate_castle_moves(self: Board, color: Color): tuple[alg: string, state: Tensor[int]]=
 

@@ -31,13 +31,20 @@ suite "start of game move generation":
   test "queen moves":
     #moves = #generate the moves
     var expected: array[0, string] = []
-    check(moves == expected)
+    check(moves == expected)]#
 
   test "king moves":
-    #moves = #generate the moves
-    var expected: array[0, string] = []
+    var moves = test_board.generate_king_moves(Color.WHITE)
 
-  test "pawn moves":
+    # This strips out the algebraic parts of the moves.
+    var alg: HashSet[string] = initHashSet[string]()
+    for i, m in moves:
+      alg.incl(m[0])
+    var expected = initHashSet[string]()
+
+    check(alg == expected)
+
+  #[#test "pawn moves":
     #moves = #generate the moves
     var expected: array[16, string] = ["a3", "a4", "b3", "b4", "c3", "c4", "d3",
                                        "d4", "e3", "e4", "f3", "f4", "g3", "g4",

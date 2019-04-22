@@ -18,12 +18,18 @@ suite "start of game move generation":
 
     check(alg == expected)
 
-  #[#test "rook moves":
-    #moves = #generate the moves
-    var expected: array[0, string] = []
-    check(moves == expected)
+  test "rook moves":
+    var moves = test_board.generate_rook_moves(Color.WHITE)
 
-  test "bishop moves":
+    # This strips out the algebraic parts of the moves.
+    var alg: HashSet[string] = initHashSet[string]()
+    for i, m in moves:
+      alg.incl(m[0])
+    var expected = initHashSet[string]()
+
+    check(alg == expected)
+
+  #[test "bishop moves":
     #moves = #generate the moves
     var expected: array[0, string] = []
     check(moves == expected)

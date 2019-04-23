@@ -58,7 +58,7 @@ proc new_board*(): Board =
   result = Board(half_move_clock: 0, game_states: @[],
                  current_state: start_board, castle_rights: start_castle_rights,
                  to_move: Color.WHITE)
-  return result
+  return
 
 
 # Finds the piece in the board state.
@@ -115,8 +115,7 @@ proc row_column_to_algebraic(self: Board, start:tuple[y, x:int], finish:tuple[y,
 
 
 proc long_algebraic_to_board_state(self: Board, move: string): Tensor[int]=
-  # Tensors aren't reference based so this works.
-  var new_state = self.current_state
+  var new_state = clone(self.current_state)
 
   var piece:char = 'P' # Default to pawn, this generally is changed.
   for i, c in move:
@@ -162,7 +161,7 @@ proc long_algebraic_to_board_state(self: Board, move: string): Tensor[int]=
 
 
 proc castle_algebraic_to_board_state(self: Board, move: string, color: Color): Tensor[int]=
-  result = self.current_state
+  result = clone(self.current_state)
 
   var
     # Piece numbers for placing.
@@ -195,6 +194,118 @@ proc castle_algebraic_to_board_state(self: Board, move: string, color: Color): T
 
 
 proc is_in_check(state: Tensor[int], color: Color): bool=
+  let
+    # The direction a pawn must travel to take this color's king.
+    # I.e. Black pawns must travel in the positive y (downward) direction
+    # To take a white king.
+    d = if color == Color.WHITE: 1 else: -1
+
+    # Color flipping for black instead of white.
+    mult = if color == Color.WHITE: -1 else: 1
+
+    # The king's number
+    king_num = if color == Color.WHITE: piece_numbers['K'] else: -piece_numbers['K']
+    # Check pawns first because they're the easiest.
+    pawn_num = if color == Color.WHITE: -piece_numbers['P'] else: piece_numbers['P']
+
+    # For this I'll assume there's only one king.
+    king = state.find_piece(king_num)[0]
+
+  # Need to ensure that the king is on any rank but the last one.
+  # No pawns can put you in check in the last rank anyway.
+  if king.y - d in 0..7:
+    if king.x - 1 >= 0 and state[king.y - d, king.x - 1] == pawn_num:
+        return true
+    elif king.x + 1 < 8 and state[king.y - d, king.x + 1] == pawn_num:
+        return true
+
+  # Checks if you'd be in check from the opposite king.
+  # This should only trigger on you moving your king into that position.
+  let opposite_king = -king_num
+  let opposite_loc = state.find_piece(opposite_king)[0]
+
+ # If the other king is vertical or horizontal the sum will be 1 since it's
+ # [0,1] or [1,0]. If it is diagonal diff will be  [1, 1]
+  let diff = [abs(king.y - opposite_loc.y), abs(king.x - opposite_loc.x)]
+  if sum(diff) == 1 or diff == [1, 1]:
+    return true
+
+  # Rooks and Queens nextrooks = find_piece(state*mult, 2)
+  let
+    queens = find_piece(state*mult, piece_numbers['Q'])
+    rooks = find_piece(state*mult, piece_numbers['R'])
+
+  var
+    # The slide a rook would have to take to get to the king.
+    slide:Tensor[int] = @[0].toTensor
+
+  for pos in concat(queens, rooks):
+    # Rook needs to be on the same file or rank to be able to put the king in
+    # check. Check the sum between the two pieces, if it's 0 then no pieces are
+    # between and it's a valid check.
+    if pos.y == king.y:
+      # Slides from the rook to the king, left to right.
+      if pos.x < king.x:
+        slide = state[king.y, pos.x + 1 ..< king.x]
+      # Slides from the king to the rook, left to right.
+      else:
+        slide = state[king.y, king.x + 1 ..< pos.x]
+      slide = abs(slide)
+      if sum(slide) == 0:
+        return true
+
+    if pos.x == king.x:
+      # Slides from the rook to the king, top down.
+      if pos.y < king.y:
+        slide = state[pos.y + 1 ..< king.y, king.x]
+      # Slides from the king to the rook, top down.
+      else:
+        slide = state[king.y + 1 ..< pos.y, king.x]
+      slide = abs(slide)
+      if sum(slide) == 0:
+        return true
+
+  # Knights can hop which is why I'm doing them before bishops
+  var knights = find_piece(state*mult, piece_numbers['N'])
+
+  for pos in knights:
+      var slope: tuple[y, x: int] = (abs(pos.y - king.y), abs(pos.x - king.x))
+
+      # Avoids a divide by 0 error. If it's on the same rank or file
+      # the knight can't get the king anyway.
+      if slope.x == 0 or slope.y == 0:
+          continue
+      if slope == (1, 2) or slope == (2, 1):
+          return true
+
+  # Now bishops and diagonal queens
+  var bishops = find_piece(state*mult, piece_numbers['B'])
+
+  for pos in concat(bishops, queens):
+    # First we check that the piece is even on a diagonal from the king.
+    # The following code finds the absolute value of the slope as well
+    # as the slope value from the bishop to the king.
+    var slope: tuple[y, x:float] = (float(pos.y - king.y), float(pos.x - king.x))
+    var abs_slope: tuple[y, x:float] = (abs(slope.y), abs(slope.x))
+    var max = max([abs_slope.y, abs_slope.x])
+    slope = (slope[0] / max, slope[1] / max)
+    abs_slope = (abs_slope[0] / max, abs_slope[1] / max)
+
+    # If the absolute slope is 1,1 then it's a diagonal.
+    if abs_slope.x == 1.0 and abs_slope.y == 1.0:
+      var cur_pos: tuple[y, x:int] = pos
+      # Now we have to check that the space between the two is empty.
+      for i in 1..7:
+        cur_pos = (king.y + i * int(slope.y), king.x + i * int(slope.x))
+
+        if not (state[cur_pos.y, cur_pos.x] == 0):
+            break
+      # This will execute if the position that caused the for loop to
+      # break is the bishop itself, otherwise this does not execute.
+      # Or the queen. Same thing.
+      if cur_pos == pos:
+          return true
+
   return false
 
 
@@ -211,13 +322,13 @@ proc remove_moves_in_check(self: Board, moves: openArray[tuple[short: string, lo
 
   # Loop through the move/board state sequence.
   for i, m in moves:
-    var check = self.current_state.is_in_check(color)
+    var check = m[2].is_in_check(color)
 
     if not check:
       # If the number of times that the short moves appears is more than 1 we
       # want to append the long move.
       # moves_tensor[1..^1,0] slices out only the short algebraic moves.
-      if moves_tensor[1..^1,0].toSeq.count(m[0]) > 1:
+      if moves_tensor[_,0].toSeq.count(m[0]) > 1:
         result.add((m[1], m[2]))
       else:
         result.add((m[0], m[2]))
@@ -344,6 +455,8 @@ proc generate_pawn_moves*(self: Board, color: Color): seq[tuple[alg: string, sta
 
   # Removes the illegal moves that leave you in check.
   result = self.remove_moves_in_check(new_states, color)
+
+  return
 
 
 proc generate_knight_moves*(self: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
@@ -623,7 +736,7 @@ proc generate_castle_moves*(self: Board, color: Color): seq[tuple[alg: string, s
     # that end in check, and the king moves two during castling,
     # it is sufficient therefore to simply check that moving the king
     # one space in the kingside direction doesn't put us in check.
-    var s = self.current_state
+    var s = clone(self.current_state)
     s[rank, 4] = 0
     s[rank, 5] = king_num
 
@@ -634,7 +747,7 @@ proc generate_castle_moves*(self: Board, color: Color): seq[tuple[alg: string, s
   between = self.current_state[rank, 1..3]
   if self.castle_rights[queenside] and sum(abs(between)) == 0:
     # See reasoning above in kingside.
-    var s = self.current_state
+    var s = clone(self.current_state)
     s[rank, 4] = 0
     s[rank, 3] = king_num
 
@@ -662,7 +775,55 @@ proc generate_castle_moves*(self: Board, color: Color): seq[tuple[alg: string, s
 
 #proc to_fen(self: Board): string=
 
-#proc load_fen(fen: string): Board=
+proc load_fen*(fen: string): Board=
+  let
+    fields = fen.splitWhitespace()
+    rows = fields[0].split('/')
+
+  var board_state: seq[seq[int]] = @[]
+  # Loops over each row.
+  for r in rows:
+    var rank: seq[int] = @[]
+    # Loops over each character in the row.
+    for c in r:
+      if c.isDigit():
+        for i in 0 ..< parseInt($c):
+          rank.add(0)
+      else:
+        # Adds a black piece if the character is lower, otherwise add a white
+        if c.isLowerASCII():
+          rank.add(-piece_numbers[c.toUpperASCII()])
+        else:
+          rank.add(piece_numbers[c])
+    # At the end of the row add it to the board_state
+    board_state.add(rank)
+
+  # Who's moving this turn.
+  var
+    side_to_move = if fields[1] == "w": Color.WHITE else: Color.BLACK
+    # Castling rights
+    castle_dict = {"WQR" : false, "WKR" : false, "BQR" : false, "BKR" : false}.toTable
+
+  let
+    castle_names = {'K' : "WKR", 'Q' : "WQR", 'k' : "BKR", 'q' : "BQR"}.toTable
+
+  var castling_field = fields[2]
+
+  # For each character in the castling field
+  for c in castling_field:
+      if c == '-':
+          break
+      var key = castle_names[c]
+      castle_dict[key] = true
+
+  # Gets the half move clock if its in the fen.
+  var half_move = 0
+  if len(fields) > 4:
+    half_move = parseInt(fields[4])
+
+  result = Board(half_move_clock: half_move, game_states: @[],
+      current_state: board_state.toTensor, castle_rights: castle_dict,
+      to_move: side_to_move)
 
 #proc load_pgn(name: string, loc: string) Board=
 

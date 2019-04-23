@@ -61,6 +61,16 @@ proc new_board*(): Board =
   return
 
 
+# Creates a new board with the given state.
+proc new_board*(start_board: Tensor[int]): Board =
+  let start_castle_rights = {"WQR" : true, "WKR" : true, "BQR" : true,
+                             "BKR" : true}.toTable
+  result = Board(half_move_clock: 0, game_states: @[],
+                 current_state: start_board, castle_rights: start_castle_rights,
+                 to_move: Color.WHITE)
+  return
+
+
 # Finds the piece in the board state.
 proc find_piece(state: Tensor[int], piece: int): seq[tuple[y, x:int]]=
   # Loop through and find the required piece positions.
@@ -765,6 +775,39 @@ proc generate_castle_moves*(self: Board, color: Color): seq[tuple[alg: string, s
 
   return result
 
+
+proc generate_moves*(self: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
+  let
+    pawns = self.generate_pawn_moves(color)
+    knights = self.generate_knight_moves(color)
+    rooks = self.generate_rook_moves(color)
+    bishops = self.generate_bishop_moves(color)
+    queens = self.generate_queen_moves(color)
+    kings = self.generate_king_moves(color)
+    castling = self.generate_castle_moves(color)
+
+  result = concat(castling, queens, rooks, bishops, knights, pawns, kings)
+  return
+
+
+proc is_checkmate(state: Tensor[int], color: Color): bool=
+  let check = state.is_in_check(color)
+
+  # Result is auto instantiated to false.
+  if not check:
+    return
+
+  # Check if there are any possible moves tat could get color out of check.
+  let
+    response_board = new_board(state)
+    responses = response_board.generate_moves(color)
+
+  if len(responses) == 0:
+    result = true
+
+  return
+
+
 #proc make_move(self: Board, move: string)=
 
 #proc unmake_move(self: Board)=
@@ -774,6 +817,7 @@ proc generate_castle_moves*(self: Board, color: Color): seq[tuple[alg: string, s
 #proc short_algebraic_to_long_algebraic(self: Board, move: string): string=
 
 #proc to_fen(self: Board): string=
+
 
 proc load_fen*(fen: string): Board=
   let
@@ -825,8 +869,7 @@ proc load_fen*(fen: string): Board=
       current_state: board_state.toTensor, castle_rights: castle_dict,
       to_move: side_to_move)
 
-#proc load_pgn(name: string, loc: string) Board=
+#proc load_pgn(name: string, loc: string): Board=
 
 #proc save_pgn(b: Board)=
 
-#proc is_checkmate(self: Board, color: Color): bool=

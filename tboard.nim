@@ -80,8 +80,23 @@ suite "start of game move generation":
     var alg: HashSet[string] = initHashSet[string]()
     for i, m in moves:
       alg.incl(m[0])
+
     var expected = ["a3", "a4", "b3", "b4", "c3", "c4", "d3", "d4", "e3", "e4",
                     "f3", "f4", "g3", "g4", "h3", "h4"].toHashSet
+
+    check(alg == expected)
+
+  test "all moves":
+    var moves = test_board.generate_moves(Color.WHITE)
+
+    # This strips out the algebraic parts of the moves.
+    var alg: HashSet[string] = initHashSet[string]()
+    for i, m in moves:
+      alg.incl(m[0])
+
+    var expected = ["a3", "a4", "b3", "b4", "c3", "c4", "d3", "d4", "e3", "e4",
+                    "f3", "f4", "g3", "g4", "h3", "h4", "Na3", "Nc3", "Nf3",
+                    "Nh3"].toHashSet
 
     check(alg == expected)
 
@@ -178,5 +193,20 @@ suite "complicated move generation":
     for i, m in moves:
       alg.incl(m[0])
     var expected = ["O-O"].toHashSet
+
+    check(alg == expected)
+
+  test "all moves":
+    var moves = test_board.generate_moves(Color.WHITE)
+
+    # This strips out the algebraic parts of the moves.
+    var alg: HashSet[string] = initHashSet[string]()
+    for i, m in moves:
+      alg.incl(m[0])
+
+    var expected = ["O-O", "b5", "d4", "d3", "e4", "e3", "h3", "gxh4", "Kf1",
+                    "Kf2", "Qa1", "Qb1", "Qc1", "Qc2", "Qb3", "Ra3", "Ra2",
+                    "Ra1", "Rf1", "Rg1", "Na2", "Nb5", "Nxd5", "Ne4", "Ba1",
+                    "Ba3", "Bc1", "Nb1"].toHashSet
 
     check(alg == expected)

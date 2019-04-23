@@ -11,8 +11,10 @@ type
   Color* = enum
     WHITE, BLACK
 
+
   Status = enum
     IN_PROGRESS, DRAW, WHITE_VICTORY, BLACK_VICTORY
+
 
   Board* = ref object
     #to_move:
@@ -20,9 +22,11 @@ type
     game_states*: seq[Tensor[int]]
     current_state*: Tensor[int]
 
+
 # The piece number -> piece name table.
 const
   piece_names = {1:'P', 2:'R', 3:'N', 4:'B', 5:'Q', 6:'K'}.toTable
+
 
 var temp: seq[tuple[key: char, val: int]] = @[]
 for key, value in piece_names:
@@ -35,6 +39,7 @@ let
 
   # The reverse piece name -> piece number table.
   piece_numbers = temp.toTable
+
 
 # Creates a new board from scratch.
 proc new_board*(): Board =
@@ -183,6 +188,7 @@ proc remove_moves_in_check(self: Board, moves: openArray[tuple[short: string, lo
 
 #proc generate_pawn_moves(self: Board, color: Color): tuple[alg: string, state: Tensor[int]]=
 
+
 proc generate_knight_moves*(self: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
   var
     # Color flipping for black instead of white.
@@ -241,7 +247,7 @@ proc generate_straight_moves(self: Board, color: Color, starts: seq[tuple[y, x:i
     mult:int = if color == Color.WHITE: 1 else: -1
     state = self.current_state * mult
 
-    # Find the rooks
+    # Get the piece num for the algebraic move.
     piece_num = if queen: piece_numbers['Q'] else: piece_numbers['R']
 
     # End_states will be a seuqnce of tuples returned by row_column_to_algebraic
@@ -306,11 +312,58 @@ proc generate_rook_moves*(self: Board, color: Color): seq[tuple[alg: string, sta
   return generate_straight_moves(self, color, rooks, queen=false)
 
 
+proc generate_diagonal_moves(self: Board, color: Color, starts: seq[tuple[y, x:int]], queen: bool = false): seq[tuple[alg: string, state: Tensor[int]]]=
+  var
+    # Color flipping for black instead of white.
+    mult:int = if color == Color.WHITE: 1 else: -1
+    state = self.current_state * mult
 
-#[proc generate_diagonal_moves(self: Board, color: Color, starts: seq[tuple[y, x:int]], queen: bool = false): seq[tuple[alg: string, state: Tensor[int]]]=
+    # Get the piece num for the algebraic move.
+    piece_num = if queen: piece_numbers['Q'] else: piece_numbers['B']
+
+    # End_states will be a seuqnce of tuples returned by row_column_to_algebraic
+    end_states:seq[tuple[short: string, long: string]] = @[]
+
+    # The ending position, this will change throughout the method.
+    fin:tuple[y, x: int] = (0, 0)
+
+  for pos in starts:
+    # We loop through the x and y dirs here since bishops move diagonally
+    # so we need directions like [1, 1] and [-1, -1] etc.
+    for xdir in [-1, 1]:
+      for ydir in [-1, 1]:
+        # Start at 1 since 0 represents the position the bishop is at.
+        for i in 1..7:
+          fin = (pos.y + ydir * i, pos.x + xdir * i)
+
+          # If this happens we went outside the bounds of the board.
+          if not (fin.y in 0..7) or not (fin.x in 0..7):
+            break
+
+          # This is the break for if we get blocked by a piece of our own color
+          if state[fin.y, fin.x] > 0:
+            break
+          # If the end piece is of the opposite color we can take it, but then
+          # we break since we can't go beyond it.
+          elif state[fin.y, fin.x] < 0:
+            end_states.add(self.row_column_to_algebraic(pos, fin, piece_num))
+            break
+          else:
+            end_states.add(self.row_column_to_algebraic(pos, fin, piece_num))
+
+  # Build a sequence of new_states that will get pruned by remove_moves_in_check
+  var new_states: seq[tuple[short: string, long: string, state: Tensor[int]]] = @[]
+  for i, move in end_states:
+      var s = self.long_algebraic_to_boardstate(move[1])
+      new_states.add((move[0], move[1], s))
+
+  # Removes the illegal moves that leave you in check.
+  result = self.remove_moves_in_check(new_states, color)
+
+  return result
 
 
-proc generate_bishop_moves(self: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
+proc generate_bishop_moves*(self: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
   var
     # Color flipping for black instead of white.
     mult:int = if color == Color.WHITE : 1 else: -1
@@ -321,9 +374,26 @@ proc generate_bishop_moves(self: Board, color: Color): seq[tuple[alg: string, st
     bishops = state.find_piece(bishop_num)
 
   return generate_diagonal_moves(self, color, bishops, queen=false)
-]#
 
-#proc generate_queen_moves(self: Board, color: Color): tuple[alg: string, state: Tensor[int]]=
+
+proc generate_queen_moves*(self: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
+  var
+    # Color flipping for black instead of white.
+    mult:int = if color == Color.WHITE : 1 else: -1
+    state = self.current_state * mult
+
+    # Find the rooks
+    queen_num = piece_numbers['Q']
+    queens = state.find_piece(queen_num)
+
+  let
+    diags = generate_diagonal_moves(self, color, queens, queen=true)
+    straights = generate_straight_moves(self, color, queens, queen=true)
+
+  result = concat(diags, straights)
+
+  return result
+
 
 proc generate_king_moves*(self: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
   var
@@ -361,6 +431,7 @@ proc generate_king_moves*(self: Board, color: Color): seq[tuple[alg: string, sta
   result = self.remove_moves_in_check(new_states, color)
 
   return result
+
 
 #proc generate_castle_moves(self: Board, color: Color): tuple[alg: string, state: Tensor[int]]=
 

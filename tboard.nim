@@ -462,3 +462,13 @@ suite "move legality":
     test_board = load_fen("r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/2N5/PPP3P1/R3KQ1R w KQ -")
     var legal = test_board.check_move_legality("O-O")
     check(legal[0] == false)
+
+suite "fen loading/saving":
+  setup:
+    let test_fen = "r4rk1/1p2qpb1/5np1/4p1Bp/p2nP2P/2N5/PPP1Q1P1/N1KR3R w - - 4 18"
+    var test_board: Board = load_fen(test_fen)
+
+  test "saving fen":
+    var expected = test_board.to_fen()
+
+    check(expected == test_fen)

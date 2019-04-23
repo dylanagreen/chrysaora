@@ -1303,7 +1303,102 @@ proc unmake_move(self: Board)=
   self.to_move = if self.to_move == Color.BLACK: Color.WHITE else: Color.BLACK
 
 
-#proc to_fen(self: Board): string=
+proc to_fen*(self: Board): string=
+  var fen: seq[string] = @[]
+
+  # Loops over the board and gets the item at each location.
+  for y in 0..7:
+    for x in 0..7:
+      # Adds pieces to the FEN. Lower case for black, and upper
+      # for white. Since the dict is in uppercase we don't have
+      # do to anything for that.
+      var piece = self.current_state[y, x]
+      if piece < 0:
+        fen.add($piece_names[-piece].toLowerAscii())
+      elif piece > 0:
+        fen.add($piece_names[piece])
+      # Empty spaces are represented by the number of blank spaces
+      # between pieces. If the previous item is a piece or the list
+      # is empty we add a 1, if the previous space is a number we
+      # increment it by one for this empty space.
+      else:
+          if len(fen) == 0 or not fen[^1].isDigit():
+            fen.add("1")
+          else:
+            fen[^1] = $(parseInt(fen[^1]) + 1)
+    # At the end of each row we need to add a "/" to indicate that the row has
+    # ended and we are moving to the next. Don't want an ending / though.
+    if y < 7:
+      fen.add("/")
+
+  # The next field is the next person to move.
+  fen.add(" ")
+  if self.to_move == Color.WHITE:
+      fen.add("w")
+  else:
+      fen.add("b")
+
+  # The next field is castling rights.
+  fen.add(" ")
+  var castle_names = {"WKR" : "K", "WQR" : "Q", "BKR" : "k", "BQR" : "q"}.toTable
+  var at_least_one = false
+  for key, val in self.castle_rights:
+    if val:
+      at_least_one = true
+      fen.add(castle_names[key])
+
+  # Adds a dash if there are no castling rights.
+  if not at_least_one:
+    fen.add("-")
+
+  var last_move: string
+  const pieces = "RNQBK"
+  # En passant target square next. From wikipedia: If a pawn has just
+  # made a two-square move, this is the position "behind" the pawn.
+  var found: bool
+  fen.add(" ")
+  if len(self.move_list) == 0:
+    fen.add("-")
+    found = true
+  else:
+    last_move = self.move_list[^1]
+    # If any piece is in the move, it obviously wasn't a pawn, so we
+    # have no en passant square. Even if it's a pawn promotion. You
+    # can't move two into a promotion.
+    for p in pieces:
+      if p in last_move:
+        fen.add("-")
+        found = true
+
+  if not found:
+    # Moves in move list are always in long algebraic, so if we get
+    # here we know that the first two characters are the start,
+    # and the second two are the end. If the difference is 2 then
+    # we can add the place in between to the fen.
+    var
+      endfile = ascii_lowercase.find(last_move[^2]) # File = x
+      endrank = 8 - parseInt($last_move[^1]) # Rank = y
+    let fin: tuple[y, x: int] = (endrank, endfile)
+
+    var
+      startfile = ascii_lowercase.find(last_move[0]) # File = x
+      startrank = 8 - parseInt($last_move[1]) # Rank = y
+    let start: tuple[y, x: int] = (startrank, startfile)
+
+    var diff = (abs(fin.y - start.y), abs(fin.x - start.x))
+    if diff == (2, 0):
+      fen.add($ascii_lowercase[fin.x])
+      fen.add($(8 - (start.y + fin.y) / 2))
+
+  # Then the half move clock for the 50 move rule.
+  fen.add(" ")
+  fen.add($self.half_move_clock)
+
+  # And finally the move number.
+  fen.add(" ")
+  fen.add($(len(self.move_list) div 2))
+
+  return fen.join("")
 
 
 proc load_fen*(fen: string): Board=
@@ -1336,7 +1431,6 @@ proc load_fen*(fen: string): Board=
     castle_dict = {"WQR" : false, "WKR" : false, "BQR" : false, "BKR" : false}.toTable
 
   let castle_names = {'K' : "WKR", 'Q' : "WQR", 'k' : "BKR", 'q' : "BQR"}.toTable
-
   var castling_field = fields[2]
 
   # For each character in the castling field
@@ -1351,9 +1445,17 @@ proc load_fen*(fen: string): Board=
   if len(fields) > 4:
     half_move = parseInt(fields[4])
 
+  var temp_move_list: seq[string] = @[]
+  if len(fields) > 5:
+    let num_plies = parseInt(fields[5]) * 2
+    # Just adds temporary digits to the move list so it's the right length
+    # for saving a fen.
+    for i in 1..num_plies:
+      temp_move_list.add($i & "Q")
+
   result = Board(half_move_clock: half_move, game_states: @[],
       current_state: board_state.toTensor, castle_rights: castle_dict,
-      to_move: side_to_move)
+      to_move: side_to_move, status: Status.IN_PROGRESS, move_list: temp_move_list)
 
 #proc load_pgn(name: string, loc: string): Board=
 

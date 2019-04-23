@@ -178,6 +178,7 @@ proc remove_moves_in_check(self: Board, moves: openArray[tuple[short: string, lo
     if not check:
       # If the number of times that the short moves appears is more than 1 we
       # want to append the long move.
+      # moves_tensor[1..^1,0] slices out only the short algebraic moves.
       if moves_tensor[1..^1,0].toSeq.count(m[0]) > 1:
         result.add((m[1], m[2]))
       else:
@@ -186,7 +187,125 @@ proc remove_moves_in_check(self: Board, moves: openArray[tuple[short: string, lo
   return result
 
 
-#proc generate_pawn_moves(self: Board, color: Color): tuple[alg: string, state: Tensor[int]]=
+# I hate pawns.
+proc generate_pawn_moves*(self: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
+  var
+    # Color flipping for black instead of white.
+    mult:int = if color == Color.WHITE: 1 else: -1
+
+    # Direction of travel, reverse for black and white. Positive is going
+    # downwards, negative is going upwards.
+    d = -1 * mult
+    state = self.current_state * mult
+
+    # Find the pawns
+    pawn_num = piece_numbers['P']
+    pawns = state.find_piece(pawn_num)
+
+    # End_states will be a sequence of tuples returned by row_column_to_algebraic
+    end_states:seq[tuple[short: string, long: string]] = @[]
+
+    # The ending position, this will change throughout the method.
+    fin:tuple[y, x: int] = (0, 0)
+
+  let
+     # The ending rank for pawn promotions
+     endrank = if color == Color.WHITE: 7 else: 0
+     # The starting rank for moving two spaces
+     startrank = if color == Color.WHITE: 6 else: 1
+
+  # Find all the pawn moves here lol.
+  for pos in pawns:
+    # En Passant first since we can take En Passant if there is a piece
+    # directly in front of our pawn. However, requires the pawn on row 5 (from
+    # bottom) Can't en passant if there's no other game states to check either.
+    if len(self.game_states) > 1 and pos.y == 4 + d:
+      let previous_state = self.game_states[^1] * mult
+      # Don't check en passant on the left if we're on the first file
+      # Similarly don't check to the right if we're on the last file
+      var
+        left_allowed = pos.x > 0
+        right_allowed = pos.x < 7
+
+        # Booleans for checking if en passant is legal or not.
+        pawn_on_left = false
+        pawn_on_right = false
+        pawn_moved_two = false
+        different_pawn = false
+
+      if left_allowed:
+        pawn_on_left = state[pos.y, pos.x - 1] == -1
+        pawn_moved_two = previous_state[pos.y + 2 * d, pos.x - 1] == -1
+
+        # Need to ensure this doesn't trigger if a different pawn is hanging
+        # out there. Thanks Lc0 for playing a move that necessitated this against
+        # KomodoMCTS
+        different_pawn = not (state[pos.y + 2 * d, pos.x - 1] == -1)
+        if pawn_on_left and pawn_moved_two and different_pawn:
+            fin = (pos.y + d, pos.x - 1)
+            end_states.add(self.row_column_to_algebraic(pos, fin, pawn_num))
+
+      if right_allowed:
+        pawn_on_right = state[pos.y, pos.x + 1] == -1
+        pawn_moved_two = previous_state[pos.y + 2 * d, pos.x + 1] == -1
+        different_pawn = not (state[pos.y + 2 * d, pos.x + 1] == -1)
+        if pawn_on_right and pawn_moved_two and different_pawn:
+          fin = (pos.y + d, pos.x + 1)
+          end_states.add(self.row_column_to_algebraic(pos, fin, pawn_num))
+
+    # Makes sure the space in front of us is clear
+    if state[pos.y + d, pos.x] == 0:
+      # Pawn promotion
+      # We do this first because pawns have to promote so we can't
+      # just "move one forward" in this position
+      if pos.y + d == endrank:
+        for key, val in piece_numbers:
+          if not (key == 'P') and not (key == 'K'):
+            fin = (pos.y + d, pos.x)
+            end_states.add(self.row_column_to_algebraic(pos, fin, pawn_num, val))
+      else:
+          # Add one move forward
+          fin = (pos.y + d, pos.x)
+          end_states.add(self.row_column_to_algebraic(pos, fin, pawn_num))
+      # This is for moving two forward. Ensures that the space 2 ahead is clear
+      if pos.y == startrank and state[pos.y + 2 * d, pos.x] == 0:
+          fin = (pos.y + 2 * d, pos.x)
+          end_states.add(self.row_column_to_algebraic(pos, fin, pawn_num))
+
+    # Takes to the left
+    # First condition ensures that we remain within the bounds of the board.
+    if pos.x - 1 > -1 and state[pos.y + d, pos.x - 1] < 0:
+      fin = (pos.y + d, pos.x - 1)
+
+      # Promotion upon taking
+      if pos.y + d == endrank:
+        for key, val in piece_numbers:
+          if not (key == 'P') or not (key == 'K'):
+            end_states.add(self.row_column_to_algebraic(pos, fin, pawn_num, val))
+      else:
+        end_states.add(self.row_column_to_algebraic(pos, fin, pawn_num))
+
+    # Takes to the right
+    # First condition ensures that we remain within the bounds of the board.
+    if pos.x + 1 < 8 and state[pos.y + d, pos.x + 1] < 0:
+      fin = (pos.y + d, pos.x + 1)
+
+      # Promotion upon taking
+      if pos.y + d == endrank:
+        for key, val in piece_numbers:
+          if not (key == 'P') or not (key == 'K'):
+            end_states.add(self.row_column_to_algebraic(pos, fin, pawn_num, val))
+      else:
+        end_states.add(self.row_column_to_algebraic(pos, fin, pawn_num))
+
+  # Build a sequence of new_states that will get pruned by remove_moves_in_check
+  var new_states: seq[tuple[short: string, long: string, state: Tensor[int]]] = @[]
+  for i, move in end_states:
+      var s = self.long_algebraic_to_boardstate(move[1])
+      new_states.add((move[0], move[1], s))
+
+  # Removes the illegal moves that leave you in check.
+  result = self.remove_moves_in_check(new_states, color)
 
 
 proc generate_knight_moves*(self: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
@@ -201,7 +320,7 @@ proc generate_knight_moves*(self: Board, color: Color): seq[tuple[alg: string, s
     knight_num = piece_numbers['N']
     knights = state.find_piece(knight_num)
 
-    # End_states will be a seuqnce of tuples returned by row_column_to_algebraic
+    # End_states will be a sequence of tuples returned by row_column_to_algebraic
     end_states:seq[tuple[short: string, long: string]] = @[]
 
   for pos in knights:
@@ -250,7 +369,7 @@ proc generate_straight_moves(self: Board, color: Color, starts: seq[tuple[y, x:i
     # Get the piece num for the algebraic move.
     piece_num = if queen: piece_numbers['Q'] else: piece_numbers['R']
 
-    # End_states will be a seuqnce of tuples returned by row_column_to_algebraic
+    # End_states will be a sequence of tuples returned by row_column_to_algebraic
     end_states:seq[tuple[short: string, long: string]] = @[]
 
     # The ending position, this will change throughout the method.
@@ -321,7 +440,7 @@ proc generate_diagonal_moves(self: Board, color: Color, starts: seq[tuple[y, x:i
     # Get the piece num for the algebraic move.
     piece_num = if queen: piece_numbers['Q'] else: piece_numbers['B']
 
-    # End_states will be a seuqnce of tuples returned by row_column_to_algebraic
+    # End_states will be a sequence of tuples returned by row_column_to_algebraic
     end_states:seq[tuple[short: string, long: string]] = @[]
 
     # The ending position, this will change throughout the method.
@@ -409,7 +528,7 @@ proc generate_king_moves*(self: Board, color: Color): seq[tuple[alg: string, sta
     moves:array[8, tuple[y, x: int]] = [(-1, -1), (-1, 0), (-1, 1), (0, -1),
                                         (0, 1), (1, -1), (1, 0), (1, 1)]
 
-    # End_states will be a seuqnce of tuples returned by row_column_to_algebraic
+    # End_states will be a sequence of tuples returned by row_column_to_algebraic
     end_states:seq[tuple[short: string, long: string]] = @[]
 
   for pos in kings:

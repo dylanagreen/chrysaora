@@ -1,4 +1,5 @@
 import unittest
+import tables
 import sets
 
 import board
@@ -51,6 +52,17 @@ suite "start of game move generation":
 
   test "king moves":
     var moves = test_board.generate_king_moves(Color.WHITE)
+
+    # This strips out the algebraic parts of the moves.
+    var alg: HashSet[string] = initHashSet[string]()
+    for i, m in moves:
+      alg.incl(m[0])
+    var expected = initHashSet[string]()
+
+    check(alg == expected)
+
+  test "castle moves":
+    var moves = test_board.generate_castle_moves(Color.WHITE)
 
     # This strips out the algebraic parts of the moves.
     var alg: HashSet[string] = initHashSet[string]()

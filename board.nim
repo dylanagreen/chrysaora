@@ -17,10 +17,11 @@ type
 
 
   Board* = ref object
-    #to_move:
+    to_move*: Color
     half_move_clock*: int
     game_states*: seq[Tensor[int]]
     current_state*: Tensor[int]
+    castle_rights*: Table[string, bool]
 
 
 # The piece number -> piece name table.
@@ -52,7 +53,11 @@ proc new_board*(): Board =
                                   [1, 1, 1, 1, 1, 1, 1, 1],
                                   [2, 3, 4, 5, 6, 4, 3, 2]].toTensor
 
-  result = Board(half_move_clock: 0, game_states: @[], current_state: start_board)
+  let start_castle_rights = {"WQR" : true, "WKR" : true, "BQR" : true,
+                             "BKR" : true}.toTable
+  result = Board(half_move_clock: 0, game_states: @[],
+                 current_state: start_board, castle_rights: start_castle_rights,
+                 to_move: Color.WHITE)
   return result
 
 
@@ -156,7 +161,40 @@ proc long_algebraic_to_board_state(self: Board, move: string): Tensor[int]=
   return new_state
 
 
-proc is_in_check(self: Board, color: Color): bool=
+proc castle_algebraic_to_board_state(self: Board, move: string, color: Color): Tensor[int]=
+  result = self.current_state
+
+  var
+    # Piece numbers for placing.
+    king_num = piece_numbers['K']
+    rook_num = piece_numbers['R']
+
+  # The rank that the king and rook are on.
+  let rank = if color == Color.WHITE: 7 else: 0
+
+  # Flips the piece to negative if we're castling for black.
+  if not (color == Color.WHITE):
+    king_num = king_num * -1
+    rook_num = rook_num * -1
+
+  # Kingside castling
+  if move == "O-O" or move == "0-0":
+    result[rank, 7] = 0 # The rook
+    result[rank, 4] = 0 # The king
+    result[rank, 6] = king_num
+    result[rank, 5] = rook_num
+    return
+
+  # Queenside castling
+  elif move == "O-O-O" or move == "0-0-0":
+    result[rank, 0] = 0 # The rook
+    result[rank, 4] = 0 # The king
+    result[rank, 2] = king_num
+    result[rank, 3] = rook_num
+    return
+
+
+proc is_in_check(state: Tensor[int], color: Color): bool=
   return false
 
 
@@ -173,7 +211,7 @@ proc remove_moves_in_check(self: Board, moves: openArray[tuple[short: string, lo
 
   # Loop through the move/board state sequence.
   for i, m in moves:
-    var check = self.is_in_check(color)
+    var check = self.current_state.is_in_check(color)
 
     if not check:
       # If the number of times that the short moves appears is more than 1 we
@@ -552,7 +590,67 @@ proc generate_king_moves*(self: Board, color: Color): seq[tuple[alg: string, sta
   return result
 
 
-#proc generate_castle_moves(self: Board, color: Color): tuple[alg: string, state: Tensor[int]]=
+proc generate_castle_moves*(self: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
+  # Hardcoded because you can only castle from starting positions.
+  # Basically just need to check that the files between the king and
+  # the rook are clear, then return the castling algebraic (O-O or O-O-O)
+  let
+    # The rank that castling takes place on.
+    rank = if color == Color.WHITE: 7 else: 0
+
+    # The king's number on the board.
+    king_num = if color == Color.WHITE: piece_numbers['K'] else: -1 * piece_numbers['K']
+
+    # Key values to check in the castling table for castling rights.
+    kingside = if color == Color.WHITE: "WKR" else: "BKR"
+    queenside = if color == Color.WHITE: "WQR" else: "BQR"
+
+  var
+    # End_states will be a sequence of castling strings
+    end_states:seq[string] = @[]
+
+    # Slice representing the two spaces between the king and the kingside rook.
+    between = self.current_state[rank, 5..6]
+
+  # You're not allowed to castle out of check so if you're in check
+  # don't generate it as a legal move.
+  if self.current_state.is_in_check(color):
+      return
+
+  if self.castle_rights[kingside] and sum(abs(between)) == 0:
+    # Before we go ahead and append the move is legal we need to verify
+    # that we don't castle through check. Since we remove moves
+    # that end in check, and the king moves two during castling,
+    # it is sufficient therefore to simply check that moving the king
+    # one space in the kingside direction doesn't put us in check.
+    var s = self.current_state
+    s[rank, 4] = 0
+    s[rank, 5] = king_num
+
+    if not s.is_in_check(color):
+      end_states.add("O-O")
+
+  # Slice representing the two spaces between the king and the queenside rook.
+  between = self.current_state[rank, 1..3]
+  if self.castle_rights[queenside] and sum(abs(between)) == 0:
+    # See reasoning above in kingside.
+    var s = self.current_state
+    s[rank, 4] = 0
+    s[rank, 3] = king_num
+
+    if not s.is_in_check(color):
+      end_states.add("O-O-O")
+
+  # Build a sequence of new_states that will get pruned by remove_moves_in_check
+  var new_states: seq[tuple[short: string, long: string, state: Tensor[int]]] = @[]
+  for i, move in end_states:
+      var s = self.castle_algebraic_to_boardstate(move, self.to_move)
+      new_states.add((move, move, s))
+
+  # Removes the illegal moves that leave you in check.
+  result = self.remove_moves_in_check(new_states, color)
+
+  return result
 
 #proc make_move(self: Board, move: string)=
 
@@ -561,8 +659,6 @@ proc generate_king_moves*(self: Board, color: Color): seq[tuple[alg: string, sta
 #proc check_move_legality(self: Board, move: string): tuple[legal: bool, alg: string]=
 
 #proc short_algebraic_to_long_algebraic(self: Board, move: string): string=
-
-#proc castle_algebraic_to_board_state(self: Board, move: string): Tensor[int]=
 
 #proc to_fen(self: Board): string=
 

@@ -22,6 +22,8 @@ type
     game_states*: seq[Tensor[int]]
     current_state*: Tensor[int]
     castle_rights*: Table[string, bool]
+    move_list*: seq[string]
+    status*: Status
 
 
 # The piece number -> piece name table.
@@ -57,7 +59,7 @@ proc new_board*(): Board =
                              "BKR" : true}.toTable
   result = Board(half_move_clock: 0, game_states: @[],
                  current_state: start_board, castle_rights: start_castle_rights,
-                 to_move: Color.WHITE)
+                 to_move: Color.WHITE, status: Status.IN_PROGRESS, move_list: @[])
   return
 
 
@@ -67,7 +69,7 @@ proc new_board*(start_board: Tensor[int]): Board =
                              "BKR" : true}.toTable
   result = Board(half_move_clock: 0, game_states: @[],
                  current_state: start_board, castle_rights: start_castle_rights,
-                 to_move: Color.WHITE)
+                 to_move: Color.WHITE, status: Status.IN_PROGRESS, move_list: @[])
   return
 
 
@@ -1207,9 +1209,99 @@ proc is_checkmate*(state: Tensor[int], color: Color): bool=
   return
 
 
-#proc make_move(self: Board, move: string)=
+proc make_move*(self: Board, move: string)=
+  let legality = self.check_move_legality(move)
 
-#proc unmake_move(self: Board)=
+  if not legality.legal:
+    raise newException(ValueError, "You tried to make an illegal move!")
+
+  # Since queenside is the same as kingside with an extra -O on the end
+  # we can just check that the kingside move is in the move.
+  var
+    castle_move = "O-O" in legality.alg or "0-0" in legality.alg
+    new_state: Tensor[int]
+
+  if castle_move:
+      new_state = self.castle_algebraic_to_boardstate(legality.alg, self.to_move)
+  else:
+      new_state = self.long_algebraic_to_boardstate(legality.alg)
+
+  # Add the current state to the list of game states and then change the state.
+  self.game_states.add(clone(self.current_state))
+  self.current_state = clone(new_state)
+
+  var piece = 'P'
+  for i, c in move:
+    # If we have an = then this is the piece the pawn promotes to.
+    # Pawns can promote to rooks which would fubar the dict.
+    if c.isUpperAscii() and not ('=' in move):
+        piece = c
+
+  # Updates the castle table for castling rights.
+  if piece == 'K' or castle_move:
+    if self.to_move == Color.WHITE:
+        self.castle_rights["WKR"] = false
+        self.castle_rights["WQR"] = false
+    else:
+        self.castle_rights["BKR"] = false
+        self.castle_rights["BQR"] = false
+  elif piece == 'R':
+    # We can get the position the rook started from using slicing in
+    # the legal move, since legal returns a long algebraic move
+    # which fully disambiguates and gives us the starting square.
+    # So once the rook moves then we set it to false.
+    if legality.alg[1..2] == "a8":
+        self.castle_rights["BQR"] = false
+    elif legality.alg[1..2] == "h8":
+        self.castle_rights["BKR"] = false
+    elif legality.alg[1..2] == "a1":
+        self.castle_rights["WQR"] = false
+    elif legality.alg[1..2] == "h1":
+        self.castle_rights["WKR"] = false
+
+  # Updates the half move clock.
+  if piece == 'P' or 'x' in legality.alg:
+    self.half_move_clock = 0
+  else:
+    self.half_move_clock += 1
+
+  # We need to update castling this side if the rook gets taken without
+  # ever moving. We can't castle with a rook that doesn't exist.
+  if "xa8" in legality.alg:
+    self.castle_rights["BQR"] = false
+  elif "xh8" in legality.alg:
+    self.castle_rights["BKR"] = false
+  elif "xa1" in legality.alg:
+    self.castle_rights["WQR"] = false
+  elif "xh1" in legality.alg:
+    self.castle_rights["WKR"] = false
+
+  # The earliest possible checkmate is after 4 plies. No reason to check earlier
+  if len(self.move_list) > 3:
+    # If there are no moves that get us out of check we need to see if we're in
+    # check right now. If we are that's check mate. If we're not that's a stalemate.
+    var
+      color = if self.to_move == Color.WHITE: Color.BLACK else: Color.WHITE
+      responses = self.generate_moves(color)
+    if len(responses) == 0:
+        var check = self.current_state.is_in_check(color)
+        if check:
+            if self.to_move == Color.WHITE:
+                self.status = Status.WHITE_VICTORY
+            else:
+                self.status = Status.BLACK_VICTORY
+        else:
+            self.status = Status.DRAW
+
+  self.to_move = if self.to_move == Color.WHITE: Color.BLACK else: Color.WHITE
+  self.move_list.add(legality.alg)
+
+
+proc unmake_move(self: Board)=
+  self.current_state = clone(self.game_states.pop())
+  discard self.move_list.pop() # Take the last move off the move list as well.
+  self.to_move = if self.to_move == Color.BLACK: Color.WHITE else: Color.BLACK
+
 
 #proc to_fen(self: Board): string=
 

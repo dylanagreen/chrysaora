@@ -694,6 +694,30 @@ proc short_algebraic_to_long_algebraic*(self: Board, move: string): string=
   return
 
 
+proc check_move_legality*(self: Board, move: string): tuple[legal: bool, alg: string]=
+  result = (false, move)
+
+  # Tries to get the long version of the move. If there is not piece that could
+  # make thismove the long_move is going to be the empty string.
+  let long_move = self.short_algebraic_to_long_algebraic(move)
+  if long_move == "":
+    return
+
+  var check: bool
+
+  # Only need to check if you castle into check since short_algebraic_to_long
+  # already checks to see if the move ends in check and if it does it returns
+  # "".  Doesn't check castling ending in check, however, hence why this
+  # is here. Castling shortcuts in short_algebraic.
+  if "O-O" in long_move or "0-0" in long_move:
+    var end_state = self.castle_algebraic_to_boardstate(long_move, self.to_move)
+    check = end_state.is_in_check(self.to_move)
+
+  if check:
+    return
+  return (true, long_move)
+
+
 proc remove_moves_in_check(self: Board, moves: openArray[tuple[short: string, long: string, state: Tensor[int]]], color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
   # Shortcut for if there's no possible moves being disambiguated.
   if len(moves) == 0:
@@ -1187,8 +1211,6 @@ proc is_checkmate*(state: Tensor[int], color: Color): bool=
 
 #proc unmake_move(self: Board)=
 
-#proc check_move_legality(self: Board, move: string): tuple[legal: bool, alg: string]=
-
 #proc to_fen(self: Board): string=
 
 
@@ -1221,8 +1243,7 @@ proc load_fen*(fen: string): Board=
     # Castling rights
     castle_dict = {"WQR" : false, "WKR" : false, "BQR" : false, "BKR" : false}.toTable
 
-  let
-    castle_names = {'K' : "WKR", 'Q' : "WQR", 'k' : "BKR", 'q' : "BQR"}.toTable
+  let castle_names = {'K' : "WKR", 'Q' : "WQR", 'k' : "BKR", 'q' : "BQR"}.toTable
 
   var castling_field = fields[2]
 

@@ -321,17 +321,17 @@ suite "short algebraic conversion":
     check(long == "g2g3")
 
   test "king moves":
-     # Illegal pawn move
-     var long = test_board.short_algebraic_to_long_algebraic("Kc2")
-     check(long == "")
+    # Illegal pawn move
+    var long = test_board.short_algebraic_to_long_algebraic("Kc2")
+    check(long == "")
 
-     # King moves diagonal
-     long = test_board.short_algebraic_to_long_algebraic("Kd2")
-     check(long == "Kc1d2")
+    # King moves diagonal
+    long = test_board.short_algebraic_to_long_algebraic("Kd2")
+    check(long == "Kc1d2")
 
-     # King moves straight
-     long = test_board.short_algebraic_to_long_algebraic("Kb1")
-     check(long == "Kc1b1")
+    # King moves straight
+    long = test_board.short_algebraic_to_long_algebraic("Kb1")
+    check(long == "Kc1b1")
 
 suite "castling algebraic conversion":
   setup:
@@ -355,3 +355,110 @@ suite "castling algebraic conversion":
     test_board = load_fen("r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/2N5/PPP3P1/R3KQ1R w KQ -")
     var long = test_board.short_algebraic_to_long_algebraic("O-O")
     check(long == "")
+
+suite "move legality":
+  setup:
+    # Loads a complicated fen to test from.
+    # Taken from the game that was the lichess puzzle on 4/23/19
+    var test_board: Board = load_fen("r4rk1/1p2qpb1/5np1/4p1Bp/p2nP2P/2N5/PPP1Q1P1/N1KR3R w - - 4 18")
+
+  test "knight moves":
+    var legal = test_board.check_move_legality("Nb3")
+    check(legal[0])
+
+    legal = test_board.check_move_legality("Nb5")
+    check(legal[0])
+
+    legal = test_board.check_move_legality("Nd5")
+    check(legal[0])
+
+  test "rook moves":
+    # Rook sideways
+    var legal = test_board.check_move_legality("Rd2")
+    check(legal[0])
+
+    # Rooks partial disambiguation
+    legal = test_board.check_move_legality("Rdf1")
+    check(legal[0])
+
+    legal = test_board.check_move_legality("Rhf1")
+    check(legal[0])
+
+    # Rook forward
+    legal = test_board.check_move_legality("Rh3")
+    check(legal[0])
+
+  test "bishop moves":
+    # Bishop diagonal
+    var legal = test_board.check_move_legality("Bd2")
+    check(legal[0])
+
+    legal = test_board.check_move_legality("Bh6")
+    check(legal[0])
+
+    # Piece taking
+    legal = test_board.check_move_legality("Bxf6")
+    check(legal[0])
+
+  test "queen moves":
+    # Piece taking
+    var legal = test_board.check_move_legality("Qxh5")
+    check(legal[0])
+
+    # Queen straight move
+    legal = test_board.check_move_legality("Qe2e3")
+    check(legal[0])
+
+    # Queen makes an illegal move
+    legal = test_board.check_move_legality("Qd1")
+    check(legal[0] == false)
+
+  test "pawn moves":
+    # Illegal pawn move
+    var legal = test_board.check_move_legality("e5")
+    check(legal[0] == false)
+
+    # Pawn moves 2
+    legal = test_board.check_move_legality("b4")
+    check(legal[0])
+
+    # Pawn moves 1
+    legal = test_board.check_move_legality("b3")
+    check(legal[0])
+
+    # Pawn full disambiguation
+    legal = test_board.check_move_legality("g2g3")
+    check(legal[0])
+
+  test "king moves":
+    # Illegal pawn move
+    var legal = test_board.check_move_legality("Kc2")
+    check(legal[0] == false)
+
+    # King moves diagonal
+    legal = test_board.check_move_legality("Kd2")
+    check(legal[0])
+
+    # King moves straight
+    legal = test_board.check_move_legality("Kb1")
+    check(legal[0])
+
+  test "kingside castling":
+    test_board = load_fen("r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/2N5/PPP1Q1P1/R3K2R w KQ -")
+    var legal = test_board.check_move_legality("O-O")
+    check(legal[0])
+
+  test "queenside":
+    test_board = load_fen("r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/2N5/PPP1Q1P1/R3K2R w KQ -")
+    var legal = test_board.check_move_legality("O-O-O")
+    check(legal[0])
+
+  test "queenside illegal":
+    test_board = load_fen("r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/8/PPP1Q1P1/R2NK2R b KQ -")
+    var legal = test_board.check_move_legality("O-O-O")
+    check(legal[0] == false)
+
+  test "kingside illegal":
+    test_board = load_fen("r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/2N5/PPP3P1/R3KQ1R w KQ -")
+    var legal = test_board.check_move_legality("O-O")
+    check(legal[0] == false)

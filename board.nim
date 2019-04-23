@@ -135,7 +135,7 @@ proc long_algebraic_to_board_state(self: Board, move: string): Tensor[int]=
           piece = c
 
   # Uses regex to find the rank/file combinations.
-  var locs = findAll(move, re"[a-h]\d+")
+  let locs = findAll(move, re"[a-h]\d+")
 
   # Gets the starting position and puts into a constant
   var
@@ -202,7 +202,6 @@ proc castle_algebraic_to_board_state(self: Board, move: string, color: Color): T
     result[rank, 3] = rook_num
     return
 
-
 proc is_in_check(state: Tensor[int], color: Color): bool=
   let
     # The direction a pawn must travel to take this color's king.
@@ -232,7 +231,9 @@ proc is_in_check(state: Tensor[int], color: Color): bool=
   # Checks if you'd be in check from the opposite king.
   # This should only trigger on you moving your king into that position.
   let opposite_king = -king_num
-  let opposite_loc = state.find_piece(opposite_king)[0]
+  var opposite_locs = state.find_piece(opposite_king)
+
+  let opposite_loc = opposite_locs[0]
 
  # If the other king is vertical or horizontal the sum will be 1 since it's
  # [0,1] or [1,0]. If it is diagonal diff will be  [1, 1]
@@ -240,7 +241,7 @@ proc is_in_check(state: Tensor[int], color: Color): bool=
   if sum(diff) == 1 or diff == [1, 1]:
     return true
 
-  # Rooks and Queens nextrooks = find_piece(state*mult, 2)
+  # Rooks and Queens
   let
     queens = find_piece(state*mult, piece_numbers['Q'])
     rooks = find_piece(state*mult, piece_numbers['R'])
@@ -250,6 +251,12 @@ proc is_in_check(state: Tensor[int], color: Color): bool=
     slide:Tensor[int] = @[0].toTensor
 
   for pos in concat(queens, rooks):
+    # If moving puts the king next to the rook you're in check guaranteed.
+    if pos.y == king.y and abs(pos.x - king.x) == 1:
+     return true
+    elif pos.x == king.x and abs(pos.y - king.y) == 1:
+      return true
+
     # Rook needs to be on the same file or rank to be able to put the king in
     # check. Check the sum between the two pieces, if it's 0 then no pieces are
     # between and it's a valid check.
@@ -317,6 +324,374 @@ proc is_in_check(state: Tensor[int], color: Color): bool=
           return true
 
   return false
+
+
+# TODO: An incredible amount of the code in here is the same as is_in_check -> refactor
+proc short_algebraic_to_long_algebraic*(self: Board, move: string): string=
+  var new_move = move
+  # A move is minimum two characters (a rank and a file for pawns)
+  # so if it's shorter it's not a good move.
+  if len(move) < 2:
+    return
+
+  # You're not allowed to castle out of check.
+  var check = self.current_state.is_in_check(self.to_move)
+  if ("O-O" in move or "0-0" in move) and check:
+      return
+
+  # Slices off the checkmate character for parsing. This is largely so that
+  # castling into putting the opponent in check parses correctly.
+  if move.endsWith('+') or move.endsWith('#'):
+    new_move = new_move[0 ..< ^1]
+
+  # Castling is the easiest to check for legality.
+  var
+    # The rank the king is on.
+    king_rank = if self.to_move == Color.WHITE: 7 else: 0
+
+    # The king's number representation
+    king_num = if self.to_move == Color.WHITE: piece_numbers['K'] else: -piece_numbers['K']
+
+  # Kingside castling
+  if new_move == "O-O" or new_move == "0-0":
+    var
+      check_side = if self.to_move == Color.WHITE: "WKR" else: "BKR"
+      # The two spaces between the king and rook.
+      between = self.current_state[king_rank, 5..6]
+
+    if self.castle_rights[check_side] and sum(abs(between)) == 0:
+        # Need to check that we don't castle through check here.
+        var new_state = clone(self.current_state)
+        new_state[king_rank, 4] = 0
+        new_state[king_rank, 5] = king_num
+
+        check = new_state.is_in_check(self.to_move)
+        if not check:
+            return new_move
+        else:
+            return
+    else:
+        return
+  # Queenside castling
+  elif new_move == "O-O-O" or new_move == "0-0-0":
+    var
+      check_side = if self.to_move == Color.WHITE: "WQR" else: "BQR"
+      # The three spaces between the king and rook.
+      between = self.current_state[king_rank, 1..3]
+
+    if self.castle_rights[check_side] and sum(abs(between)) == 0:
+        # Need to check that we don't castle through check here.
+        var new_state = clone(self.current_state)
+        new_state[king_rank, 4] = 0
+        new_state[king_rank, 3] = king_num
+
+        check = new_state.is_in_check(self.to_move)
+        if not check:
+            return new_move
+        else:
+            return
+    else:
+        return
+
+  # Use regex to extract the positions as well as the singular ranks
+  # and files and the pieces (for finding the piece and pawn promotion)
+  let
+    locs = findAll(move, re"[a-h]\d+")
+    ranks = findAll(move, re"\d+")
+    files = findAll(move, re"[a-h]")
+    pieces = findAll(move, re"[PRNQKB]")
+    illegal_piece = findAll(move, re"[A-Z]")
+
+  # If you passed too few or too many locations bail
+  if len(locs) == 0 or len(locs) >= 3:
+    return
+
+  # If you didn't pass a valid piece then bail
+  if len(pieces) == 0 and len(illegal_piece) > 0:
+    return
+
+  # Disallows promotions to pawns or kings.
+  if ("P" in pieces or "K" in pieces) and '=' in new_move:
+    return
+
+  # Ensures your move stays within the 8 ranks of the board.
+  for r in ranks:
+    if not (parseInt(r) in  1..8):
+      return
+
+  # Gets the ending position and puts into a constant
+  var
+    dest = locs[^1]
+    file = ascii_lowercase.find(dest[0]) # File = x
+    rank = 8 - parseInt($dest[1]) # Rank = y
+
+  let fin: tuple[y, x: int] = (rank, file)
+
+  # Defults everything to pawn.
+  var
+    mult = if self.to_move == Color.WHITE: 1 else: -1
+    piece_char = 'P'
+    piece_num = piece_numbers['P'] * mult
+    promotion_piece = piece_numbers['P'] * mult
+
+  # If a piece was passed in we set the piece_char to that piece.
+  if len(pieces) > 0:
+    piece_char = pieces[0][0]
+
+  # Puts the found piece number into either piece_num or promotion_piece
+  # Depending what piece is moving.
+  if '=' in new_move:
+    promotion_piece = piece_numbers[piece_char] * mult
+  else:
+    piece_num = piece_numbers[piece_char] * mult
+
+  var found_pieces = self.current_state.find_piece(piece_num)
+
+  # If we have any sort of disambiguation use that as our starting point.
+  # This allows us to trim the pieces we search through and find the
+  # correct correct one rather than the "first one allowed to make this move."
+  var start: tuple[y, x: int] = (-1, -1)
+
+  if len(locs) == 2:
+    dest = locs[0]
+    start.x = ascii_lowercase.find(dest[0]) # File = x
+    start.y = 8 - parseInt($dest[1]) # Rank = y
+  elif len(files) == 2:
+    start.x = ascii_lowercase.find(files[0][0])
+  elif len(ranks) == 2:
+    start.y = 8 - parseInt($ranks[0])
+
+  # This trims the list of found pieces only down to the pieces that could
+  # make this move according to disamgibuation.
+  if start != (-1, -1):
+    var good: seq[tuple[y, x:int]] = @[]
+    for loc in found_pieces:
+      # File disambiguation
+      if start.y == -1 and loc.x == start.x:
+          good.add(loc)
+      # Rank disambiguation
+      elif start.x == -1 and loc.y == start.y:
+          good.add(loc)
+      # Full disambiguation
+      elif loc == start:
+          good.add(loc)
+
+    found_pieces = good
+
+  var
+    # Direction opposite that which the color's pawns move.
+    # So 1 is downwards, opposite White's pawns going upwards.
+    d = if self.to_move == Color.WHITE: -1 else: 1
+
+    # The starting file for the pawn row, for double move checking
+    pawn_start = if self.to_move == Color.WHITE: 6 else: 1
+
+    # The file the pawn needs to be on to take en passant.
+    ep_file = if self.to_move == Color.WHITE: 3 else: 4
+
+    # The ending rank for pawn promotion
+    pawn_end = if self.to_move == Color.WHITE: 0 else: 7
+
+    state = clone(self.current_state * mult)
+
+  # This handy line of code prevents you from taking your own pieces.
+  if state[fin.y, fin.x] > 0:
+    return
+
+  # An inner proc to remove code duplication that checks if moving the piece
+  # would end with you in check. This exists in case you try to move a piece
+  # that's pinned.
+  proc good_move(start: tuple[y, x: int], fin: tuple[y, x: int],  piece_num: int, ep: bool=false): bool=
+    var s = clone(self.current_state)
+    s[start.y, start.x] = 0
+    s[fin.y, fin.x] = piece_num
+
+    if ep:
+      s[start.y, fin.x] = 0
+
+    result = not s.is_in_check(self.to_move)
+    return
+  if piece_char == 'P':
+    # This requires that the pawn promote upon reaching the end.
+    if fin.y == pawn_end and not ('=' in new_move):
+      return
+    # Loop over the found pawns.
+    for pawn in found_pieces:
+      var
+        found: tuple[y, x: int] = (-1, -1)
+        promotion: bool = fin.x == pawn_end
+        # Ensures that this pawn would actually have to move forward and not
+        # backward to get to the ending square. This is true if the pawn
+        # moves backwards.
+        direc = if self.to_move == Color.WHITE: pawn.y < fin.y  else: pawn.y > fin.y
+
+      if direc:
+        continue
+
+      # First check where the ending position is empty
+      # Second condition is that the pawn is on the same rank
+      if state[fin.y, fin.x] == 0 and pawn.x == fin.x:
+        # If this pawn can move forward 1 and end on the end it's good.
+        if pawn.y + d == fin.y:
+            found = pawn
+
+        # Need to check the space between one move and two is empty.
+        var empty = state[pawn.y + d, fin.x] == 0
+        if pawn.y + 2 * d == fin.y and pawn.y == pawn_start and empty:
+            found = pawn
+
+      # This is the case for where the ending state isn't empty, which
+      # means that the pawn needs to travel diagonally to take this piece.
+      if state[fin.y, fin.x] < 0:
+        let
+          take_left = pawn.y + d == fin.y and pawn.x - 1 == fin.x
+          take_right = pawn.y + d == fin.y and pawn.y + 1 == fin.x
+        if take_left or take_right:
+            found = pawn
+
+      # Interestingly d happens to correspond to "pawn of the opposite color"
+      # Bools check that we are adjacent to a pawn of the opposite color which
+      # is a requirement of en_passant.
+      let
+        ep_left = pawn.x == fin.x - 1 and self.current_state[pawn.y, fin.x] == d
+        ep_right = pawn.x == fin.x + 1 and self.current_state[pawn.y, fin.x] == d
+
+        # We need to start on the correct file for en passant.
+        good_start = pawn.y == ep_file
+        # Makes sure the ending far enough from the edge for a good en passant.
+        good_end = fin.y in 1..6
+
+      var ep = false
+
+      # Can't en passant on turn 1 (or anything less than turn 3 I think)
+      # so if you got this far it's not a legal pawn move.
+      if len(self.game_states) > 1:
+        let previous_state = clone(self.game_states[^1])
+        if state[fin.y, fin.x] == 0 and (ep_left or ep_right) and good_start:
+            # Checks that in the previous state the pawn actually
+            # moved two spaces. This prevents trying an en passant
+            # move three moves after the pawn moved.
+            if good_end and previous_state[fin.y + d, fin.x] == d:
+                found = pawn
+                ep = true
+
+      # Ensures that moving this piece doesn't end in check. In theory it could
+      # end in a promotion, but if moving this piece leaves us in check then it
+      # won't matter what piece it promotes to so I can just check as a pawn.
+      if not (found == (-1, -1)) and good_move(found, fin, piece_num, ep):
+        if promotion:
+            return self.row_column_to_algebraic(pawn, fin, piece_num, promotion_piece)[1]
+        if ep:
+            return self.row_column_to_algebraic(found, fin, piece_num)[1] & "e.p."
+        return self.row_column_to_algebraic(found, fin, piece_num)[1]
+
+  elif piece_char == 'N':
+    for knight in found_pieces:
+      var
+        found: tuple[y, x: int] = (-1, -1)
+        slope: tuple[y, x: int] = (abs(fin.y - knight.y), abs(fin.x - knight.x))
+
+      # Avoids a divide by 0 error. If it's on the same rank or file
+      # the knight can't get the king anyway.
+      if slope.x == 0 or slope.y == 0:
+          continue
+      if slope == (1, 2) or slope == (2, 1):
+          found = knight
+
+      # Ensures that moving this piece doesn't end in check.
+      if not (found == (-1, -1)) and good_move(found, fin, piece_num):
+          return self.row_column_to_algebraic(found, fin, piece_num)[1]
+
+  elif piece_char == 'R' or  piece_char == 'Q':
+    for rook in found_pieces:
+      var found: tuple[y, x: int] = (-1, -1)
+      # If we only move one space then we found the piece already.
+      if rook.y == fin.y and abs(rook.x - fin.x) == 1:
+        found = rook
+      elif rook.x == fin.x and abs(rook.y - fin.y) == 1:
+        found = rook
+      else:
+        # The slide a rook would have to take to get to the end.
+        var slide:Tensor[int] = @[0].toTensor
+
+        if rook.y == fin.y:
+          # Slides from the rook to the fin, left to right.
+          if rook.x < fin.x:
+            slide = state[fin.y, rook.x + 1 ..< fin.x]
+          # Slides from the fin to the rook, left to right.
+          else:
+            slide = state[fin.y, fin.x + 1 ..< rook.x]
+          slide = abs(slide)
+          if sum(slide) == 0:
+            found = rook
+
+        if rook.x == fin.x:
+          # Slides from the rook to the fin, top down.
+          if rook.y < fin.y:
+            slide = state[rook.y + 1 ..< fin.y, fin.x]
+          # Slides from the fin to the rook, top down.
+          else:
+            slide = state[fin.y + 1 ..< rook.y, fin.x]
+          slide = abs(slide)
+          if sum(slide) == 0:
+            found = rook
+
+      # Ensures that moving this piece doesn't end in check.
+      if not (found == (-1, -1)) and good_move(found, fin, piece_num):
+          return self.row_column_to_algebraic(found, fin, piece_num)[1]
+
+    # If we make it through all the rooks and didn't find one that has a
+    # straight shot to the end then there isn't a good move. However we only do
+    # this if we entered this block as a Rook Since queens can still go diagonal
+    if piece_char == 'R':
+        return
+
+  if piece_char == 'B' or  piece_char == 'Q':
+    for bishop in found_pieces:
+      # First we check that the piece is even on a diagonal from the fin.
+      # The following code finds the absolute value of the slope as well
+      # as the slope value from the bishop to the fin.
+      var
+        found: tuple[y, x: int] = (-1, -1)
+        slope: tuple[y, x:float] = (float(bishop.y - fin.y), float(bishop.x - fin.x))
+        abs_slope: tuple[y, x:float] = (abs(slope.y), abs(slope.x))
+        max = max([abs_slope.y, abs_slope.x])
+
+      slope = (slope[0] / max, slope[1] / max)
+      abs_slope = (abs_slope[0] / max, abs_slope[1] / max)
+
+      # If the absolute slope is 1,1 then it's a diagonal.
+      if abs_slope.x == 1.0 and abs_slope.y == 1.0:
+        var cur_pos: tuple[y, x:int] = bishop
+        # Now we have to check that the space between the two is empty.
+        for i in 1..7:
+          cur_pos = (fin.y + i * int(slope.y), fin.x + i * int(slope.x))
+
+          if not (state[cur_pos.y, cur_pos.x] == 0):
+              break
+        # This will execute if the position that caused the for loop to
+        # break is the bishop itself, otherwise this does not execute.
+        # Or the queen. Same thing.
+        if cur_pos == bishop:
+            found = bishop
+
+      # Ensures that moving this piece doesn't end in check.
+      if not (found == (-1, -1)) and good_move(found, fin, piece_num):
+        return self.row_column_to_algebraic(found, fin, piece_num)[1]
+
+  if piece_char == 'K':
+    for king in found_pieces:
+      var found: tuple[y, x: int] = (-1, -1)
+
+      let diff = [abs(king.y - fin.y), abs(king.x - fin.x)]
+      if sum(diff) == 1 or diff == [1, 1]:
+        found = king
+
+      #Ensures that moving this piece doesn't end in check.
+      if not (found == (-1, -1)) and good_move(found, fin, piece_num):
+        return self.row_column_to_algebraic(found, fin, piece_num)[1]
+
+  return
 
 
 proc remove_moves_in_check(self: Board, moves: openArray[tuple[short: string, long: string, state: Tensor[int]]], color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
@@ -790,7 +1165,7 @@ proc generate_moves*(self: Board, color: Color): seq[tuple[alg: string, state: T
   return
 
 
-proc is_checkmate(state: Tensor[int], color: Color): bool=
+proc is_checkmate*(state: Tensor[int], color: Color): bool=
   let check = state.is_in_check(color)
 
   # Result is auto instantiated to false.
@@ -813,8 +1188,6 @@ proc is_checkmate(state: Tensor[int], color: Color): bool=
 #proc unmake_move(self: Board)=
 
 #proc check_move_legality(self: Board, move: string): tuple[legal: bool, alg: string]=
-
-#proc short_algebraic_to_long_algebraic(self: Board, move: string): string=
 
 #proc to_fen(self: Board): string=
 

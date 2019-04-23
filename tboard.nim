@@ -7,7 +7,7 @@ import board
 
 suite "start of game move generation":
   setup:
-    var test_board: Board = new_board()
+    let test_board: Board = new_board()
 
   test "knight moves":
     var moves = test_board.generate_knight_moves(Color.WHITE)
@@ -50,6 +50,8 @@ suite "start of game move generation":
     for i, m in moves:
       alg.incl(m[0])
     var expected = initHashSet[string]()
+
+    check(alg == expected)
 
   test "king moves":
     var moves = test_board.generate_king_moves(Color.WHITE)
@@ -103,7 +105,7 @@ suite "start of game move generation":
 suite "complicated move generation":
   setup:
     # Loads a complicated fen to test from.
-    var test_board: Board = load_fen("1nb1kb2/7p/r1p2np1/P2r4/RP5q/2N3P1/1B1PP2P/3QK2R w KQkq -")
+    let test_board: Board = load_fen("1nb1kb2/7p/r1p2np1/P2r4/RP5q/2N3P1/1B1PP2P/3QK2R w KQkq -")
 
   test "loading board state from fen":
     var expected = @[[0, -3, -4, 0, -6, -4, 0, 0],
@@ -210,3 +212,146 @@ suite "complicated move generation":
                     "Ba3", "Bc1", "Nb1"].toHashSet
 
     check(alg == expected)
+
+suite "checkmate verification":
+  test "white":
+    # Puzzle from Lichess, already solved as a checkmate
+    let test_board = load_fen("5rk1/8/7p/3R2p1/3P4/8/6PP/4q1K1 w - - 0 37")
+    var moves = test_board.generate_moves(Color.WHITE)
+
+    # This strips out the algebraic parts of the moves.
+    var alg: HashSet[string] = initHashSet[string]()
+    for i, m in moves:
+      alg.incl(m[0])
+    var expected = initHashSet[string]()
+
+    check(alg == expected)
+
+    var checkmate = test_board.current_state.is_checkmate(test_board.to_move)
+    check(checkmate == true)
+
+  test "black":
+    # Puzzle from Lichess, already solved as a checkmate
+    let test_board = load_fen("r6k/1bp2Bp1/p5p1/1p6/3qn2Q/7P/P4PP1/2R3K1 b - - 1 25")
+    var moves = test_board.generate_moves(Color.BLACK)
+
+    # This strips out the algebraic parts of the moves.
+    var alg: HashSet[string] = initHashSet[string]()
+    for i, m in moves:
+      alg.incl(m[0])
+    var expected = initHashSet[string]()
+
+    check(alg == expected)
+
+    var checkmate = test_board.current_state.is_checkmate(test_board.to_move)
+    check(checkmate == true)
+
+suite "short algebraic conversion":
+  setup:
+    # Loads a complicated fen to test from.
+    # Taken from the game that was the lichess puzzle on 4/23/19
+    let test_board: Board = load_fen("r4rk1/1p2qpb1/5np1/4p1Bp/p2nP2P/2N5/PPP1Q1P1/N1KR3R w - - 4 18")
+
+  test "knight moves":
+    var long = test_board.short_algebraic_to_long_algebraic("Nb3")
+    check(long == "Na1b3")
+
+    long = test_board.short_algebraic_to_long_algebraic("Nb5")
+    check(long == "Nc3b5")
+
+    long = test_board.short_algebraic_to_long_algebraic("Nd5")
+    check(long == "Nc3d5")
+
+  test "rook moves":
+    # Rook sideways
+    var long = test_board.short_algebraic_to_long_algebraic("Rd2")
+    check(long == "Rd1d2")
+
+    # Rooks partial disambiguation
+    long = test_board.short_algebraic_to_long_algebraic("Rdf1")
+    check(long == "Rd1f1")
+
+    long = test_board.short_algebraic_to_long_algebraic("Rhf1")
+    check(long == "Rh1f1")
+
+    # Rook forward
+    long = test_board.short_algebraic_to_long_algebraic("Rh3")
+    check(long == "Rh1h3")
+
+  test "bishop moves":
+    # Bishop diagonal
+    var long = test_board.short_algebraic_to_long_algebraic("Bd2")
+    check(long == "Bg5d2")
+
+    long = test_board.short_algebraic_to_long_algebraic("Bh6")
+    check(long == "Bg5h6")
+
+    # Piece taking
+    long = test_board.short_algebraic_to_long_algebraic("Bxf6")
+    check(long == "Bg5xf6")
+
+  test "queen moves":
+    # Piece taking
+    var long = test_board.short_algebraic_to_long_algebraic("Qxh5")
+    check(long == "Qe2xh5")
+
+    # Queen straight move
+    long = test_board.short_algebraic_to_long_algebraic("Qe2e3")
+    check(long == "Qe2e3")
+
+    # Queen makes an illegal move
+    long = test_board.short_algebraic_to_long_algebraic("Qd1")
+    check(long == "")
+
+  test "pawn moves":
+    # Illegal pawn move
+    var long = test_board.short_algebraic_to_long_algebraic("e5")
+    check(long == "")
+
+    # Pawn moves 2
+    long = test_board.short_algebraic_to_long_algebraic("b4")
+    check(long == "b2b4")
+
+    # Pawn moves 1
+    long = test_board.short_algebraic_to_long_algebraic("b3")
+    check(long == "b2b3")
+
+    # Pawn full disambiguation
+    long = test_board.short_algebraic_to_long_algebraic("g2g3")
+    check(long == "g2g3")
+
+  test "king moves":
+     # Illegal pawn move
+     var long = test_board.short_algebraic_to_long_algebraic("Kc2")
+     check(long == "")
+
+     # King moves diagonal
+     long = test_board.short_algebraic_to_long_algebraic("Kd2")
+     check(long == "Kc1d2")
+
+     # King moves straight
+     long = test_board.short_algebraic_to_long_algebraic("Kb1")
+     check(long == "Kc1b1")
+
+suite "castling algebraic conversion":
+  setup:
+    # This test suite uses a modified version of the fen from short algebraic
+    var test_board: Board = load_fen("r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/2N5/PPP1Q1P1/R3K2R w KQ -")
+
+  test "kingside":
+    var long = test_board.short_algebraic_to_long_algebraic("O-O")
+    check(long == "O-O")
+
+  test "queenside":
+    var long = test_board.short_algebraic_to_long_algebraic("O-O-O")
+    check(long == "O-O-O")
+
+  test "queenside illegal":
+    test_board = load_fen("r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/8/PPP1Q1P1/R2NK2R b KQ -")
+    var long = test_board.short_algebraic_to_long_algebraic("O-O-O")
+    check(long == "")
+
+  test "kingside illegal":
+    test_board = load_fen("r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/2N5/PPP3P1/R3KQ1R w KQ -")
+    var long = test_board.short_algebraic_to_long_algebraic("O-O")
+    check(long == "")

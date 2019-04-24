@@ -91,7 +91,7 @@ proc find_piece(state: Tensor[int], piece: int): seq[tuple[y, x:int]]=
 # Use open arrays here since finish or start may be passed as a fixed length
 # array or as a sequence as created by find_piece.
 # TODO: Rewrite so that alg1 is generated and simply appended to alg2 instead of building them simultaneously
-proc row_column_to_algebraic(self: Board, start:tuple[y, x:int], finish:tuple[y, x:int], piece: int, promotion: int = 0): tuple[short: string, long: string]=
+proc row_column_to_algebraic(board: Board, start:tuple[y, x:int], finish:tuple[y, x:int], piece: int, promotion: int = 0): tuple[short: string, long: string]=
   var
     alg1: string = ""
     alg2: string = ""
@@ -105,7 +105,7 @@ proc row_column_to_algebraic(self: Board, start:tuple[y, x:int], finish:tuple[y,
   alg2.add($(8 - start.y)) # Rank = y
 
   # The x for captures
-  if self.current_state[finish.y, finish.x] != 0:
+  if board.current_state[finish.y, finish.x] != 0:
     # On pawn captures alg notation requires including the starting file.
     # Since we may not include a piece character
     if piece == 1:
@@ -130,8 +130,8 @@ proc row_column_to_algebraic(self: Board, start:tuple[y, x:int], finish:tuple[y,
   return (alg1, alg2)
 
 
-proc long_algebraic_to_board_state(self: Board, move: string): Tensor[int]=
-  var new_state = clone(self.current_state)
+proc long_algebraic_to_board_state(board: Board, move: string): Tensor[int]=
+  var new_state = clone(board.current_state)
 
   var piece:char = 'P' # Default to pawn, this generally is changed.
   for i, c in move:
@@ -159,7 +159,7 @@ proc long_algebraic_to_board_state(self: Board, move: string): Tensor[int]=
   let finish = [rank, file]
 
   # Gets the value of the piece that's moving.
-  var end_piece:int = self.current_state[start[0], start[1]]
+  var end_piece:int = board.current_state[start[0], start[1]]
 
   # In case of promotions we want the pice to change upon moving.
   if "=" in move:
@@ -176,8 +176,8 @@ proc long_algebraic_to_board_state(self: Board, move: string): Tensor[int]=
   return new_state
 
 
-proc castle_algebraic_to_board_state(self: Board, move: string, color: Color): Tensor[int]=
-  result = clone(self.current_state)
+proc castle_algebraic_to_board_state(board: Board, move: string, color: Color): Tensor[int]=
+  result = clone(board.current_state)
 
   var
     # Piece numbers for placing.
@@ -324,7 +324,7 @@ proc is_in_check(state: Tensor[int], color: Color): bool=
         if not (state[cur_pos.y, cur_pos.x] == 0):
             break
       # This will execute if the position that caused the for loop to
-      # break is the bishop itself, otherwise this does not execute.
+      # break is the bishop itboard, otherwise this does not execute.
       # Or the queen. Same thing.
       if cur_pos == pos:
           return true
@@ -333,7 +333,7 @@ proc is_in_check(state: Tensor[int], color: Color): bool=
 
 
 # TODO: An incredible amount of the code in here is the same as is_in_check -> refactor
-proc short_algebraic_to_long_algebraic*(self: Board, move: string): string=
+proc short_algebraic_to_long_algebraic*(board: Board, move: string): string=
   var new_move = move
   # A move is minimum two characters (a rank and a file for pawns)
   # so if it's shorter it's not a good move.
@@ -341,7 +341,7 @@ proc short_algebraic_to_long_algebraic*(self: Board, move: string): string=
     return
 
   # You're not allowed to castle out of check.
-  var check = self.current_state.is_in_check(self.to_move)
+  var check = board.current_state.is_in_check(board.to_move)
   if ("O-O" in move or "0-0" in move) and check:
       return
 
@@ -353,25 +353,25 @@ proc short_algebraic_to_long_algebraic*(self: Board, move: string): string=
   # Castling is the easiest to check for legality.
   var
     # The rank the king is on.
-    king_rank = if self.to_move == Color.WHITE: 7 else: 0
+    king_rank = if board.to_move == Color.WHITE: 7 else: 0
 
     # The king's number representation
-    king_num = if self.to_move == Color.WHITE: piece_numbers['K'] else: -piece_numbers['K']
+    king_num = if board.to_move == Color.WHITE: piece_numbers['K'] else: -piece_numbers['K']
 
   # Kingside castling
   if new_move == "O-O" or new_move == "0-0":
     var
-      check_side = if self.to_move == Color.WHITE: "WKR" else: "BKR"
+      check_side = if board.to_move == Color.WHITE: "WKR" else: "BKR"
       # The two spaces between the king and rook.
-      between = self.current_state[king_rank, 5..6]
+      between = board.current_state[king_rank, 5..6]
 
-    if self.castle_rights[check_side] and sum(abs(between)) == 0:
+    if board.castle_rights[check_side] and sum(abs(between)) == 0:
         # Need to check that we don't castle through check here.
-        var new_state = clone(self.current_state)
+        var new_state = clone(board.current_state)
         new_state[king_rank, 4] = 0
         new_state[king_rank, 5] = king_num
 
-        check = new_state.is_in_check(self.to_move)
+        check = new_state.is_in_check(board.to_move)
         if not check:
             return new_move
         else:
@@ -381,17 +381,17 @@ proc short_algebraic_to_long_algebraic*(self: Board, move: string): string=
   # Queenside castling
   elif new_move == "O-O-O" or new_move == "0-0-0":
     var
-      check_side = if self.to_move == Color.WHITE: "WQR" else: "BQR"
+      check_side = if board.to_move == Color.WHITE: "WQR" else: "BQR"
       # The three spaces between the king and rook.
-      between = self.current_state[king_rank, 1..3]
+      between = board.current_state[king_rank, 1..3]
 
-    if self.castle_rights[check_side] and sum(abs(between)) == 0:
+    if board.castle_rights[check_side] and sum(abs(between)) == 0:
         # Need to check that we don't castle through check here.
-        var new_state = clone(self.current_state)
+        var new_state = clone(board.current_state)
         new_state[king_rank, 4] = 0
         new_state[king_rank, 3] = king_num
 
-        check = new_state.is_in_check(self.to_move)
+        check = new_state.is_in_check(board.to_move)
         if not check:
             return new_move
         else:
@@ -435,7 +435,7 @@ proc short_algebraic_to_long_algebraic*(self: Board, move: string): string=
 
   # Defults everything to pawn.
   var
-    mult = if self.to_move == Color.WHITE: 1 else: -1
+    mult = if board.to_move == Color.WHITE: 1 else: -1
     piece_char = 'P'
     piece_num = piece_numbers['P'] * mult
     promotion_piece = piece_numbers['P'] * mult
@@ -451,7 +451,7 @@ proc short_algebraic_to_long_algebraic*(self: Board, move: string): string=
   else:
     piece_num = piece_numbers[piece_char] * mult
 
-  var found_pieces = self.current_state.find_piece(piece_num)
+  var found_pieces = board.current_state.find_piece(piece_num)
 
   # If we have any sort of disambiguation use that as our starting point.
   # This allows us to trim the pieces we search through and find the
@@ -487,18 +487,18 @@ proc short_algebraic_to_long_algebraic*(self: Board, move: string): string=
   var
     # Direction opposite that which the color's pawns move.
     # So 1 is downwards, opposite White's pawns going upwards.
-    d = if self.to_move == Color.WHITE: -1 else: 1
+    d = if board.to_move == Color.WHITE: -1 else: 1
 
     # The starting file for the pawn row, for double move checking
-    pawn_start = if self.to_move == Color.WHITE: 6 else: 1
+    pawn_start = if board.to_move == Color.WHITE: 6 else: 1
 
     # The file the pawn needs to be on to take en passant.
-    ep_file = if self.to_move == Color.WHITE: 3 else: 4
+    ep_file = if board.to_move == Color.WHITE: 3 else: 4
 
     # The ending rank for pawn promotion
-    pawn_end = if self.to_move == Color.WHITE: 0 else: 7
+    pawn_end = if board.to_move == Color.WHITE: 0 else: 7
 
-    state = clone(self.current_state * mult)
+    state = clone(board.current_state * mult)
 
   # This handy line of code prevents you from taking your own pieces.
   if state[fin.y, fin.x] > 0:
@@ -508,14 +508,14 @@ proc short_algebraic_to_long_algebraic*(self: Board, move: string): string=
   # would end with you in check. This exists in case you try to move a piece
   # that's pinned.
   proc good_move(start: tuple[y, x: int], fin: tuple[y, x: int],  piece_num: int, ep: bool=false): bool=
-    var s = clone(self.current_state)
+    var s = clone(board.current_state)
     s[start.y, start.x] = 0
     s[fin.y, fin.x] = piece_num
 
     if ep:
       s[start.y, fin.x] = 0
 
-    result = not s.is_in_check(self.to_move)
+    result = not s.is_in_check(board.to_move)
     return
 
 
@@ -531,7 +531,7 @@ proc short_algebraic_to_long_algebraic*(self: Board, move: string): string=
         # Ensures that this pawn would actually have to move forward and not
         # backward to get to the ending square. This is true if the pawn
         # moves backwards.
-        direc = if self.to_move == Color.WHITE: pawn.y < fin.y  else: pawn.y > fin.y
+        direc = if board.to_move == Color.WHITE: pawn.y < fin.y  else: pawn.y > fin.y
 
       if direc:
         continue
@@ -562,8 +562,8 @@ proc short_algebraic_to_long_algebraic*(self: Board, move: string): string=
       # Bools check that we are adjacent to a pawn of the opposite color which
       # is a requirement of en_passant.
       let
-        ep_left = pawn.x == fin.x - 1 and self.current_state[pawn.y, fin.x] == d
-        ep_right = pawn.x == fin.x + 1 and self.current_state[pawn.y, fin.x] == d
+        ep_left = pawn.x == fin.x - 1 and board.current_state[pawn.y, fin.x] == d
+        ep_right = pawn.x == fin.x + 1 and board.current_state[pawn.y, fin.x] == d
 
         # We need to start on the correct file for en passant.
         good_start = pawn.y == ep_file
@@ -574,8 +574,8 @@ proc short_algebraic_to_long_algebraic*(self: Board, move: string): string=
 
       # Can't en passant on turn 1 (or anything less than turn 3 I think)
       # so if you got this far it's not a legal pawn move.
-      if len(self.game_states) > 1:
-        let previous_state = clone(self.game_states[^1])
+      if len(board.game_states) > 1:
+        let previous_state = clone(board.game_states[^1])
         if state[fin.y, fin.x] == 0 and (ep_left or ep_right) and good_start:
             # Checks that in the previous state the pawn actually
             # moved two spaces. This prevents trying an en passant
@@ -589,10 +589,10 @@ proc short_algebraic_to_long_algebraic*(self: Board, move: string): string=
       # won't matter what piece it promotes to so I can just check as a pawn.
       if not (found == (-1, -1)) and good_move(found, fin, piece_num, ep):
         if promotion:
-            return self.row_column_to_algebraic(pawn, fin, piece_num, promotion_piece)[1]
+            return board.row_column_to_algebraic(pawn, fin, piece_num, promotion_piece)[1]
         if ep:
-            return self.row_column_to_algebraic(found, fin, piece_num)[1] & "e.p."
-        return self.row_column_to_algebraic(found, fin, piece_num)[1]
+            return board.row_column_to_algebraic(found, fin, piece_num)[1] & "e.p."
+        return board.row_column_to_algebraic(found, fin, piece_num)[1]
 
   elif piece_char == 'N':
     for knight in found_pieces:
@@ -609,7 +609,7 @@ proc short_algebraic_to_long_algebraic*(self: Board, move: string): string=
 
       # Ensures that moving this piece doesn't end in check.
       if not (found == (-1, -1)) and good_move(found, fin, piece_num):
-          return self.row_column_to_algebraic(found, fin, piece_num)[1]
+          return board.row_column_to_algebraic(found, fin, piece_num)[1]
 
   elif piece_char == 'R' or  piece_char == 'Q':
     for rook in found_pieces:
@@ -647,7 +647,7 @@ proc short_algebraic_to_long_algebraic*(self: Board, move: string): string=
 
       # Ensures that moving this piece doesn't end in check.
       if not (found == (-1, -1)) and good_move(found, fin, piece_num):
-          return self.row_column_to_algebraic(found, fin, piece_num)[1]
+          return board.row_column_to_algebraic(found, fin, piece_num)[1]
 
     # If we make it through all the rooks and didn't find one that has a
     # straight shot to the end then there isn't a good move. However we only do
@@ -679,14 +679,14 @@ proc short_algebraic_to_long_algebraic*(self: Board, move: string): string=
           if not (state[cur_pos.y, cur_pos.x] == 0):
               break
         # This will execute if the position that caused the for loop to
-        # break is the bishop itself, otherwise this does not execute.
+        # break is the bishop itboard, otherwise this does not execute.
         # Or the queen. Same thing.
         if cur_pos == bishop:
             found = bishop
 
       # Ensures that moving this piece doesn't end in check.
       if not (found == (-1, -1)) and good_move(found, fin, piece_num):
-        return self.row_column_to_algebraic(found, fin, piece_num)[1]
+        return board.row_column_to_algebraic(found, fin, piece_num)[1]
 
   if piece_char == 'K':
     for king in found_pieces:
@@ -698,17 +698,17 @@ proc short_algebraic_to_long_algebraic*(self: Board, move: string): string=
 
       #Ensures that moving this piece doesn't end in check.
       if not (found == (-1, -1)) and good_move(found, fin, piece_num):
-        return self.row_column_to_algebraic(found, fin, piece_num)[1]
+        return board.row_column_to_algebraic(found, fin, piece_num)[1]
 
   return
 
 
-proc check_move_legality*(self: Board, move: string): tuple[legal: bool, alg: string]=
+proc check_move_legality*(board: Board, move: string): tuple[legal: bool, alg: string]=
   result = (false, move)
 
   # Tries to get the long version of the move. If there is not piece that could
   # make thismove the long_move is going to be the empty string.
-  let long_move = self.short_algebraic_to_long_algebraic(move)
+  let long_move = board.short_algebraic_to_long_algebraic(move)
   if long_move == "":
     return
 
@@ -719,15 +719,15 @@ proc check_move_legality*(self: Board, move: string): tuple[legal: bool, alg: st
   # "".  Doesn't check castling ending in check, however, hence why this
   # is here. Castling shortcuts in short_algebraic.
   if "O-O" in long_move or "0-0" in long_move:
-    var end_state = self.castle_algebraic_to_boardstate(long_move, self.to_move)
-    check = end_state.is_in_check(self.to_move)
+    var end_state = board.castle_algebraic_to_boardstate(long_move, board.to_move)
+    check = end_state.is_in_check(board.to_move)
 
   if check:
     return
   return (true, long_move)
 
 
-proc remove_moves_in_check(self: Board, moves: openArray[tuple[short: string, long: string, state: Tensor[int]]], color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
+proc remove_moves_in_check(board: Board, moves: openArray[tuple[short: string, long: string, state: Tensor[int]]], color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
   # Shortcut for if there's no possible moves being disambiguated.
   if len(moves) == 0:
     return
@@ -755,7 +755,7 @@ proc remove_moves_in_check(self: Board, moves: openArray[tuple[short: string, lo
 
 
 # I hate pawns.
-proc generate_pawn_moves*(self: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
+proc generate_pawn_moves*(board: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
   var
     # Color flipping for black instead of white.
     mult:int = if color == Color.WHITE: 1 else: -1
@@ -763,7 +763,7 @@ proc generate_pawn_moves*(self: Board, color: Color): seq[tuple[alg: string, sta
     # Direction of travel, reverse for black and white. Positive is going
     # downwards, negative is going upwards.
     d = -1 * mult
-    state = self.current_state * mult
+    state = board.current_state * mult
 
     # Find the pawns
     pawn_num = piece_numbers['P']
@@ -786,8 +786,8 @@ proc generate_pawn_moves*(self: Board, color: Color): seq[tuple[alg: string, sta
     # En Passant first since we can take En Passant if there is a piece
     # directly in front of our pawn. However, requires the pawn on row 5 (from
     # bottom) Can't en passant if there's no other game states to check either.
-    if len(self.game_states) > 1 and pos.y == 4 + d:
-      let previous_state = self.game_states[^1] * mult
+    if len(board.game_states) > 1 and pos.y == 4 + d:
+      let previous_state = board.game_states[^1] * mult
       # Don't check en passant on the left if we're on the first file
       # Similarly don't check to the right if we're on the last file
       var
@@ -810,7 +810,7 @@ proc generate_pawn_moves*(self: Board, color: Color): seq[tuple[alg: string, sta
         different_pawn = not (state[pos.y + 2 * d, pos.x - 1] == -1)
         if pawn_on_left and pawn_moved_two and different_pawn:
             fin = (pos.y + d, pos.x - 1)
-            end_states.add(self.row_column_to_algebraic(pos, fin, pawn_num))
+            end_states.add(board.row_column_to_algebraic(pos, fin, pawn_num))
 
       if right_allowed:
         pawn_on_right = state[pos.y, pos.x + 1] == -1
@@ -818,7 +818,7 @@ proc generate_pawn_moves*(self: Board, color: Color): seq[tuple[alg: string, sta
         different_pawn = not (state[pos.y + 2 * d, pos.x + 1] == -1)
         if pawn_on_right and pawn_moved_two and different_pawn:
           fin = (pos.y + d, pos.x + 1)
-          end_states.add(self.row_column_to_algebraic(pos, fin, pawn_num))
+          end_states.add(board.row_column_to_algebraic(pos, fin, pawn_num))
 
     # Makes sure the space in front of us is clear
     if state[pos.y + d, pos.x] == 0:
@@ -829,15 +829,15 @@ proc generate_pawn_moves*(self: Board, color: Color): seq[tuple[alg: string, sta
         for key, val in piece_numbers:
           if not (key == 'P') and not (key == 'K'):
             fin = (pos.y + d, pos.x)
-            end_states.add(self.row_column_to_algebraic(pos, fin, pawn_num, val))
+            end_states.add(board.row_column_to_algebraic(pos, fin, pawn_num, val))
       else:
           # Add one move forward
           fin = (pos.y + d, pos.x)
-          end_states.add(self.row_column_to_algebraic(pos, fin, pawn_num))
+          end_states.add(board.row_column_to_algebraic(pos, fin, pawn_num))
       # This is for moving two forward. Ensures that the space 2 ahead is clear
       if pos.y == startrank and state[pos.y + 2 * d, pos.x] == 0:
           fin = (pos.y + 2 * d, pos.x)
-          end_states.add(self.row_column_to_algebraic(pos, fin, pawn_num))
+          end_states.add(board.row_column_to_algebraic(pos, fin, pawn_num))
 
     # Takes to the left
     # First condition ensures that we remain within the bounds of the board.
@@ -848,9 +848,9 @@ proc generate_pawn_moves*(self: Board, color: Color): seq[tuple[alg: string, sta
       if pos.y + d == endrank:
         for key, val in piece_numbers:
           if not (key == 'P') or not (key == 'K'):
-            end_states.add(self.row_column_to_algebraic(pos, fin, pawn_num, val))
+            end_states.add(board.row_column_to_algebraic(pos, fin, pawn_num, val))
       else:
-        end_states.add(self.row_column_to_algebraic(pos, fin, pawn_num))
+        end_states.add(board.row_column_to_algebraic(pos, fin, pawn_num))
 
     # Takes to the right
     # First condition ensures that we remain within the bounds of the board.
@@ -861,27 +861,27 @@ proc generate_pawn_moves*(self: Board, color: Color): seq[tuple[alg: string, sta
       if pos.y + d == endrank:
         for key, val in piece_numbers:
           if not (key == 'P') or not (key == 'K'):
-            end_states.add(self.row_column_to_algebraic(pos, fin, pawn_num, val))
+            end_states.add(board.row_column_to_algebraic(pos, fin, pawn_num, val))
       else:
-        end_states.add(self.row_column_to_algebraic(pos, fin, pawn_num))
+        end_states.add(board.row_column_to_algebraic(pos, fin, pawn_num))
 
   # Build a sequence of new_states that will get pruned by remove_moves_in_check
   var new_states: seq[tuple[short: string, long: string, state: Tensor[int]]] = @[]
   for i, move in end_states:
-      var s = self.long_algebraic_to_boardstate(move[1])
+      var s = board.long_algebraic_to_boardstate(move[1])
       new_states.add((move[0], move[1], s))
 
   # Removes the illegal moves that leave you in check.
-  result = self.remove_moves_in_check(new_states, color)
+  result = board.remove_moves_in_check(new_states, color)
 
   return
 
 
-proc generate_knight_moves*(self: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
+proc generate_knight_moves*(board: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
   var
     # Color flipping for black instead of white.
     mult:int = if color == Color.WHITE: 1 else: -1
-    state = self.current_state * mult
+    state = board.current_state * mult
 
     # All possible knight moves, ignore flips.
     moves:array[4, tuple[y, x: int]] = [(2, 1), (2, -1), (-2, 1), (-2, -1)]
@@ -912,28 +912,28 @@ proc generate_knight_moves*(self: Board, color: Color): seq[tuple[alg: string, s
       # The following code blocks only run if the ending positions are actually
       # on the board.
       if legal1:
-        end_states.add(self.row_column_to_algebraic(pos, end1, knight_num))
+        end_states.add(board.row_column_to_algebraic(pos, end1, knight_num))
 
       if legal2:
-        end_states.add(self.row_column_to_algebraic(pos, end2, knight_num))
+        end_states.add(board.row_column_to_algebraic(pos, end2, knight_num))
 
   # Build a sequence of new_states that will get pruned by remove_moves_in_check
   var new_states: seq[tuple[short: string, long: string, state: Tensor[int]]] = @[]
   for i, move in end_states:
-      var s = self.long_algebraic_to_boardstate(move[1])
+      var s = board.long_algebraic_to_boardstate(move[1])
       new_states.add((move[0], move[1], s))
 
   # Removes the illegal moves that leave you in check.
-  result = self.remove_moves_in_check(new_states, color)
+  result = board.remove_moves_in_check(new_states, color)
 
   return result
 
 
-proc generate_straight_moves(self: Board, color: Color, starts: seq[tuple[y, x:int]], queen: bool = false): seq[tuple[alg: string, state: Tensor[int]]]=
+proc generate_straight_moves(board: Board, color: Color, starts: seq[tuple[y, x:int]], queen: bool = false): seq[tuple[alg: string, state: Tensor[int]]]=
   var
     # Color flipping for black instead of white.
     mult:int = if color == Color.WHITE: 1 else: -1
-    state = self.current_state * mult
+    state = board.current_state * mult
 
     # Get the piece num for the algebraic move.
     piece_num = if queen: piece_numbers['Q'] else: piece_numbers['R']
@@ -970,41 +970,41 @@ proc generate_straight_moves(self: Board, color: Color, starts: seq[tuple[y, x:i
           # If the end piece is of the opposite color we can take it, but then
           # we break since we can't go beyond it.
           elif state[fin.y, fin.x] < 0:
-            end_states.add(self.row_column_to_algebraic(pos, fin, piece_num))
+            end_states.add(board.row_column_to_algebraic(pos, fin, piece_num))
             break
           else:
-            end_states.add(self.row_column_to_algebraic(pos, fin, piece_num))
+            end_states.add(board.row_column_to_algebraic(pos, fin, piece_num))
 
   # Build a sequence of new_states that will get pruned by remove_moves_in_check
   var new_states: seq[tuple[short: string, long: string, state: Tensor[int]]] = @[]
   for i, move in end_states:
-      var s = self.long_algebraic_to_boardstate(move[1])
+      var s = board.long_algebraic_to_boardstate(move[1])
       new_states.add((move[0], move[1], s))
 
   # Removes the illegal moves that leave you in check.
-  result = self.remove_moves_in_check(new_states, color)
+  result = board.remove_moves_in_check(new_states, color)
 
   return result
 
 
-proc generate_rook_moves*(self: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
+proc generate_rook_moves*(board: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
   var
     # Color flipping for black instead of white.
     mult:int = if color == Color.WHITE : 1 else: -1
-    state = self.current_state * mult
+    state = board.current_state * mult
 
     # Find the rooks
     rook_num = piece_numbers['R']
     rooks = state.find_piece(rook_num)
 
-  return generate_straight_moves(self, color, rooks, queen=false)
+  return generate_straight_moves(board, color, rooks, queen=false)
 
 
-proc generate_diagonal_moves(self: Board, color: Color, starts: seq[tuple[y, x:int]], queen: bool = false): seq[tuple[alg: string, state: Tensor[int]]]=
+proc generate_diagonal_moves(board: Board, color: Color, starts: seq[tuple[y, x:int]], queen: bool = false): seq[tuple[alg: string, state: Tensor[int]]]=
   var
     # Color flipping for black instead of white.
     mult:int = if color == Color.WHITE: 1 else: -1
-    state = self.current_state * mult
+    state = board.current_state * mult
 
     # Get the piece num for the algebraic move.
     piece_num = if queen: piece_numbers['Q'] else: piece_numbers['B']
@@ -1034,60 +1034,60 @@ proc generate_diagonal_moves(self: Board, color: Color, starts: seq[tuple[y, x:i
           # If the end piece is of the opposite color we can take it, but then
           # we break since we can't go beyond it.
           elif state[fin.y, fin.x] < 0:
-            end_states.add(self.row_column_to_algebraic(pos, fin, piece_num))
+            end_states.add(board.row_column_to_algebraic(pos, fin, piece_num))
             break
           else:
-            end_states.add(self.row_column_to_algebraic(pos, fin, piece_num))
+            end_states.add(board.row_column_to_algebraic(pos, fin, piece_num))
 
   # Build a sequence of new_states that will get pruned by remove_moves_in_check
   var new_states: seq[tuple[short: string, long: string, state: Tensor[int]]] = @[]
   for i, move in end_states:
-      var s = self.long_algebraic_to_boardstate(move[1])
+      var s = board.long_algebraic_to_boardstate(move[1])
       new_states.add((move[0], move[1], s))
 
   # Removes the illegal moves that leave you in check.
-  result = self.remove_moves_in_check(new_states, color)
+  result = board.remove_moves_in_check(new_states, color)
 
   return result
 
 
-proc generate_bishop_moves*(self: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
+proc generate_bishop_moves*(board: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
   var
     # Color flipping for black instead of white.
     mult:int = if color == Color.WHITE : 1 else: -1
-    state = self.current_state * mult
+    state = board.current_state * mult
 
     # Find the rooks
     bishop_num = piece_numbers['B']
     bishops = state.find_piece(bishop_num)
 
-  return generate_diagonal_moves(self, color, bishops, queen=false)
+  return generate_diagonal_moves(board, color, bishops, queen=false)
 
 
-proc generate_queen_moves*(self: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
+proc generate_queen_moves*(board: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
   var
     # Color flipping for black instead of white.
     mult:int = if color == Color.WHITE : 1 else: -1
-    state = self.current_state * mult
+    state = board.current_state * mult
 
     # Find the rooks
     queen_num = piece_numbers['Q']
     queens = state.find_piece(queen_num)
 
   let
-    diags = generate_diagonal_moves(self, color, queens, queen=true)
-    straights = generate_straight_moves(self, color, queens, queen=true)
+    diags = generate_diagonal_moves(board, color, queens, queen=true)
+    straights = generate_straight_moves(board, color, queens, queen=true)
 
   result = concat(diags, straights)
 
   return result
 
 
-proc generate_king_moves*(self: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
+proc generate_king_moves*(board: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
   var
     # Color flipping for black instead of white.
     mult:int = if color == Color.WHITE: 1 else: -1
-    state = self.current_state * mult
+    state = board.current_state * mult
 
     # Find the kings
     king_num = piece_numbers['K']
@@ -1107,21 +1107,21 @@ proc generate_king_moves*(self: Board, color: Color): seq[tuple[alg: string, sta
       # Ensures that the ending position is inside the board and that we
       # don't try to take our own piece.
       if fin.x in 0..7 and fin.y in 0..7 and state[fin.y, fin.x] <= 0:
-        end_states.add(self.row_column_to_algebraic(pos, fin, king_num))
+        end_states.add(board.row_column_to_algebraic(pos, fin, king_num))
 
   # Build a sequence of new_states that will get pruned by remove_moves_in_check
   var new_states: seq[tuple[short: string, long: string, state: Tensor[int]]] = @[]
   for i, move in end_states:
-      var s = self.long_algebraic_to_boardstate(move[1])
+      var s = board.long_algebraic_to_boardstate(move[1])
       new_states.add((move[0], move[1], s))
 
   # Removes the illegal moves that leave you in check.
-  result = self.remove_moves_in_check(new_states, color)
+  result = board.remove_moves_in_check(new_states, color)
 
   return result
 
 
-proc generate_castle_moves*(self: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
+proc generate_castle_moves*(board: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
   # Hardcoded because you can only castle from starting positions.
   # Basically just need to check that the files between the king and
   # the rook are clear, then return the castling algebraic (O-O or O-O-O)
@@ -1141,20 +1141,20 @@ proc generate_castle_moves*(self: Board, color: Color): seq[tuple[alg: string, s
     end_states:seq[string] = @[]
 
     # Slice representing the two spaces between the king and the kingside rook.
-    between = self.current_state[rank, 5..6]
+    between = board.current_state[rank, 5..6]
 
   # You're not allowed to castle out of check so if you're in check
   # don't generate it as a legal move.
-  if self.current_state.is_in_check(color):
+  if board.current_state.is_in_check(color):
       return
 
-  if self.castle_rights[kingside] and sum(abs(between)) == 0:
+  if board.castle_rights[kingside] and sum(abs(between)) == 0:
     # Before we go ahead and append the move is legal we need to verify
     # that we don't castle through check. Since we remove moves
     # that end in check, and the king moves two during castling,
     # it is sufficient therefore to simply check that moving the king
     # one space in the kingside direction doesn't put us in check.
-    var s = clone(self.current_state)
+    var s = clone(board.current_state)
     s[rank, 4] = 0
     s[rank, 5] = king_num
 
@@ -1162,10 +1162,10 @@ proc generate_castle_moves*(self: Board, color: Color): seq[tuple[alg: string, s
       end_states.add("O-O")
 
   # Slice representing the two spaces between the king and the queenside rook.
-  between = self.current_state[rank, 1..3]
-  if self.castle_rights[queenside] and sum(abs(between)) == 0:
+  between = board.current_state[rank, 1..3]
+  if board.castle_rights[queenside] and sum(abs(between)) == 0:
     # See reasoning above in kingside.
-    var s = clone(self.current_state)
+    var s = clone(board.current_state)
     s[rank, 4] = 0
     s[rank, 3] = king_num
 
@@ -1175,24 +1175,24 @@ proc generate_castle_moves*(self: Board, color: Color): seq[tuple[alg: string, s
   # Build a sequence of new_states that will get pruned by remove_moves_in_check
   var new_states: seq[tuple[short: string, long: string, state: Tensor[int]]] = @[]
   for i, move in end_states:
-      var s = self.castle_algebraic_to_boardstate(move, self.to_move)
+      var s = board.castle_algebraic_to_boardstate(move, board.to_move)
       new_states.add((move, move, s))
 
   # Removes the illegal moves that leave you in check.
-  result = self.remove_moves_in_check(new_states, color)
+  result = board.remove_moves_in_check(new_states, color)
 
   return result
 
 
-proc generate_moves*(self: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
+proc generate_moves*(board: Board, color: Color): seq[tuple[alg: string, state: Tensor[int]]]=
   let
-    pawns = self.generate_pawn_moves(color)
-    knights = self.generate_knight_moves(color)
-    rooks = self.generate_rook_moves(color)
-    bishops = self.generate_bishop_moves(color)
-    queens = self.generate_queen_moves(color)
-    kings = self.generate_king_moves(color)
-    castling = self.generate_castle_moves(color)
+    pawns = board.generate_pawn_moves(color)
+    knights = board.generate_knight_moves(color)
+    rooks = board.generate_rook_moves(color)
+    bishops = board.generate_bishop_moves(color)
+    queens = board.generate_queen_moves(color)
+    kings = board.generate_king_moves(color)
+    castling = board.generate_castle_moves(color)
 
   result = concat(castling, queens, rooks, bishops, knights, pawns, kings)
   return
@@ -1216,8 +1216,8 @@ proc is_checkmate*(state: Tensor[int], color: Color): bool=
   return
 
 
-proc make_move*(self: Board, move: string)=
-  let legality = self.check_move_legality(move)
+proc make_move*(board: Board, move: string)=
+  let legality = board.check_move_legality(move)
 
   if not legality.legal:
     raise newException(ValueError, "You tried to make an illegal move!")
@@ -1229,13 +1229,13 @@ proc make_move*(self: Board, move: string)=
     new_state: Tensor[int]
 
   if castle_move:
-      new_state = self.castle_algebraic_to_boardstate(legality.alg, self.to_move)
+      new_state = board.castle_algebraic_to_boardstate(legality.alg, board.to_move)
   else:
-      new_state = self.long_algebraic_to_boardstate(legality.alg)
+      new_state = board.long_algebraic_to_boardstate(legality.alg)
 
   # Add the current state to the list of game states and then change the state.
-  self.game_states.add(clone(self.current_state))
-  self.current_state = clone(new_state)
+  board.game_states.add(clone(board.current_state))
+  board.current_state = clone(new_state)
 
   var piece = 'P'
   for i, c in move:
@@ -1246,71 +1246,71 @@ proc make_move*(self: Board, move: string)=
 
   # Updates the castle table for castling rights.
   if piece == 'K' or castle_move:
-    if self.to_move == Color.WHITE:
-        self.castle_rights["WKR"] = false
-        self.castle_rights["WQR"] = false
+    if board.to_move == Color.WHITE:
+        board.castle_rights["WKR"] = false
+        board.castle_rights["WQR"] = false
     else:
-        self.castle_rights["BKR"] = false
-        self.castle_rights["BQR"] = false
+        board.castle_rights["BKR"] = false
+        board.castle_rights["BQR"] = false
   elif piece == 'R':
     # We can get the position the rook started from using slicing in
     # the legal move, since legal returns a long algebraic move
     # which fully disambiguates and gives us the starting square.
     # So once the rook moves then we set it to false.
     if legality.alg[1..2] == "a8":
-        self.castle_rights["BQR"] = false
+        board.castle_rights["BQR"] = false
     elif legality.alg[1..2] == "h8":
-        self.castle_rights["BKR"] = false
+        board.castle_rights["BKR"] = false
     elif legality.alg[1..2] == "a1":
-        self.castle_rights["WQR"] = false
+        board.castle_rights["WQR"] = false
     elif legality.alg[1..2] == "h1":
-        self.castle_rights["WKR"] = false
+        board.castle_rights["WKR"] = false
 
   # Updates the half move clock.
   if piece == 'P' or 'x' in legality.alg:
-    self.half_move_clock = 0
+    board.half_move_clock = 0
   else:
-    self.half_move_clock += 1
+    board.half_move_clock += 1
 
   # We need to update castling this side if the rook gets taken without
   # ever moving. We can't castle with a rook that doesn't exist.
   if "xa8" in legality.alg:
-    self.castle_rights["BQR"] = false
+    board.castle_rights["BQR"] = false
   elif "xh8" in legality.alg:
-    self.castle_rights["BKR"] = false
+    board.castle_rights["BKR"] = false
   elif "xa1" in legality.alg:
-    self.castle_rights["WQR"] = false
+    board.castle_rights["WQR"] = false
   elif "xh1" in legality.alg:
-    self.castle_rights["WKR"] = false
+    board.castle_rights["WKR"] = false
 
   # The earliest possible checkmate is after 4 plies. No reason to check earlier
-  if len(self.move_list) > 3:
+  if len(board.move_list) > 3:
     # If there are no moves that get us out of check we need to see if we're in
     # check right now. If we are that's check mate. If we're not that's a stalemate.
     var
-      color = if self.to_move == Color.WHITE: Color.BLACK else: Color.WHITE
-      responses = self.generate_moves(color)
+      color = if board.to_move == Color.WHITE: Color.BLACK else: Color.WHITE
+      responses = board.generate_moves(color)
     if len(responses) == 0:
-        var check = self.current_state.is_in_check(color)
+        var check = board.current_state.is_in_check(color)
         if check:
-            if self.to_move == Color.WHITE:
-                self.status = Status.WHITE_VICTORY
+            if board.to_move == Color.WHITE:
+                board.status = Status.WHITE_VICTORY
             else:
-                self.status = Status.BLACK_VICTORY
+                board.status = Status.BLACK_VICTORY
         else:
-            self.status = Status.DRAW
+            board.status = Status.DRAW
 
-  self.to_move = if self.to_move == Color.WHITE: Color.BLACK else: Color.WHITE
-  self.move_list.add(legality.alg)
-
-
-proc unmake_move(self: Board)=
-  self.current_state = clone(self.game_states.pop())
-  discard self.move_list.pop() # Take the last move off the move list as well.
-  self.to_move = if self.to_move == Color.BLACK: Color.WHITE else: Color.BLACK
+  board.to_move = if board.to_move == Color.WHITE: Color.BLACK else: Color.WHITE
+  board.move_list.add(legality.alg)
 
 
-proc to_fen*(self: Board): string=
+proc unmake_move(board: Board)=
+  board.current_state = clone(board.game_states.pop())
+  discard board.move_list.pop() # Take the last move off the move list as well.
+  board.to_move = if board.to_move == Color.BLACK: Color.WHITE else: Color.BLACK
+
+
+proc to_fen*(board: Board): string=
   var fen: seq[string] = @[]
 
   # Loops over the board and gets the item at each location.
@@ -1319,7 +1319,7 @@ proc to_fen*(self: Board): string=
       # Adds pieces to the FEN. Lower case for black, and upper
       # for white. Since the dict is in uppercase we don't have
       # do to anything for that.
-      var piece = self.current_state[y, x]
+      var piece = board.current_state[y, x]
       if piece < 0:
         fen.add($piece_names[-piece].toLowerAscii())
       elif piece > 0:
@@ -1340,7 +1340,7 @@ proc to_fen*(self: Board): string=
 
   # The next field is the next person to move.
   fen.add(" ")
-  if self.to_move == Color.WHITE:
+  if board.to_move == Color.WHITE:
       fen.add("w")
   else:
       fen.add("b")
@@ -1349,7 +1349,7 @@ proc to_fen*(self: Board): string=
   fen.add(" ")
   var castle_names = {"WKR" : "K", "WQR" : "Q", "BKR" : "k", "BQR" : "q"}.toTable
   var at_least_one = false
-  for key, val in self.castle_rights:
+  for key, val in board.castle_rights:
     if val:
       at_least_one = true
       fen.add(castle_names[key])
@@ -1364,11 +1364,11 @@ proc to_fen*(self: Board): string=
   # made a two-square move, this is the position "behind" the pawn.
   var found: bool
   fen.add(" ")
-  if len(self.move_list) == 0:
+  if len(board.move_list) == 0:
     fen.add("-")
     found = true
   else:
-    last_move = self.move_list[^1]
+    last_move = board.move_list[^1]
     # If any piece is in the move, it obviously wasn't a pawn, so we
     # have no en passant square. Even if it's a pawn promotion. You
     # can't move two into a promotion.
@@ -1399,11 +1399,11 @@ proc to_fen*(self: Board): string=
 
   # Then the half move clock for the 50 move rule.
   fen.add(" ")
-  fen.add($self.half_move_clock)
+  fen.add($board.half_move_clock)
 
   # And finally the move number.
   fen.add(" ")
-  fen.add($(len(self.move_list) div 2))
+  fen.add($(len(board.move_list) div 2))
 
   return fen.join("")
 
@@ -1528,27 +1528,27 @@ proc load_pgn*(name: string, folder: string="games"): Board=
 
   return
 
-proc save_pgn*(b: Board)=
-  let full: bool = len(b.headers) > 0
+proc save_pgn*(board: Board)=
+  let full: bool = len(board.headers) > 0
   # First gets the name to save to.
   var name: string
   if full:
-    name = b.headers["White"] & "vs" & b.headers["Black"] & b.headers["Date"] & ".pgn"
+    name = board.headers["White"] & "vs" & board.headers["Black"] & board.headers["Date"] & ".pgn"
   else:
     name = "???vs???" & $(now()) & ".pgn"
 
   let f = open("results/" & name, fmWrite)
 
   if full:
-    for key, val in b.headers:
+    for key, val in board.headers:
       var line = "[" & key & " " & "\"" & val & "\"" & "]\n"
       f.write(line)
 
     # Inserts a blank line between the headers and the move line.
     f.write("\n")
 
-    if len(b.move_list) > 0:
-      for i, m in b.move_list:
+    if len(board.move_list) > 0:
+      for i, m in board.move_list:
         var line = $m & " "
 
         # Adds the move number every 2 plies.
@@ -1559,8 +1559,8 @@ proc save_pgn*(b: Board)=
         f.write(line)
 
   # Writes the result at the end of the PGN or * for ongoing game.
-  if full and "Result" in b.headers:
-      f.write(b.headers["Result"])
+  if full and "Result" in board.headers:
+      f.write(board.headers["Result"])
   else:
       f.write("*")
 

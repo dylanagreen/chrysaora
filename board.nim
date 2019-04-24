@@ -208,6 +208,153 @@ proc castle_algebraic_to_board_state(board: Board, move: string, color: Color): 
     result[rank, 3] = rook_num
     return
 
+
+proc can_make_move(board: Board, start: tuple[y, x: int], fin: tuple[y, x: int], piece: char): bool=
+  var
+    mult = if board.to_move == Color.WHITE: 1 else: -1
+    state = clone(board.current_state * mult)
+
+  if piece == 'P':
+    var
+      # Direction opposite that which the color's pawns move.
+      # So 1 is downwards, opposite White's pawns going upwards.
+      d = if board.to_move == Color.WHITE: -1 else: 1
+
+      # The starting file for the pawn row, for double move checking
+      pawn_start = if board.to_move == Color.WHITE: 6 else: 1
+
+      # The file the pawn needs to be on to take en passant.
+      ep_file = if board.to_move == Color.WHITE: 3 else: 4
+
+      # Ensures that this pawn would actually have to move forward and not
+      # backward to get to the ending square. This is true if the pawn
+      # moves backwards.
+      direc = if board.to_move == Color.WHITE: start.y < fin.y  else: start.y > fin.y
+
+    if direc:
+      return
+
+    # First check where the ending position is empty
+    # Second condition is that the pawn is on the same rank
+    if start.x == fin.x and state[fin.y, fin.x] == 0:
+      # If this pawn can move forward 1 and end on the end it's good.
+      if start.y + d == fin.y:
+          return true
+
+      # Need to check the space between one move and two is empty.
+      var empty = state[start.y + d, fin.x] == 0
+      if start.y + 2 * d == fin.y and start.y == pawn_start and empty:
+          return true
+
+    # This is the case for where the ending state isn't empty, which
+    # means that the pawn needs to travel diagonally to take this piece.
+    if state[fin.y, fin.x] < 0:
+      let
+        take_left = start.y + d == fin.y and start.x - 1 == fin.x
+        take_right = start.y + d == fin.y and start.x + 1 == fin.x
+
+      if take_left or take_right:
+          return true
+
+    # Interestingly d happens to correspond to "pawn of the opposite color"
+    # Bools check that we are adjacent to a pawn of the opposite color which
+    # is a requirement of en_passant.
+    let
+      ep_left = start.x == fin.x - 1 and board.current_state[start.y, fin.x] == d
+      ep_right = start.x == fin.x + 1 and board.current_state[start.y, fin.x] == d
+
+      # We need to start on the correct file for en passant.
+      good_start = start.y == ep_file
+      # Makes sure the ending far enough from the edge for a good en passant.
+      good_end = fin.y in 1..6
+
+    # Can't en passant on turn 1 (or anything less than turn 3 I think)
+    # so if you got this far it's not a legal pawn move.
+    if len(board.game_states) > 1:
+      let previous_state = clone(board.game_states[^1])
+      if state[fin.y, fin.x] == 0 and (ep_left or ep_right) and good_start:
+          # Checks that in the previous state the pawn actually
+          # moved two spaces. This prevents trying an en passant
+          # move three moves after the pawn moved.
+          if good_end and previous_state[fin.y + d, fin.x] == d:
+              return true
+
+  elif piece == 'N':
+    var
+      slope: tuple[y, x: int] = (abs(fin.y - start.y), abs(fin.x - start.x))
+
+    # Avoids a divide by 0 error. If it's on the same rank or file
+    # the knight can't get the king anyway.
+    if slope.x == 0 or slope.y == 0:
+        return
+    if slope == (1, 2) or slope == (2, 1):
+        return true
+
+  elif piece == 'R' or  piece == 'Q':
+    # If we only move one space then we found the piece already.
+    if start.y == fin.y and abs(start.x - fin.x) == 1:
+      return true
+    elif start.x == fin.x and abs(start.y - fin.y) == 1:
+      return true
+    else:
+      # The slide a start would have to take to get to the end.
+      var slide:Tensor[int] = @[0].toTensor
+
+      if start.y == fin.y:
+        # Slides from the start to the fin, left to right.
+        if start.x < fin.x:
+          slide = state[fin.y, start.x + 1 ..< fin.x]
+        # Slides from the fin to the start, left to right.
+        else:
+          slide = state[fin.y, fin.x + 1 ..< start.x]
+        slide = abs(slide)
+        if sum(slide) == 0:
+          return true
+
+      if start.x == fin.x:
+        # Slides from the start to the fin, top down.
+        if start.y < fin.y:
+          slide = state[start.y + 1 ..< fin.y, fin.x]
+        # Slides from the fin to the start, top down.
+        else:
+          slide = state[fin.y + 1 ..< start.y, fin.x]
+        slide = abs(slide)
+        if sum(slide) == 0:
+          return true
+
+  if piece == 'B' or  piece == 'Q':
+    # First we check that the piece is even on a diagonal from the fin.
+    # The following code finds the absolute value of the slope as well
+    # as the slope value from the start to the fin.
+    var
+      slope: tuple[y, x:float] = (float(start.y - fin.y), float(start.x - fin.x))
+      abs_slope: tuple[y, x:float] = (abs(slope.y), abs(slope.x))
+      max = max([abs_slope.y, abs_slope.x])
+
+    slope = (slope[0] / max, slope[1] / max)
+    abs_slope = (abs_slope[0] / max, abs_slope[1] / max)
+
+    # If the absolute slope is 1,1 then it's a diagonal.
+    if abs_slope.x == 1.0 and abs_slope.y == 1.0:
+      var cur_pos: tuple[y, x:int] = start
+      # Now we have to check that the space between the two is empty.
+      for i in 1..7:
+        cur_pos = (fin.y + i * int(slope.y), fin.x + i * int(slope.x))
+
+        if not (state[cur_pos.y, cur_pos.x] == 0):
+            break
+      # This will execute if the position that caused the for loop to
+      # break is the start itboard, otherwise this does not execute.
+      # Or the queen. Same thing.
+      if cur_pos == start:
+          return true
+
+  if piece == 'K':
+    let diff = [abs(start.y - fin.y), abs(start.x - fin.x)]
+    if sum(diff) == 1 or diff == [1, 1]:
+      return true
+
+
 proc is_in_check(state: Tensor[int], color: Color): bool=
   let
     # The direction a pawn must travel to take this color's king.
@@ -234,105 +381,16 @@ proc is_in_check(state: Tensor[int], color: Color): bool=
     elif king.x + 1 < 8 and state[king.y - d, king.x + 1] == pawn_num:
         return true
 
-  # Checks if you'd be in check from the opposite king.
-  # This should only trigger on you moving your king into that position.
-  let opposite_king = -king_num
-  var opposite_locs = state.find_piece(opposite_king)
+  for key, val in piece_names:
+    # We already did pawns, don't need overkill checking for those.
+    if val == 'P': continue
 
-  let opposite_loc = opposite_locs[0]
-
- # If the other king is vertical or horizontal the sum will be 1 since it's
- # [0,1] or [1,0]. If it is diagonal diff will be  [1, 1]
-  let diff = [abs(king.y - opposite_loc.y), abs(king.x - opposite_loc.x)]
-  if sum(diff) == 1 or diff == [1, 1]:
-    return true
-
-  # Rooks and Queens
-  let
-    queens = find_piece(state*mult, piece_numbers['Q'])
-    rooks = find_piece(state*mult, piece_numbers['R'])
-
-  var
-    # The slide a rook would have to take to get to the king.
-    slide:Tensor[int] = @[0].toTensor
-
-  for pos in concat(queens, rooks):
-    # If moving puts the king next to the rook you're in check guaranteed.
-    if pos.y == king.y and abs(pos.x - king.x) == 1:
-     return true
-    elif pos.x == king.x and abs(pos.y - king.y) == 1:
-      return true
-
-    # Rook needs to be on the same file or rank to be able to put the king in
-    # check. Check the sum between the two pieces, if it's 0 then no pieces are
-    # between and it's a valid check.
-    if pos.y == king.y:
-      # Slides from the rook to the king, left to right.
-      if pos.x < king.x:
-        slide = state[king.y, pos.x + 1 ..< king.x]
-      # Slides from the king to the rook, left to right.
-      else:
-        slide = state[king.y, king.x + 1 ..< pos.x]
-      slide = abs(slide)
-      if sum(slide) == 0:
-        return true
-
-    if pos.x == king.x:
-      # Slides from the rook to the king, top down.
-      if pos.y < king.y:
-        slide = state[pos.y + 1 ..< king.y, king.x]
-      # Slides from the king to the rook, top down.
-      else:
-        slide = state[king.y + 1 ..< pos.y, king.x]
-      slide = abs(slide)
-      if sum(slide) == 0:
-        return true
-
-  # Knights can hop which is why I'm doing them before bishops
-  var knights = find_piece(state*mult, piece_numbers['N'])
-
-  for pos in knights:
-      var slope: tuple[y, x: int] = (abs(pos.y - king.y), abs(pos.x - king.x))
-
-      # Avoids a divide by 0 error. If it's on the same rank or file
-      # the knight can't get the king anyway.
-      if slope.x == 0 or slope.y == 0:
-          continue
-      if slope == (1, 2) or slope == (2, 1):
-          return true
-
-  # Now bishops and diagonal queens
-  var bishops = find_piece(state*mult, piece_numbers['B'])
-
-  for pos in concat(bishops, queens):
-    # First we check that the piece is even on a diagonal from the king.
-    # The following code finds the absolute value of the slope as well
-    # as the slope value from the bishop to the king.
-    var slope: tuple[y, x:float] = (float(pos.y - king.y), float(pos.x - king.x))
-    var abs_slope: tuple[y, x:float] = (abs(slope.y), abs(slope.x))
-    var max = max([abs_slope.y, abs_slope.x])
-    slope = (slope[0] / max, slope[1] / max)
-    abs_slope = (abs_slope[0] / max, abs_slope[1] / max)
-
-    # If the absolute slope is 1,1 then it's a diagonal.
-    if abs_slope.x == 1.0 and abs_slope.y == 1.0:
-      var cur_pos: tuple[y, x:int] = pos
-      # Now we have to check that the space between the two is empty.
-      for i in 1..7:
-        cur_pos = (king.y + i * int(slope.y), king.x + i * int(slope.x))
-
-        if not (state[cur_pos.y, cur_pos.x] == 0):
-            break
-      # This will execute if the position that caused the for loop to
-      # break is the bishop itboard, otherwise this does not execute.
-      # Or the queen. Same thing.
-      if cur_pos == pos:
-          return true
-
-  return false
+    var attackers = find_piece(state*mult, key)
+    for pos in attackers:
+      if can_make_move(new_board(state), pos, king, val): return true
+  return
 
 
-# TODO: An incredible amount of the code in here is the same as is_in_check -> refactor
 proc short_algebraic_to_long_algebraic*(board: Board, move: string): string=
   var new_move = move
   # A move is minimum two characters (a rank and a file for pawns)
@@ -489,9 +547,6 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string=
     # So 1 is downwards, opposite White's pawns going upwards.
     d = if board.to_move == Color.WHITE: -1 else: 1
 
-    # The starting file for the pawn row, for double move checking
-    pawn_start = if board.to_move == Color.WHITE: 6 else: 1
-
     # The file the pawn needs to be on to take en passant.
     ep_file = if board.to_move == Color.WHITE: 3 else: 4
 
@@ -499,6 +554,10 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string=
     pawn_end = if board.to_move == Color.WHITE: 0 else: 7
 
     state = clone(board.current_state * mult)
+
+  # This requires that the pawn promote upon reaching the end.
+  if piece_char == 'P' and fin.y == pawn_end and not ('=' in new_move):
+    return
 
   # This handy line of code prevents you from taking your own pieces.
   if state[fin.y, fin.x] > 0:
@@ -519,187 +578,43 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string=
     return
 
 
-  if piece_char == 'P':
-    # This requires that the pawn promote upon reaching the end.
-    if fin.y == pawn_end and not ('=' in new_move):
-      return
-    # Loop over the found pawns.
-    for pawn in found_pieces:
-      var
-        found: tuple[y, x: int] = (-1, -1)
-        promotion: bool = fin.x == pawn_end
-        # Ensures that this pawn would actually have to move forward and not
-        # backward to get to the ending square. This is true if the pawn
-        # moves backwards.
-        direc = if board.to_move == Color.WHITE: pawn.y < fin.y  else: pawn.y > fin.y
-
-      if direc:
-        continue
-
-      # First check where the ending position is empty
-      # Second condition is that the pawn is on the same rank
-      if state[fin.y, fin.x] == 0 and pawn.x == fin.x:
-        # If this pawn can move forward 1 and end on the end it's good.
-        if pawn.y + d == fin.y:
-            found = pawn
-
-        # Need to check the space between one move and two is empty.
-        var empty = state[pawn.y + d, fin.x] == 0
-        if pawn.y + 2 * d == fin.y and pawn.y == pawn_start and empty:
-            found = pawn
-
-      # This is the case for where the ending state isn't empty, which
-      # means that the pawn needs to travel diagonally to take this piece.
-      if state[fin.y, fin.x] < 0:
-        let
-          take_left = pawn.y + d == fin.y and pawn.x - 1 == fin.x
-          take_right = pawn.y + d == fin.y and pawn.x + 1 == fin.x
-
-        if take_left or take_right:
-            found = pawn
-
+  for pos in found_pieces:
+    var ep = false
+    var promotion: bool = fin.x == pawn_end and piece_char == 'P'
+    # Checks if we need to add en passant to the move.
+    if piece_char == 'P' and pos.y == ep_file:
       # Interestingly d happens to correspond to "pawn of the opposite color"
       # Bools check that we are adjacent to a pawn of the opposite color which
       # is a requirement of en_passant.
       let
-        ep_left = pawn.x == fin.x - 1 and board.current_state[pawn.y, fin.x] == d
-        ep_right = pawn.x == fin.x + 1 and board.current_state[pawn.y, fin.x] == d
+        ep_left = pos.x == fin.x - 1 and board.current_state[pos.y, fin.x] == d
+        ep_right = pos.x == fin.x + 1 and board.current_state[pos.y, fin.x] == d
 
-        # We need to start on the correct file for en passant.
-        good_start = pawn.y == ep_file
         # Makes sure the ending far enough from the edge for a good en passant.
         good_end = fin.y in 1..6
-
-      var ep = false
 
       # Can't en passant on turn 1 (or anything less than turn 3 I think)
       # so if you got this far it's not a legal pawn move.
       if len(board.game_states) > 1:
         let previous_state = clone(board.game_states[^1])
-        if state[fin.y, fin.x] == 0 and (ep_left or ep_right) and good_start:
+        if (ep_left or ep_right) and state[fin.y, fin.x] == 0:
             # Checks that in the previous state the pawn actually
             # moved two spaces. This prevents trying an en passant
             # move three moves after the pawn moved.
             if good_end and previous_state[fin.y + d, fin.x] == d:
-                found = pawn
                 ep = true
+    let
+      can_make = can_make_move(board, pos, fin, piece_char)
+      no_check = good_move(pos, fin, piece_num, ep)
 
-      # Ensures that moving this piece doesn't end in check. In theory it could
-      # end in a promotion, but if moving this piece leaves us in check then it
-      # won't matter what piece it promotes to so I can just check as a pawn.
-      if not (found == (-1, -1)) and good_move(found, fin, piece_num, ep):
-        if promotion:
-            return board.row_column_to_algebraic(pawn, fin, piece_num, promotion_piece)[1]
-        if ep:
-            return board.row_column_to_algebraic(found, fin, piece_num)[1] & "e.p."
-        return board.row_column_to_algebraic(found, fin, piece_num)[1]
-
-  elif piece_char == 'N':
-    for knight in found_pieces:
-      var
-        found: tuple[y, x: int] = (-1, -1)
-        slope: tuple[y, x: int] = (abs(fin.y - knight.y), abs(fin.x - knight.x))
-
-      # Avoids a divide by 0 error. If it's on the same rank or file
-      # the knight can't get the king anyway.
-      if slope.x == 0 or slope.y == 0:
-          continue
-      if slope == (1, 2) or slope == (2, 1):
-          found = knight
-
-      # Ensures that moving this piece doesn't end in check.
-      if not (found == (-1, -1)) and good_move(found, fin, piece_num):
-          return board.row_column_to_algebraic(found, fin, piece_num)[1]
-
-  elif piece_char == 'R' or  piece_char == 'Q':
-    for rook in found_pieces:
-      var found: tuple[y, x: int] = (-1, -1)
-      # If we only move one space then we found the piece already.
-      if rook.y == fin.y and abs(rook.x - fin.x) == 1:
-        found = rook
-      elif rook.x == fin.x and abs(rook.y - fin.y) == 1:
-        found = rook
+    if can_make and no_check:
+      if promotion:
+        result = board.row_column_to_algebraic(pos, fin, piece_num, promotion_piece)[1]
       else:
-        # The slide a rook would have to take to get to the end.
-        var slide:Tensor[int] = @[0].toTensor
-
-        if rook.y == fin.y:
-          # Slides from the rook to the fin, left to right.
-          if rook.x < fin.x:
-            slide = state[fin.y, rook.x + 1 ..< fin.x]
-          # Slides from the fin to the rook, left to right.
-          else:
-            slide = state[fin.y, fin.x + 1 ..< rook.x]
-          slide = abs(slide)
-          if sum(slide) == 0:
-            found = rook
-
-        if rook.x == fin.x:
-          # Slides from the rook to the fin, top down.
-          if rook.y < fin.y:
-            slide = state[rook.y + 1 ..< fin.y, fin.x]
-          # Slides from the fin to the rook, top down.
-          else:
-            slide = state[fin.y + 1 ..< rook.y, fin.x]
-          slide = abs(slide)
-          if sum(slide) == 0:
-            found = rook
-
-      # Ensures that moving this piece doesn't end in check.
-      if not (found == (-1, -1)) and good_move(found, fin, piece_num):
-          return board.row_column_to_algebraic(found, fin, piece_num)[1]
-
-    # If we make it through all the rooks and didn't find one that has a
-    # straight shot to the end then there isn't a good move. However we only do
-    # this if we entered this block as a Rook Since queens can still go diagonal
-    if piece_char == 'R':
-        return
-
-  if piece_char == 'B' or  piece_char == 'Q':
-    for bishop in found_pieces:
-      # First we check that the piece is even on a diagonal from the fin.
-      # The following code finds the absolute value of the slope as well
-      # as the slope value from the bishop to the fin.
-      var
-        found: tuple[y, x: int] = (-1, -1)
-        slope: tuple[y, x:float] = (float(bishop.y - fin.y), float(bishop.x - fin.x))
-        abs_slope: tuple[y, x:float] = (abs(slope.y), abs(slope.x))
-        max = max([abs_slope.y, abs_slope.x])
-
-      slope = (slope[0] / max, slope[1] / max)
-      abs_slope = (abs_slope[0] / max, abs_slope[1] / max)
-
-      # If the absolute slope is 1,1 then it's a diagonal.
-      if abs_slope.x == 1.0 and abs_slope.y == 1.0:
-        var cur_pos: tuple[y, x:int] = bishop
-        # Now we have to check that the space between the two is empty.
-        for i in 1..7:
-          cur_pos = (fin.y + i * int(slope.y), fin.x + i * int(slope.x))
-
-          if not (state[cur_pos.y, cur_pos.x] == 0):
-              break
-        # This will execute if the position that caused the for loop to
-        # break is the bishop itboard, otherwise this does not execute.
-        # Or the queen. Same thing.
-        if cur_pos == bishop:
-            found = bishop
-
-      # Ensures that moving this piece doesn't end in check.
-      if not (found == (-1, -1)) and good_move(found, fin, piece_num):
-        return board.row_column_to_algebraic(found, fin, piece_num)[1]
-
-  if piece_char == 'K':
-    for king in found_pieces:
-      var found: tuple[y, x: int] = (-1, -1)
-
-      let diff = [abs(king.y - fin.y), abs(king.x - fin.x)]
-      if sum(diff) == 1 or diff == [1, 1]:
-        found = king
-
-      #Ensures that moving this piece doesn't end in check.
-      if not (found == (-1, -1)) and good_move(found, fin, piece_num):
-        return board.row_column_to_algebraic(found, fin, piece_num)[1]
-
+        result =  board.row_column_to_algebraic(pos, fin, piece_num)[1]
+      if ep:
+        result = result & "e.p."
+      return
   return
 
 

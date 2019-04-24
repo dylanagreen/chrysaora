@@ -4,6 +4,7 @@ import sequtils
 import strutils
 import re
 import math
+import times
 
 import arraymancer
 
@@ -1527,5 +1528,39 @@ proc load_pgn*(name: string, folder: string="games"): Board=
 
   return
 
-#proc save_pgn(b: Board)=
+proc save_pgn*(b: Board)=
+  let full: bool = len(b.headers) > 0
+  # First gets the name to save to.
+  var name: string
+  if full:
+    name = b.headers["White"] & "vs" & b.headers["Black"] & b.headers["Date"] & ".pgn"
+  else:
+    name = "???vs???" & $(now()) & ".pgn"
+
+  let f = open("results/" & name, fmWrite)
+
+  if full:
+    for key, val in b.headers:
+      var line = "[" & key & " " & "\"" & val & "\"" & "]\n"
+      f.write(line)
+
+    # Inserts a blank line between the headers and the move line.
+    f.write("\n")
+
+    if len(b.move_list) > 0:
+      for i, m in b.move_list:
+        var line = $m & " "
+
+        # Adds the move number every 2 plies.
+        if i mod 2 == 0:
+            var move_num = int(i / 2 + 1)
+            line = $move_num & ". " & line
+
+        f.write(line)
+
+  # Writes the result at the end of the PGN or * for ongoing game.
+  if full and "Result" in b.headers:
+      f.write(b.headers["Result"])
+  else:
+      f.write("*")
 

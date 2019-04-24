@@ -500,3 +500,5 @@ suite "loading/saving":
                      [ 0, 0, 0, 2, 0, 0, 0, 0]].toTensor
 
     check(test_board.current_state == expected)
+
+    test_board.save_pgn()

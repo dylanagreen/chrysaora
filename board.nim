@@ -24,6 +24,7 @@ type
     castle_rights*: Table[string, bool]
     move_list*: seq[string]
     status*: Status
+    headers*: Table[string, string]
 
 
 # The piece number -> piece name table.
@@ -59,7 +60,8 @@ proc new_board*(): Board =
                              "BKR" : true}.toTable
   result = Board(half_move_clock: 0, game_states: @[],
                  current_state: start_board, castle_rights: start_castle_rights,
-                 to_move: Color.WHITE, status: Status.IN_PROGRESS, move_list: @[])
+                 to_move: Color.WHITE, status: Status.IN_PROGRESS,
+                 move_list: @[], headers: initTable[string, string]())
   return
 
 
@@ -69,7 +71,8 @@ proc new_board*(start_board: Tensor[int]): Board =
                              "BKR" : true}.toTable
   result = Board(half_move_clock: 0, game_states: @[],
                  current_state: start_board, castle_rights: start_castle_rights,
-                 to_move: Color.WHITE, status: Status.IN_PROGRESS, move_list: @[])
+                 to_move: Color.WHITE, status: Status.IN_PROGRESS,
+                 move_list: @[], headers: initTable[string, string]())
   return
 
 
@@ -513,6 +516,8 @@ proc short_algebraic_to_long_algebraic*(self: Board, move: string): string=
 
     result = not s.is_in_check(self.to_move)
     return
+
+
   if piece_char == 'P':
     # This requires that the pawn promote upon reaching the end.
     if fin.y == pawn_end and not ('=' in new_move):
@@ -547,7 +552,8 @@ proc short_algebraic_to_long_algebraic*(self: Board, move: string): string=
       if state[fin.y, fin.x] < 0:
         let
           take_left = pawn.y + d == fin.y and pawn.x - 1 == fin.x
-          take_right = pawn.y + d == fin.y and pawn.y + 1 == fin.x
+          take_right = pawn.y + d == fin.y and pawn.x + 1 == fin.x
+
         if take_left or take_right:
             found = pawn
 
@@ -1457,7 +1463,69 @@ proc load_fen*(fen: string): Board=
       current_state: board_state.toTensor, castle_rights: castle_dict,
       to_move: side_to_move, status: Status.IN_PROGRESS, move_list: temp_move_list)
 
-#proc load_pgn(name: string, loc: string): Board=
+
+proc load_pgn*(name: string, folder: string="games"): Board=
+  # File location of the pgn.
+  var loc = folder & "/" & name
+
+  # In case you pass the name without .pgn at the end.
+  if not loc.endsWith(".pgn"):
+    loc = loc & ".pgn"
+
+  let data = open(loc)
+
+  # We're going to extract the text into a single string so we need to append
+  # lines here into this array.
+  var
+    game_line: seq[string] = @[]
+    tags = initTable[string, string]()
+
+  for line in data.lines:
+    if not line.startsWith("["):
+      game_line.add(line & " ")
+    else:
+      var
+        trimmed = line.strip(chars = {'[', ']'})
+        pair = trimmed.split("\"")
+
+      tags[pair[0].strip()] = pair[1]
+
+  var moves_line = game_line.join("")
+
+  # Loops as long as there's an opening comment character.
+  while '{' in moves_line:
+    var
+      before = moves_line[0..<moves_line.find('{')]
+      after = moves_line[moves_line.find('}') + 1..^1]
+    moves_line = before & after
+
+  # \d+ looks for 1 or more digits
+  # \. escapes the period
+  # \s* looks for 0 or more white space
+  # Entire: looks for 1 or more digits followed by a period followed by
+  # whitespace or no whitespace
+  # Splits by move number.
+  var
+    moves = moves_line.split(re"\d+\.\s*")
+    plies: seq[string] = @[]
+
+  for m in moves:
+    # Splits the move by the space to get the two plies that make it up.
+    var spl = m.splitWhitespace()
+    for s in spl:
+      plies.add(s.strip())
+
+  # Cuts out the game result
+  discard plies.pop()
+
+  # Makes all the moves and then returns the board state at the end.
+  result = new_board()
+  result.headers = tags
+
+  for ply in plies:
+    result.make_move(ply)
+
+  return
 
 #proc save_pgn(b: Board)=
 

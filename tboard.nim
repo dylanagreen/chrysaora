@@ -107,18 +107,6 @@ suite "complicated move generation":
     # Loads a complicated fen to test from.
     let test_board: Board = load_fen("1nb1kb2/7p/r1p2np1/P2r4/RP5q/2N3P1/1B1PP2P/3QK2R w KQkq -")
 
-  test "loading board state from fen":
-    var expected = @[[0, -3, -4, 0, -6, -4, 0, 0],
-                      [0, 0, 0, 0, 0, 0, 0, -1],
-                      [-2, 0, -1, 0, 0, -3, -1, 0],
-                      [1, 0, 0, -2, 0, 0, 0, 0],
-                      [2, 1, 0, 0, 0, 0, 0, -5],
-                      [0, 0, 3, 0, 0, 0, 1, 0],
-                      [0, 4, 0, 1, 1, 0, 0, 1],
-                      [0, 0, 0, 5, 6, 0, 0, 2]].toTensor
-
-    check(test_board.current_state == expected)
-
   test "knight moves":
     var moves = test_board.generate_knight_moves(Color.BLACK)
 
@@ -463,12 +451,52 @@ suite "move legality":
     var legal = test_board.check_move_legality("O-O")
     check(legal[0] == false)
 
-suite "fen loading/saving":
-  setup:
+suite "loading/saving":
+
+  test "loading fen":
+    var test_board: Board = load_fen("1nb1kb2/7p/r1p2np1/P2r4/RP5q/2N3P1/1B1PP2P/3QK2R w KQkq -")
+    var expected = @[[0, -3, -4, 0, -6, -4, 0, 0],
+                      [0, 0, 0, 0, 0, 0, 0, -1],
+                      [-2, 0, -1, 0, 0, -3, -1, 0],
+                      [1, 0, 0, -2, 0, 0, 0, 0],
+                      [2, 1, 0, 0, 0, 0, 0, -5],
+                      [0, 0, 3, 0, 0, 0, 1, 0],
+                      [0, 4, 0, 1, 1, 0, 0, 1],
+                      [0, 0, 0, 5, 6, 0, 0, 2]].toTensor
+
+    check(test_board.current_state == expected)
+
+  test "saving fen":
     let test_fen = "r4rk1/1p2qpb1/5np1/4p1Bp/p2nP2P/2N5/PPP1Q1P1/N1KR3R w - - 4 18"
     var test_board: Board = load_fen(test_fen)
 
-  test "saving fen":
     var expected = test_board.to_fen()
 
     check(expected == test_fen)
+
+  test "loading pgn - immortal game":
+    var test_board: Board = load_pgn("anderssen_kieseritzky_1851", "games")
+    var expected = @[[-2, 0, -4, -6, 0, 0, 0, -2],
+                     [-1, 0, 0, -1, 4, -1, 3, -1],
+                     [-3, 0, 0, 0, 0, -3, 0, 0],
+                     [0, -1, 0, 3, 1, 0, 0, 1],
+                     [0, 0, 0, 0, 0, 0, 1, 0],
+                     [0, 0, 0, 1, 0, 0, 0, 0],
+                     [1, 0, 1, 0, 6, 0, 0, 0],
+                     [-5, 0, 0, 0, 0, 0, -4, 0]].toTensor
+
+    check(test_board.current_state == expected)
+
+  test "loading pgn - Komodo MCTS vs Lc0":
+    var test_board: Board = load_pgn("KomodoMCTS 2221.00vsLCZero v19.1-11248 2018-12-15", "games")
+
+    var expected = @[[ 0, 0, 0, 0, 0, 0, 0, 0],
+                     [ 0, 0, 0, 0, 0, 0, 0, 0],
+                     [ 0, 0, 0, 0, 0, 0, 0, 0],
+                     [ 0, 0, 0, 0, 0, 0, 0, 0],
+                     [ 0, 0, 0, 0, 0, 0, 0, 0],
+                     [ 0, 0, -6, 0, 6, 0, 0, 0],
+                     [-1, 0, 0, -1, 0, -1, 0, 0],
+                     [ 0, 0, 0, 2, 0, 0, 0, 0]].toTensor
+
+    check(test_board.current_state == expected)

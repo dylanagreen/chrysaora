@@ -2,12 +2,13 @@ import unittest
 import tables
 import sets
 import arraymancer
+import times
 
 import board
 
 suite "start of game move generation":
   setup:
-    let test_board: Board = new_board()
+    let test_board = new_board()
 
   test "knight moves":
     var moves = test_board.generate_knight_moves(Color.WHITE)
@@ -83,8 +84,8 @@ suite "start of game move generation":
     for i, m in moves:
       alg.incl(m[0])
 
-    var expected = ["a3", "a4", "b3", "b4", "c3", "c4", "d3", "d4", "e3", "e4",
-                    "f3", "f4", "g3", "g4", "h3", "h4"].toHashSet
+    var expected = ["a3", "a4", "b3", "b4", "c3", "c4", "d3", "d4", "e3",
+                    "e4", "f3", "f4", "g3", "g4", "h3", "h4"].toHashSet
 
     check(alg == expected)
 
@@ -96,16 +97,18 @@ suite "start of game move generation":
     for i, m in moves:
       alg.incl(m[0])
 
-    var expected = ["a3", "a4", "b3", "b4", "c3", "c4", "d3", "d4", "e3", "e4",
-                    "f3", "f4", "g3", "g4", "h3", "h4", "Na3", "Nc3", "Nf3",
-                    "Nh3"].toHashSet
+    var expected = ["a3", "a4", "b3", "b4", "c3", "c4", "d3", "d4", "e3",
+                    "e4", "f3", "f4", "g3", "g4", "h3", "h4", "Na3", "Nc3",
+                    "Nf3", "Nh3"].toHashSet
 
     check(alg == expected)
 
 suite "complicated move generation":
   setup:
-    # Loads a complicated fen to test from.
-    let test_board: Board = load_fen("1nb1kb2/7p/r1p2np1/P2r4/RP5q/2N3P1/1B1PP2P/3QK2R w KQkq -")
+    let
+      test_fen = "1nb1kb2/7p/r1p2np1/P2r4/RP5q/2N3P1/1B1PP2P/3QK2R w KQkq -"
+      # Loads a complicated fen to test from.
+      test_board = load_fen(test_fen)
 
   test "knight moves":
     var moves = test_board.generate_knight_moves(Color.BLACK)
@@ -220,7 +223,10 @@ suite "checkmate verification":
 
   test "black":
     # Puzzle from Lichess, already solved as a checkmate
-    let test_board = load_fen("r6k/1bp2Bp1/p5p1/1p6/3qn2Q/7P/P4PP1/2R3K1 b - - 1 25")
+    let
+      test_fen = "r6k/1bp2Bp1/p5p1/1p6/3qn2Q/7P/P4PP1/2R3K1 b - - 1 25"
+      test_board = load_fen(test_fen)
+
     var moves = test_board.generate_moves(Color.BLACK)
 
     # This strips out the algebraic parts of the moves.
@@ -238,7 +244,9 @@ suite "short algebraic conversion":
   setup:
     # Loads a complicated fen to test from.
     # Taken from the game that was the lichess puzzle on 4/23/19
-    let test_board: Board = load_fen("r4rk1/1p2qpb1/5np1/4p1Bp/p2nP2P/2N5/PPP1Q1P1/N1KR3R w - - 4 18")
+    let
+      test_fen = "r4rk1/1p2qpb1/5np1/4p1Bp/p2nP2P/2N5/PPP1Q1P1/N1KR3R w - - 4 18"
+      test_board = load_fen(test_fen)
 
   test "knight moves":
     var long = test_board.short_algebraic_to_long_algebraic("Nb3")
@@ -324,7 +332,9 @@ suite "short algebraic conversion":
 suite "castling algebraic conversion":
   setup:
     # This test suite uses a modified version of the fen from short algebraic
-    var test_board: Board = load_fen("r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/2N5/PPP1Q1P1/R3K2R w KQ -")
+    var
+      test_fen = "r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/2N5/PPP1Q1P1/R3K2R w KQ -"
+      test_board = load_fen(test_fen)
 
   test "kingside":
     var long = test_board.short_algebraic_to_long_algebraic("O-O")
@@ -335,12 +345,16 @@ suite "castling algebraic conversion":
     check(long == "O-O-O")
 
   test "queenside illegal":
-    test_board = load_fen("r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/8/PPP1Q1P1/R2NK2R b KQ -")
+    test_fen = "r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/8/PPP1Q1P1/R2NK2R b KQ -"
+    test_board = load_fen(test_fen)
+
     var long = test_board.short_algebraic_to_long_algebraic("O-O-O")
     check(long == "")
 
   test "kingside illegal":
-    test_board = load_fen("r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/2N5/PPP3P1/R3KQ1R w KQ -")
+    test_fen = "r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/2N5/PPP3P1/R3KQ1R w KQ -"
+    test_board = load_fen(test_fen)
+
     var long = test_board.short_algebraic_to_long_algebraic("O-O")
     check(long == "")
 
@@ -348,7 +362,9 @@ suite "move legality":
   setup:
     # Loads a complicated fen to test from.
     # Taken from the game that was the lichess puzzle on 4/23/19
-    var test_board: Board = load_fen("r4rk1/1p2qpb1/5np1/4p1Bp/p2nP2P/2N5/PPP1Q1P1/N1KR3R w - - 4 18")
+    var
+      test_fen = "r4rk1/1p2qpb1/5np1/4p1Bp/p2nP2P/2N5/PPP1Q1P1/N1KR3R w - - 4 18"
+      test_board = load_fen(test_fen)
 
   test "knight moves":
     var legal = test_board.check_move_legality("Nb3")
@@ -432,50 +448,63 @@ suite "move legality":
     check(legal[0])
 
   test "kingside castling":
-    test_board = load_fen("r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/2N5/PPP1Q1P1/R3K2R w KQ -")
+    test_fen = "r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/2N5/PPP1Q1P1/R3K2R w KQ -"
+    test_board = load_fen(test_fen)
+
     var legal = test_board.check_move_legality("O-O")
     check(legal[0])
 
   test "queenside":
-    test_board = load_fen("r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/2N5/PPP1Q1P1/R3K2R w KQ -")
+    test_fen = "r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/2N5/PPP1Q1P1/R3K2R w KQ -"
+    test_board = load_fen(test_fen)
+
     var legal = test_board.check_move_legality("O-O-O")
     check(legal[0])
 
   test "queenside illegal":
-    test_board = load_fen("r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/8/PPP1Q1P1/R2NK2R b KQ -")
+    test_fen = "r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/8/PPP1Q1P1/R2NK2R b KQ -"
+    test_board = load_fen(test_fen)
+
     var legal = test_board.check_move_legality("O-O-O")
     check(legal[0] == false)
 
   test "kingside illegal":
-    test_board = load_fen("r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/2N5/PPP3P1/R3KQ1R w KQ -")
+    test_fen = "r4rk1/1p2qpb1/2n2np1/4p1Bp/p3P2P/2N5/PPP3P1/R3KQ1R w KQ -"
+    test_board = load_fen(test_fen)
+
     var legal = test_board.check_move_legality("O-O")
     check(legal[0] == false)
 
 suite "loading/saving":
 
   test "loading fen":
-    var test_board: Board = load_fen("1nb1kb2/7p/r1p2np1/P2r4/RP5q/2N3P1/1B1PP2P/3QK2R w KQkq -")
-    var expected = @[[0, -3, -4, 0, -6, -4, 0, 0],
-                      [0, 0, 0, 0, 0, 0, 0, -1],
-                      [-2, 0, -1, 0, 0, -3, -1, 0],
-                      [1, 0, 0, -2, 0, 0, 0, 0],
-                      [2, 1, 0, 0, 0, 0, 0, -5],
-                      [0, 0, 3, 0, 0, 0, 1, 0],
-                      [0, 4, 0, 1, 1, 0, 0, 1],
-                      [0, 0, 0, 5, 6, 0, 0, 2]].toTensor
+    var
+      test_fen = "1nb1kb2/7p/r1p2np1/P2r4/RP5q/2N3P1/1B1PP2P/3QK2R w KQkq -"
+      test_board = load_fen(test_fen)
+      expected = @[[0, -3, -4, 0, -6, -4, 0, 0],
+                   [0, 0, 0, 0, 0, 0, 0, -1],
+                   [-2, 0, -1, 0, 0, -3, -1, 0],
+                   [1, 0, 0, -2, 0, 0, 0, 0],
+                   [2, 1, 0, 0, 0, 0, 0, -5],
+                   [0, 0, 3, 0, 0, 0, 1, 0],
+                   [0, 4, 0, 1, 1, 0, 0, 1],
+                   [0, 0, 0, 5, 6, 0, 0, 2]].toTensor
 
     check(test_board.current_state == expected)
 
   test "saving fen":
-    let test_fen = "r4rk1/1p2qpb1/5np1/4p1Bp/p2nP2P/2N5/PPP1Q1P1/N1KR3R w - - 4 18"
-    var test_board: Board = load_fen(test_fen)
+    var
+      test_fen = "r4rk1/1p2qpb1/5np1/4p1Bp/p2nP2P/2N5/PPP1Q1P1/N1KR3R w - - 4 18"
+      test_board = load_fen(test_fen)
 
-    var expected = test_board.to_fen()
+      expected = test_board.to_fen()
 
     check(expected == test_fen)
 
   test "loading pgn - immortal game":
-    var test_board: Board = load_pgn("anderssen_kieseritzky_1851", "games")
+    let t1 = cpuTime()
+    var test_board = load_pgn("anderssen_kieseritzky_1851", "games")
+    echo "Time taken: ", cpuTime() - t1
     var expected = @[[-2, 0, -4, -6, 0, 0, 0, -2],
                      [-1, 0, 0, -1, 4, -1, 3, -1],
                      [-3, 0, 0, 0, 0, -3, 0, 0],
@@ -488,16 +517,19 @@ suite "loading/saving":
     check(test_board.current_state == expected)
 
   test "loading pgn - Komodo MCTS vs Lc0":
-    var test_board: Board = load_pgn("KomodoMCTS 2221.00vsLCZero v19.1-11248 2018-12-15", "games")
+    let t1 = cpuTime()
+    let test_pgn = "KomodoMCTS 2221.00vsLCZero v19.1-11248 2018-12-15"
+    var test_board = load_pgn(test_pgn, "games")
+    echo "Time taken: ", cpuTime() - t1
 
-    var expected = @[[ 0, 0, 0, 0, 0, 0, 0, 0],
-                     [ 0, 0, 0, 0, 0, 0, 0, 0],
-                     [ 0, 0, 0, 0, 0, 0, 0, 0],
-                     [ 0, 0, 0, 0, 0, 0, 0, 0],
-                     [ 0, 0, 0, 0, 0, 0, 0, 0],
-                     [ 0, 0, -6, 0, 6, 0, 0, 0],
+    var expected = @[[0, 0, 0, 0, 0, 0, 0, 0],
+                     [0, 0, 0, 0, 0, 0, 0, 0],
+                     [0, 0, 0, 0, 0, 0, 0, 0],
+                     [0, 0, 0, 0, 0, 0, 0, 0],
+                     [0, 0, 0, 0, 0, 0, 0, 0],
+                     [0, 0, -6, 0, 6, 0, 0, 0],
                      [-1, 0, 0, -1, 0, -1, 0, 0],
-                     [ 0, 0, 0, 2, 0, 0, 0, 0]].toTensor
+                     [0, 0, 0, 2, 0, 0, 0, 0]].toTensor
 
     check(test_board.current_state == expected)
 

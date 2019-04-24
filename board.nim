@@ -5,6 +5,7 @@ import strutils
 import re
 import math
 import times
+import os
 
 import arraymancer
 
@@ -1393,11 +1394,14 @@ proc load_fen*(fen: string): Board =
 
 proc load_pgn*(name: string, folder: string = "games"): Board =
   # File location of the pgn.
-  var loc = folder & "/" & name
+  var loc = os.joinPath(folder, name)
 
   # In case you pass the name without .pgn at the end.
   if not loc.endsWith(".pgn"):
     loc = loc & ".pgn"
+
+  if not fileExists(loc):
+    raise newException(IOError, "PGN not found!")
 
   let data = open(loc)
 
@@ -1463,7 +1467,9 @@ proc save_pgn*(board: Board) =
   else:
     name = "???vs???" & $(now()) & ".pgn"
 
-  let f = open("results/" & name, fmWrite)
+  let loc = os.joinPath("results", name)
+
+  let f = open(loc, fmWrite)
 
   if full:
     for key, val in board.headers:

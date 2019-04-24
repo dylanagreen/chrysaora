@@ -665,11 +665,8 @@ proc remove_moves_in_check(board: Board, moves: openArray[ShortAndLongMove],
   if len(moves) == 0:
     return
 
-  # Convert to a tensor of strings so we can slice out only the first column.
-  var new_moves: seq[seq[string]] = @[]
-  for move_state in moves:
-    new_moves.add(@[move_state[0], move_state[1]])
-  let moves_tensor = new_moves.toTensor
+  # Strips out the shrot algebraic moves from the sequence.
+  let all_short = moves.map(proc (x: ShortAndLongMove): string = x.short)
 
   # Loop through the move/board state sequence.
   for i, m in moves:
@@ -678,8 +675,7 @@ proc remove_moves_in_check(board: Board, moves: openArray[ShortAndLongMove],
     if not check:
       # If the number of times that the short moves appears is more than 1 we
       # want to append the long move.
-      # moves_tensor[1..^1,0] slices out only the short algebraic moves.
-      if moves_tensor[_, 0].toSeq.count(m[0]) > 1:
+      if all_short.count(m[0]) > 1:
         result.add((m[1], m[2]))
       else:
         result.add((m[0], m[2]))
@@ -1421,14 +1417,21 @@ proc load_pgn*(name: string, folder: string = "games"): Board =
 
       tags[pair[0].strip()] = pair[1]
 
-  var moves_line = game_line.join("")
+  var moves_line: string
 
   # Loops as long as there's an opening comment character.
-  while '{' in moves_line:
-    var
-      before = moves_line[0..<moves_line.find('{')]
-      after = moves_line[moves_line.find('}') + 1..^1]
-    moves_line = before & after
+  var in_comment = false
+
+  for i, c in game_line.join(""):
+    if c == '{':
+      in_comment = true
+      continue
+    elif c == '}':
+      in_comment = false
+      continue
+
+    if not in_comment:
+      moves_line.add(c)
 
   # \d+ looks for 1 or more digits
   # \. escapes the period

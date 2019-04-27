@@ -29,16 +29,16 @@ type
     headers*: Table[string, string]
 
   # Custom Position type.
-  Position = tuple[y, x: int]
+  Position* = tuple[y, x: int]
 
   # Custom move list types
-  DisambigMove = tuple[algebraic: string, state: Tensor[int]]
+  DisambigMove* = tuple[algebraic: string, state: Tensor[int]]
   ShortAndLongMove = tuple[short: string, long: string, state: Tensor[int]]
 
 
 # The piece number -> piece name table.
 const
-  piece_names = {1: 'P', 2: 'R', 3: 'N', 4: 'B', 5: 'Q', 6: 'K'}.toTable
+  piece_names* = {1: 'P', 2: 'R', 3: 'N', 4: 'B', 5: 'Q', 6: 'K'}.toTable
 
 
 var temp: seq[tuple[key: char, val: int]] = @[]
@@ -48,7 +48,7 @@ for key, value in piece_names:
 
 let
   # The lowercase ascii alphabet.
-  ascii_lowercase = toSeq 'a'..'z'
+  ascii_lowercase* = toSeq 'a'..'z'
 
   # The reverse piece name -> piece number table.
   piece_numbers = temp.toTable
@@ -365,7 +365,7 @@ proc can_make_move(board: Board, start: Position, fin: Position,
       return true
 
 
-proc is_in_check(state: Tensor[int], color: Color): bool =
+proc is_in_check*(state: Tensor[int], color: Color): bool =
   let
     # The direction a pawn must travel to take this color's king.
     # I.e. Black pawns must travel in the positive y (downward) direction
@@ -665,7 +665,7 @@ proc remove_moves_in_check(board: Board, moves: openArray[ShortAndLongMove],
   if len(moves) == 0:
     return
 
-  # Strips out the shrot algebraic moves from the sequence.
+  # Strips out the short algebraic moves from the sequence.
   let all_short = moves.map(proc (x: ShortAndLongMove): string = x.short)
 
   # Loop through the move/board state sequence.

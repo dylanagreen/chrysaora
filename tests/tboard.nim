@@ -4,7 +4,7 @@ import sets
 import arraymancer
 import times
 
-import board
+import ../src/board
 
 suite "start of game move generation":
   setup:

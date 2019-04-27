@@ -1,29 +1,34 @@
 # Chrysaora
 
-Chrysaora is an attempt to teach an image classification convolutional neural network (CCN) to play chess. In addition, I plan to bolster Chrysaora's playing strength with a search function, although at present I am uncertain as to whether it will be MCTS or Alpha-Beta, or possibly a combination of both.
+Chrysaora may very well be the first serious attempt to build a world class chess engine in Nim.
 
-The theory is that every board "state" comes from a match won by either black or white or from a draw. This means that each board state can be considered an image, which will be categorized into one of three different categories. Then, once the network is trained, you pass it every possible move it could make, and then pick the move that the network classifies as win for its side. If there are more than one, then pick the board with the highest confidence.
+Chrysaora started as an attempt to use supervised learning and a small image classification styled network to play chess using Python. The results of this experiment are stored in chrysaora_py. The project has now shifted to building an experimental "hybrid" chess engine. This hybrid will have an evaluation function that consists of two parts:
+
+- A reinforcement learning trained neural network
+- A handcraft evaluation function top layer.
+
+At present I see a few ways to integrate the two, none of which I have settled on yet. Chrysaora also features an alpha-beta pruned minimax search. 
 
 # Dependencies
-Deep learning is done using PyTorch, with backend math and move generation done by NumPy and SciPy.  
+Deep learning is done using arraymancer, which is the only dependency outside the Nim standard library.
+
+### Support
+Chrysaora will be supported until I get my PhD, it wins a season of the TCEC or Nim dies, whichever comes first.
 
 ### Naming
 
 Chrysaora is named after the genus of jellyfish, which in turn is named after Chrysaor, a being from Greek mythology. Chrysaor roughly translates as "he who has a golden armament."
 
-## Something to Keep in Mind
+## Why a hybrid?
 
-Would I like Chrysaora to one day be a high level chess engine? **Yes**. Is it going to be incredibly difficult if not impossible for that to be a reality? **Double yes**. Why?
+Neural Network based chess engines seem to be the "new era" so to speak in computer chess, although Stockfish has, as of the writing of this README, remained the champion of the TCEC. NN based engines come with their own set of problems, however. The general width and size of the NN required to play chess at the level that LC0 plays at is massive, explaining a major part of why NN based engines tend to be so much slower than traditional hand crafted engines. Consider that if Lc0 could achieve the nps that Stockfish does it would be, in my opinion, unbeatable.
 
-Well for one, keep in mind that this is, by and large, an experiment. I have absolutely no idea how replacing a traditional evaluation function with an FCN will work in practice. I have no idea if it'll even be able to reasonably approximate an evaluation function. It's entirely possible that it can't and the project dies there.
+By hybridizing a NN with a handcrafted evaluation function, I hope to achieve similar playing performance to top level engines with a much narrower network structure. The much narrower network should compute faster, and if my coding and optimization prowess is up to the task, achieve a potentially higher nodes per second. 
 
-However, if by some miracle the FCN plays decently well, it's important to note something further: *Python is slow.* And on top of that, *neural networks are slow.* The most powerful of engines can search millions of nodes per second, but LeelaChess0 tops out at a couple hundred kilonodes per second. There are a few ways around this, if we actually get this far. Much of the move generation and tree searching code can be reimplemented with few changes in Cython, which should provide substantial speedup. But the network is still slow. If we can even come within a factor of 10 of the nodes per second Lc0 reaches that would be impressive.
-
-# Why a CNN?
-The instigating force behind Chrysaora is that of image classification. Humans, or at the very least high level grandmasters, can look at a chess board position and tell rather quickly which of the two sides has the advantage. My personal theory, which is being put to the test here, is that this is analagous to an image classification problem. In much the same way a person can look at a picture of a dog, discern the features, and go "that's a dog", a CNN can do the same. I hope to transfer this thinking to chess. A grandmaster looks at a board, looks at the features, and goes "white's winning." Why should a CNN not be able to do the same?
-
-Lc0 (and my personal underdog in TCEC, AllieStein) are both also based on Neural Networks. Chrysaora differs in that it's not trained using reinforcement learning, but rather using a loss function and a much more rigid rule structure. My initial experiments are... promising in some aspects, and less in others. Chrysaora has been coded in such a way that the internal network can be easily swapped for a different one, and it may be prudent in the future to swap to a RL trained network instead. 
+On the other hand it could blow up in my face.
 
 ## Licenses
 The SVGs used for each piece are licensed under [CC BY-SA 3.0.](https://creativecommons.org/licenses/by-sa/3.0/) and were created by Colin M.L. Burnett. 
+
+You can find the details of Chrysaora's license in the LICENSE.txt file. Chrysaora is licensed under GPL-3.
 

@@ -136,7 +136,7 @@ proc set_up_position(parser: UCI, cmd: openArray[string]) =
   parser.previous_pos = @cmd
 
 
-proc algebraic_to_uci(parser: UCI, move: string): string =
+proc algebraic_to_uci*(parser: UCI, move: string): string =
   # Converts the castling moves.
   if "O-" in move:
     # Starting file
@@ -157,7 +157,7 @@ proc algebraic_to_uci(parser: UCI, move: string): string =
   else:
     # UCI is basically long algebraic with a few minor adjustments.
     result = parser.board.short_algebraic_to_long_algebraic(move)
-
+    logging.debug("Long: ", result)
     # First we remove the capture "x"
     if 'x' in result:
       result = result.replace("x", "")

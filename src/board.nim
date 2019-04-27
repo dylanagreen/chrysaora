@@ -594,7 +594,7 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
 
   for pos in found_pieces:
     var ep = false
-    var promotion: bool = fin.x == pawn_end and piece_char == 'P'
+    var promotion: bool = fin.y == pawn_end and piece_char == 'P'
     # Checks if we need to add en passant to the move.
     if piece_char == 'P' and pos.y == ep_file:
       # Interestingly d happens to correspond to "pawn of the opposite color"
@@ -1499,3 +1499,20 @@ proc save_pgn*(board: Board) =
   else:
     f.write("*")
 
+
+proc `$`*(board: Board): string=
+  for y in 0..7:
+    for x in 0..7:
+      var loc = board.current_state[y, x]
+      # Black is supposed to be lower case hence this
+      # if block differentiating between the two.
+      if loc < 0:
+        result = result & piece_names[abs(loc)].toLowerAscii()
+      elif loc > 0:
+        result = result & piece_names[loc]
+      else:
+        result = result & "."
+      # This space makes it look nice
+      result = result & " "
+    # End of line new line.
+    result = result & "\n"

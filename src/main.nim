@@ -3,13 +3,13 @@ import os
 import times
 import logging
 import tables
+import random
 
 import system
 
 import uci
 import engine
 import board
-
 
 var cmd = stdin.readLine()
 

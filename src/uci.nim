@@ -1,7 +1,7 @@
+import logging
+import re
 import strutils
 import tables
-import re
-import logging
 import terminal
 
 import arraymancer
@@ -234,8 +234,5 @@ proc decrypt_uci*(parser: UCI, cmd: string) =
 
 
 proc receive_command*(): string =
-  if not isatty(stdin):
-    return
-
   result = stdin.readLine
   logging.debug("Input: ", result)

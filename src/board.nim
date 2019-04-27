@@ -1,11 +1,12 @@
-import system
-import tables
+import math
+import os
+import re
 import sequtils
 import strutils
-import re
-import math
+import system
+import tables
 import times
-import os
+
 
 import arraymancer
 

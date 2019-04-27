@@ -7,3 +7,7 @@ chrysaora_py/logs/
 # Training data for the network
 chrysaora_py/split
 chrysaora_py/network
+
+# Binaries
+src/main
+tests/tboard

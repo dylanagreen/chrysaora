@@ -1,12 +1,13 @@
 import logging
-import tables
-import system
-import sequtils
-import strutils
-import terminal
+import os
 import random
 import selectors
-import os
+import sequtils
+import strutils
+import system
+import tables
+import terminal
+
 
 import arraymancer
 

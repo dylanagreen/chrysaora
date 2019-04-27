@@ -1,11 +1,9 @@
 import logging
 import os
-import times
-import logging
 import tables
 import random
-
 import system
+import times
 
 import uci
 import engine
@@ -22,7 +20,7 @@ if not existsDir(log_folder):
 # Initiliazes the log.
 let
   log_name = os.joinPath(log_folder, $(now()) & ".log")
-  fileLog = newRollingFileLogger(log_name, levelThreshold = lvlDebug)
+  fileLog* = newFileLogger(log_name, levelThreshold = lvlDebug)
   cur_board = new_board()
   time_params = {"wtime" : -1, "btime" : -1, "winc" : -1, "binc" : -1}.toTable
   cur_engine = Engine(board: cur_board, time_params: time_params, compute: true,
@@ -39,3 +37,5 @@ while true:
 
   if cmd != "":
     interpreter.decrypt_uci(cmd)
+
+  flushFile(fileLog.file)

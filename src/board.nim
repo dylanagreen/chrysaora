@@ -510,16 +510,19 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
     mult = if board.to_move == Color.WHITE: 1 else: -1
     piece_char = 'P'
     piece_num = piece_numbers['P'] * mult
+    promotion_char = 'P'
     promotion_piece = piece_numbers['P'] * mult
 
   # If a piece was passed in we set the piece_char to that piece.
-  if len(pieces) > 0:
+  if len(pieces) > 0 and not ('=' in new_move):
     piece_char = pieces[0][0]
+  elif len(pieces) > 0 and '=' in new_move:
+    promotion_char = pieces[^1][0]
 
   # Puts the found piece number into either piece_num or promotion_piece
   # Depending what piece is moving.
   if '=' in new_move:
-    promotion_piece = piece_numbers[piece_char] * mult
+    promotion_piece = piece_numbers[promotion_char] * mult
   else:
     piece_num = piece_numbers[piece_char] * mult
 

@@ -85,8 +85,10 @@ proc uci_to_algebraic(parser: UCI, move: string): string =
         found = true
         result = "O-O-O"
 
-    if not found:
+    if not found and not( piece_name == 'P'):
       result = $piece_name & move
+    else:
+      result = move
 
 
 #proc set_option(option: openArray[string]) =

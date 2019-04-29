@@ -61,37 +61,9 @@ let
   piece_finder = re"[PRNQKB]"
   illegal_piece_finder = re"[A-Z]"
 
-
-# Creates a new board from scratch.
-proc new_board*(): Board =
-  let start_board: Tensor[int] = @[[-2, -3, -4, -5, -6, -4, -3, -2],
-                                  [-1, -1, -1, -1, -1, -1, -1, -1],
-                                  [0, 0, 0, 0, 0, 0, 0, 0],
-                                  [0, 0, 0, 0, 0, 0, 0, 0],
-                                  [0, 0, 0, 0, 0, 0, 0, 0],
-                                  [0, 0, 0, 0, 0, 0, 0, 0],
-                                  [1, 1, 1, 1, 1, 1, 1, 1],
-                                  [2, 3, 4, 5, 6, 4, 3, 2]].toTensor
-
-  let start_castle_rights = {"WQR": true, "WKR": true, "BQR": true,
-                             "BKR": true}.toTable
-  result = Board(half_move_clock: 0, game_states: @[],
-                 current_state: start_board,
-                 castle_rights: start_castle_rights, to_move: Color.WHITE,
-                 status: Status.IN_PROGRESS, move_list: @[],
-                 headers: initTable[string, string]())
-
-
-# Creates a new board with the given state.
-proc new_board*(start_board: Tensor[int]): Board =
-  let start_castle_rights = {"WQR": true, "WKR": true, "BQR": true,
-                             "BKR": true}.toTable
-  result = Board(half_move_clock: 0, game_states: @[],
-                 current_state: start_board,
-                 castle_rights: start_castle_rights, to_move: Color.WHITE,
-                 status: Status.IN_PROGRESS, move_list: @[],
-                 headers: initTable[string, string]())
-
+# Forward declarations for use of this later.
+proc new_board*(): Board
+proc new_board*(start_board: Tensor[int]): Board
 
 # Finds the piece in the board state.
 proc find_piece(state: Tensor[int], piece: int): seq[Position] =
@@ -1332,9 +1304,10 @@ proc to_fen*(board: Board): string =
   fen.add(" ")
   fen.add($board.half_move_clock)
 
-  # And finally the move number.
+  # And finally the move number. We need to add 1 because the starting position
+  # Starts at 1 and not at 0.
   fen.add(" ")
-  fen.add($(len(board.move_list) div 2))
+  fen.add($(len(board.move_list) div 2 + 1))
 
   result = fen.join("")
 
@@ -1387,16 +1360,24 @@ proc load_fen*(fen: string): Board =
 
   var temp_move_list: seq[string] = @[]
   if len(fields) > 5:
-    let num_plies = parseInt(fields[5]) * 2
+    var num_plies = parseInt(fields[5]) * 2
+
+    # This ensures that the move list is the right length and that move clock
+    # is only incremented after black moves.
+    if side_to_move == Color.WHITE:
+      num_plies = num_plies - 1
+
     # Just adds temporary digits to the move list so it's the right length
     # for saving a fen.
-    for i in 1..num_plies:
-      temp_move_list.add($i & "Q")
+    if num_plies > 1:
+      for i in 1..num_plies:
+        temp_move_list.add($i & "Q")
 
   result = Board(half_move_clock: half_move, game_states: @[],
                 current_state: board_state.toTensor,
                 castle_rights: castle_dict, to_move: side_to_move,
-                status: Status.IN_PROGRESS, move_list: temp_move_list)
+                status: Status.IN_PROGRESS, move_list: temp_move_list,
+                headers: initTable[string, string]())
 
 
 proc load_pgn*(name: string, folder: string = "games"): Board =
@@ -1527,3 +1508,21 @@ proc `$`*(board: Board): string=
       result = result & " "
     # End of line new line.
     result = result & "\n"
+
+
+# Creates a new board from scratch.
+proc new_board*(): Board =
+  # Just loads the starting fen so we can change piece numbering without
+  # having to change a hard coded tensor.
+  result = load_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+
+
+# Creates a new board with the given state.
+proc new_board*(start_board: Tensor[int]): Board =
+  let start_castle_rights = {"WQR": true, "WKR": true, "BQR": true,
+                             "BKR": true}.toTable
+  result = Board(half_move_clock: 0, game_states: @[],
+                 current_state: start_board,
+                 castle_rights: start_castle_rights, to_move: Color.WHITE,
+                 status: Status.IN_PROGRESS, move_list: @[],
+                 headers: initTable[string, string]())

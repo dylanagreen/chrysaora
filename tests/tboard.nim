@@ -497,9 +497,9 @@ suite "loading/saving":
       test_fen = "r4rk1/1p2qpb1/5np1/4p1Bp/p2nP2P/2N5/PPP1Q1P1/N1KR3R w - - 4 18"
       test_board = load_fen(test_fen)
 
-      expected = test_board.to_fen()
+      generated = test_board.to_fen()
 
-    check(expected == test_fen)
+    check(generated == test_fen)
 
   test "loading pgn - immortal game":
     let t1 = cpuTime()
@@ -535,3 +535,12 @@ suite "loading/saving":
 
     # For testing saving to make sure it doesn't throw an exception
     #test_board.save_pgn()
+
+  test "pgn -> fen":
+    let
+      test_pgn = "KomodoMCTS 2221.00vsLCZero v19.1-11248 2018-12-15"
+      test_fen = "8/8/8/8/8/2k1K3/p2p1p2/3R4 b - - 0 78"
+    var
+      test_board = load_pgn(test_pgn, "games")
+      generated = test_board.to_fen()
+    check(generated == test_fen)

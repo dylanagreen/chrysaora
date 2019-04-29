@@ -54,6 +54,13 @@ let
   # The reverse piece name -> piece number table.
   piece_numbers = temp.toTable
 
+  # Regular expressions for finding strings in algebraic moves.
+  loc_finder = re"[a-h]\d+"
+  rank_finder = re"\d+"
+  file_finder = re"[a-h]"
+  piece_finder = re"[PRNQKB]"
+  illegal_piece_finder = re"[A-Z]"
+
 
 # Creates a new board from scratch.
 proc new_board*(): Board =
@@ -150,7 +157,7 @@ proc long_algebraic_to_board_state(board: Board, move: string): Tensor[int] =
       piece = c
 
   # Uses regex to find the rank/file combinations.
-  let locs = findAll(move, re"[a-h]\d+")
+  let locs = findAll(move, loc_finder)
 
   # Gets the starting Position and puts into a constant
   var
@@ -474,11 +481,11 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
   # Use regex to extract the Positions as well as the singular ranks
   # and files and the pieces (for finding the piece and pawn promotion)
   let
-    locs = findAll(move, re"[a-h]\d+")
-    ranks = findAll(move, re"\d+")
-    files = findAll(move, re"[a-h]")
-    pieces = findAll(move, re"[PRNQKB]")
-    illegal_piece = findAll(move, re"[A-Z]")
+    locs = findAll(move, loc_finder)
+    ranks = findAll(move, rank_finder)
+    files = findAll(move, file_finder)
+    pieces = findAll(move, piece_finder)
+    illegal_piece = findAll(move, illegal_piece_finder)
 
   # If you passed too few or too many locations bail
   if len(locs) == 0 or len(locs) >= 3:

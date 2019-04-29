@@ -39,13 +39,13 @@ type
 
 # The piece number -> piece name table.
 const
-  piece_names* = {1: 'P', 2: 'R', 3: 'N', 4: 'B', 5: 'Q', 6: 'K'}.toTable
-
+  # These values are centipawn versions of values taken from "Beginner's Guide
+  # to Winning Chess" the book that basically taught me all  my chess skills.
+  piece_names* = {100: 'P', 500: 'R', 310: 'N', 300: 'B', 900: 'Q', 1000: 'K'}.toTable
 
 var temp: seq[tuple[key: char, val: int]] = @[]
 for key, value in piece_names:
   temp.add((value, key))
-
 
 let
   # The lowercase ascii alphabet.
@@ -84,7 +84,7 @@ proc row_column_to_algebraic(board: Board, start: Position, finish: Position,
     alg1: string = ""
     alg2: string = ""
 
-  if abs(piece) > 1:
+  if abs(piece) > piece_numbers['P']:
     alg1.add(piece_names[abs(piece)])
     alg2.add(piece_names[abs(piece)])
 
@@ -96,7 +96,7 @@ proc row_column_to_algebraic(board: Board, start: Position, finish: Position,
   if board.current_state[finish.y, finish.x] != 0:
     # On pawn captures alg notation requires including the starting file.
     # Since we may not include a piece character
-    if piece == 1:
+    if piece == piece_numbers['P']:
       alg1.add(ascii_lowercase[start.x])
     alg1.add("x")
     alg2.add("x")
@@ -206,6 +206,9 @@ proc can_make_move(board: Board, start: Position, fin: Position,
       # So 1 is downwards, opposite White's pawns going upwards.
       d = if board.to_move == Color.WHITE: -1 else: 1
 
+      opposite_pawn = if board.to_move == Color.WHITE: -piece_numbers['P']
+                      else: piece_numbers['P']
+
       # The starting file for the pawn row, for double move checking
       pawn_start = if board.to_move == Color.WHITE: 6 else: 1
 
@@ -248,9 +251,9 @@ proc can_make_move(board: Board, start: Position, fin: Position,
     # is a requirement of en_passant.
     let
       ep_left = start.x == fin.x - 1 and
-                board.current_state[start.y, fin.x] == d
+                board.current_state[start.y, fin.x] == opposite_pawn
       ep_right = start.x == fin.x + 1 and
-                 board.current_state[start.y, fin.x] == d
+                 board.current_state[start.y, fin.x] == opposite_pawn
 
       # We need to start on the correct file for en passant.
       good_start = start.y == ep_file
@@ -265,7 +268,7 @@ proc can_make_move(board: Board, start: Position, fin: Position,
         # Checks that in the previous state the pawn actually
         # moved two spaces. This prevents trying an en passant
         # move three moves after the pawn moved.
-        if good_end and previous_state[fin.y + d, fin.x] == d:
+        if good_end and previous_state[fin.y + d, fin.x] == opposite_pawn:
           return true
 
   elif piece == 'N':

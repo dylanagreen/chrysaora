@@ -43,8 +43,8 @@ proc check_for_stop(): bool =
 
 
 proc evaluate_moves(engine: Engine, board_states: Tensor[int],
-                    color: Color): seq[float] =
-  result = @[rand(5.5)]
+                    color: Color): seq[int] =
+  result = @[sum(board_states)]
 
 
 # Bypasses making a move using board.make_move by updating the castle dict
@@ -100,8 +100,8 @@ proc bypass_make_move(engine: Engine, old_board: Board, move: string,
 
 
 proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
-                    alpha: float = -10, beta: float = 10, color: Color):
-                    tuple[best_move: string, val: float] =
+                    alpha: int = -10, beta: int = 10, color: Color):
+                    tuple[best_move: string, val: int] =
   # If we recieve the stop command don't go any deeper just return best move.
   if check_for_stop():
     engine.compute = false
@@ -129,7 +129,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
       return
     # Otherwise we found a checkmate and we really want this
     else:
-      return ("", 50.0)
+      return ("", 50)
 
   # Strips out the short algebraic moves from the sequence.
   let
@@ -144,15 +144,15 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
   if depth == 1:
     var
       run_color = if color == Color.BLACK: Color.WHITE else: Color.BLACK
-      mult: float = if color == engine.board.to_move: 1 else: -1
+      mult: int = if color == engine.board.to_move: 1 else: -1
 
-      net_vals: seq[float] = @[]
+      net_vals: seq[int] = @[]
 
     for i, s in states:
 
       # The evaluations spit out by the network
       net_vals = engine.evaluate_moves(s, run_color)
-      net_vals = net_vals.map(proc (x: float): float = x * mult)
+      net_vals = net_vals.map(proc (x: int): int = x * mult)
 
       # J is an index, v refers to the current val.
       for j, v in net_vals:

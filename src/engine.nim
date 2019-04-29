@@ -100,7 +100,7 @@ proc bypass_make_move(engine: Engine, old_board: Board, move: string,
 
 
 proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
-                    alpha: int = -10, beta: int = 10, color: Color):
+                    alpha: int = -10000, beta: int = 10000, color: Color):
                     tuple[best_move: string, val: int] =
   # If we recieve the stop command don't go any deeper just return best move.
   if check_for_stop():

@@ -55,7 +55,7 @@ let
   piece_numbers = temp.toTable
 
   # Regular expressions for finding strings in algebraic moves.
-  loc_finder = re"[a-h]\d+"
+  loc_finder* = re"[a-h]\d+"
   rank_finder = re"\d+"
   file_finder = re"[a-h]"
   piece_finder = re"[PRNQKB]"
@@ -576,7 +576,6 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
 
     result = not s.is_in_check(board.to_move)
     return
-
 
   for pos in found_pieces:
     var ep = false

@@ -53,16 +53,13 @@ proc uci_to_algebraic(parser: UCI, move: string): string =
     result = move[0..^2] & '=' & toUpperAscii(move[^1])
   else:
     # Uses regex to find the rank/file combinations.
-    let locs = findAll(move, re"[a-h]\d+")
+    let locs = findAll(move, loc_finder)
 
     # Gets the starting Position and puts into a constant
     var
       dest = locs[0]
       file = ascii_lowercase.find(dest[0]) # File = x
       rank = 8 - parseInt($dest[1]) # Rank = y
-
-      # Simple check to see if the move was found as a castling move
-      found = false
 
     let
       start: Position = (rank, file)
@@ -78,17 +75,15 @@ proc uci_to_algebraic(parser: UCI, move: string): string =
 
       # Kingside castling
       if dest[0] == 'g':
-        found = true
-        result = "O-O"
+        return "O-O"
       # Queenside castling
       elif dest[0] == 'c':
-        found = true
-        result = "O-O-O"
+        return "O-O-O"
 
-    if not found and not( piece_name == 'P'):
-      result = $piece_name & move
-    else:
+    if piece_name == 'P':
       result = move
+    else:
+      result = $piece_name & move
 
 
 #proc set_option(option: openArray[string]) =
@@ -128,7 +123,9 @@ proc set_up_position(parser: UCI, cmd: openArray[string]) =
 
     # Converts the moves to long algebraic to make them.
     for move in moves_to_make:
-      parser.board.make_move(parser.uci_to_algebraic(move))
+      var converted = parser.uci_to_algebraic(move)
+      echo converted
+      parser.board.make_move(converted)
 
   # When the command is just start pos reset the board to the start pos.
   elif "startpos" in cmd:

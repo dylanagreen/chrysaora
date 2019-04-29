@@ -11,3 +11,6 @@ chrysaora_py/network
 # Binaries
 src/main
 tests/tboard
+
+# Logs
+src/logs

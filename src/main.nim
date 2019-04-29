@@ -13,7 +13,7 @@ var cmd = stdin.readLine()
 
 # Makes the folder for the logs if it doesn't exist yet. For now just makes it
 # in the folder the program is in.
-let log_folder = os.joinPath(getCurrentDir(), "logs")
+let log_folder = os.joinPath(getAppDir(), "logs")
 if not existsDir(log_folder):
     createDir(log_folder)
 

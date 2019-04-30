@@ -246,7 +246,6 @@ proc can_make_move(board: Board, start: Position, fin: Position,
       if take_left or take_right:
         return true
 
-    # Interestingly d happens to correspond to "pawn of the opposite color"
     # Bools check that we are adjacent to a pawn of the opposite color which
     # is a requirement of en_passant.
     let
@@ -582,14 +581,15 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
     var promotion: bool = fin.y == pawn_end and piece_char == 'P'
     # Checks if we need to add en passant to the move.
     if piece_char == 'P' and pos.y == ep_file:
-      # Interestingly d happens to correspond to "pawn of the opposite color"
       # Bools check that we are adjacent to a pawn of the opposite color which
       # is a requirement of en_passant.
       let
+        opposite_pawn = if board.to_move == Color.WHITE: -piece_numbers['P']
+                        else: piece_numbers['P']
         ep_left = pos.x == fin.x - 1 and
-                  board.current_state[pos.y, fin.x] == d
+                  board.current_state[pos.y, fin.x] == opposite_pawn
         ep_right = pos.x == fin.x + 1 and
-                   board.current_state[pos.y, fin.x] == d
+                   board.current_state[pos.y, fin.x] == opposite_pawn
 
         # Makes sure the ending far enough from the edge for a good en passant.
         good_end = fin.y in 1..6
@@ -602,7 +602,7 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
           # Checks that in the previous state the pawn actually
           # moved two spaces. This prevents trying an en passant
           # move three moves after the pawn moved.
-          if good_end and previous_state[fin.y + d, fin.x] == d:
+          if good_end and previous_state[fin.y + d, fin.x] == opposite_pawn:
             ep = true
     let
       can_make = can_make_move(board, pos, fin, piece_char)

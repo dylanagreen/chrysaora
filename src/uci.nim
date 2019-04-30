@@ -131,7 +131,6 @@ proc set_up_position(parser: UCI, cmd: openArray[string]) =
     logging.debug("Reset Board")
     parser.board = new_board()
 
-  #echo parser.board
   parser.previous_pos = @cmd
 
 

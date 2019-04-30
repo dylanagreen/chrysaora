@@ -224,27 +224,26 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
     var
       run_color = color
       mult: int = if color == engine.board.to_move: 1 else: -1
-
       net_vals: seq[int] = @[]
 
     for i, s in states:
       # The evaluations spit out by the network
       net_vals = engine.evaluate_moves(s, run_color)
-      net_vals = net_vals.map(proc (x: int): int = x * mult)
+      #net_vals = net_vals.map(proc (x: int): int = x * mult)
       # J is an index, v refers to the current val.
       for j, v in net_vals:
         # Updates alpha or beta variable depending on which cutoff to use.
         if cutoff_type == "alpha":
-          # If we're doing alpha cut offs we're looking for the minimum on
-          # this ply, so if the valuation is less than the lowest so far
+          # If we're doing alpha cut offs we're looking for the maximum on
+          # this ply, so if the valuation is more than the highest so far
           # we update it.
           if result.val < v:
             result.best_move = alg[j+i]
             result.val = v
           cur_alpha = max([cur_alpha, result.val])
         else:
-          # If we're doing beta cut offs we're looking for the maximum on
-          # this ply, so if the valuation is more than the highest so far
+          # If we're doing beta cut offs we're looking for the minimum on
+          # this ply, so if the valuation is less than the lowest so far
           # we update it.
           if result.val > v:
             result.best_move = alg[j+i]
@@ -263,25 +262,27 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
         new_board = engine.bypass_make_move(search_board, alg[i], states[i])
 
         # Best move from the next lower ply.
-        best_lower = engine.minimax_search(new_board, depth - 1, alpha, beta,
+        best_lower = engine.minimax_search(new_board, depth - 1, cur_alpha, cur_beta,
                                            new_board.to_move)
+
+      var cur_val = best_lower.val# * -1
 
       # Updates alpha or beta variable depending on which cutoff to use.
       if cutoff_type == "alpha":
-        # If we're doing alpha cut offs we're looking for the minimum on
-        # this ply, so if the valuation is less than the lowest so far
-        # we update it.
-        if result.val < best_lower.val:
-          result.best_move = alg[i]
-          result.val = best_lower.val
-        cur_alpha = max([cur_alpha, result.val])
-      else:
-        # If we're doing beta cut offs we're looking for the maximum on
+        # If we're doing alpha cut offs we're looking for the maximum on
         # this ply, so if the valuation is more than the highest so far
         # we update it.
-        if result.val > best_lower.val:
+        if result.val < cur_val:
           result.best_move = alg[i]
-          result.val = best_lower.val
+          result.val = cur_val
+        cur_alpha = max([cur_alpha, result.val])
+      else:
+        # If we're doing beta cut offs we're looking for the minimum on
+        # this ply, so if the valuation is less than the lowest so far
+        # we update it.
+        if result.val > cur_val:
+          result.best_move = alg[i]
+          result.val = cur_val
         cur_beta = min([cur_beta, result.val])
 
       # Once alpha exceeds beta, i.e. once the minimum score that

@@ -124,7 +124,6 @@ proc set_up_position(parser: UCI, cmd: openArray[string]) =
     # Converts the moves to long algebraic to make them.
     for move in moves_to_make:
       var converted = parser.uci_to_algebraic(move)
-      echo converted
       parser.board.make_move(converted)
 
   # When the command is just start pos reset the board to the start pos.
@@ -132,6 +131,7 @@ proc set_up_position(parser: UCI, cmd: openArray[string]) =
     logging.debug("Reset Board")
     parser.board = new_board()
 
+  #echo parser.board
   parser.previous_pos = @cmd
 
 

@@ -52,7 +52,7 @@ let
   ascii_lowercase* = toSeq 'a'..'z'
 
   # The reverse piece name -> piece number table.
-  piece_numbers = temp.toTable
+  piece_numbers* = temp.toTable
 
   # Regular expressions for finding strings in algebraic moves.
   loc_finder* = re"[a-h]\d+"
@@ -66,7 +66,7 @@ proc new_board*(): Board
 proc new_board*(start_board: Tensor[int]): Board
 
 # Finds the piece in the board state.
-proc find_piece(state: Tensor[int], piece: int): seq[Position] =
+proc find_piece*(state: Tensor[int], piece: int): seq[Position] =
   # Loop through and find the required piece Positions.
   for coords, piece_num in state:
     if piece_num == piece:

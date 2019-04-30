@@ -26,6 +26,74 @@ type
     # The maximum search depth of the engine.
     max_depth*: int
 
+# Piece-square tables. These tables are partially designed based on those on
+# the chess programming wiki and partially self designed based on my own
+# knowledge and understanding of the game.
+let
+  knight_table = @[[-4, -3, -2, -2, -2, -2, -3, -4],
+                   [-3, -2, 0, 1, 1, 0, -2, -3],
+                   [-2, 0, 1, 2, 2, 1, 0, -2],
+                   [-2, 1, 2, 3, 3, 2, 1, -2],
+                   [-2, 1, 2, 3, 3, 2, 1, -2],
+                   [-2, 0, 1, 2, 2, 1, 0, -2],
+                   [-3, -2, 0, 1, 1, 0, -2, -3],
+                   [-4, -3, -2, -2, -2, -2, -3, -4]].toTensor
+
+  rook_table = @[[0, 0, 0, 0, 0, 0, 0, 0],
+                [1, 2, 2, 2, 2, 2, 2, 1],
+                [-1, 0, 0, 0, 0, 0, 0, -1],
+                [-1, 0, 0, 0, 0, 0, 0, -1],
+                [-1, 0, 0, 0, 0, 0, 0, -1],
+                [-1, 0, 0, 0, 0, 0, 0, -1],
+                [-1, 0, 0, 0, 0, 0, 0, -1],
+                [0, 0, 0, 1, 1, 0, 0, 0]].toTensor
+
+  king_table = @[[0, 0, 0, 0, 0, 0, 0, 0],
+                 [0, 0, 0, 0, 0, 0, 0, 0],
+                 [0, 0, 0, 0, 0, 0, 0, 0],
+                 [0, 0, 0, 0, 0, 0, 0, 0],
+                 [0, 0, 0, 0, 0, 0, 0, 0],
+                 [0, 0, 0, 0, 0, 0, 0, 0],
+                 [0, 0, 0, 0, 0, 0, 0, 0],
+                 [0, 0, 0, 0, 0, 0, 0, 0]].toTensor
+
+  pawn_table = @[[0, 0, 0, 0, 0, 0, 0, 0],
+                 [5, 5, 5, 5, 5, 5, 5, 5],
+                 [2, 2, 3, 4, 4, 3, 2, 2],
+                 [1, 1, 1, 4, 4, 1, 1, 1],
+                 [0, 0, 0, 3, 3, 0, 0, 0],
+                 [0, -1, -1, 2, 2, -1, -1, 0],
+                 [1, 1, 1, -2, -2, 1, 1, 1],
+                 [0, 0, 0, 0, 0, 0, 0, 0]].toTensor
+
+  queen_table = @[[-2, -1, -1, -1, -1, -1, -1, -2],
+                 [-1, 0, 0, 0, 0, 0, 0, -1],
+                 [-1, 1, 1, 1, 1, 1, 1, -1],
+                 [-1, 0, 0, 2, 2, 0, 0, -1],
+                 [-1, 0, 0, 2, 2, 0, 0, -1],
+                 [-1, 1, 1, 1, 1, 1, 1, -1],
+                 [-1, 0, 1, 0, 0, 1, 0, -1],
+                 [-2, -1, -1, -1, -1, -1, -1, -2]].toTensor
+
+  bishop_table = @[[-2, -1, -1, -1, -1, -1, -1, -2],
+                 [-1, 0, 0, 0, 0, 0, 0, -1],
+                 [-1, 0, 1, 2, 2, 1, 0, -1],
+                 [-1, 1, 1, 2, 2, 1, 1, -1],
+                 [-1, 0, 2, 2, 2, 2, 0, -1],
+                 [-1, 1, 1, 1, 1, 1, 1, -1],
+                 [-1, 1, 0, 0, 0, 0, 1, -1],
+                 [-2, -1, -1, -1, -1, -1, -1, -2]].toTensor
+
+  value_table = {'N': knight_table, 'R': rook_table, 'K': king_table,
+                 'P': pawn_table, 'Q': queen_table, 'B': bishop_table}.toTable
+
+
+proc flip_y(state: Tensor[int]): Tensor[int]=
+  result = ones[int]([8, 8])
+  for i in 0..<state.shape[0]:
+    result[7-i, 0..^1] = state[i, 0..^1]
+
+
 # Set up the selector
 var selector: Selector[int] = newSelector[int]()
 registerHandle(selector, int(getFileHandle(stdin)), {Event.READ}, 0)
@@ -42,9 +110,20 @@ proc check_for_stop(): bool =
       result = true
 
 
-proc evaluate_moves(engine: Engine, board_states: Tensor[int],
+proc evaluate_moves(engine: Engine, board_state: Tensor[int],
                     color: Color): seq[int] =
-  result = @[sum(board_states)]
+  var eval = sum(board_state)
+
+  for key, value in piece_numbers:
+    var
+      pieces = board_state.find_piece(value)
+      table = value_table[key]
+
+    if color == Color.BLACK: table = table.flip_y()
+    for pos in pieces:
+      eval += table[pos.y, pos.x] * 10# value
+
+  result = @[eval]
 
 
 # Bypasses making a move using board.make_move by updating the castle dict
@@ -138,22 +217,20 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
 
   # Val is the evaluation of the best possible move.
   # These are some default values, start the best_move with the first move.
-  result.val = if color == engine.board.to_move: -10 else: 10
+  result.val = if color == engine.board.to_move: -1000 else: 1000
   result.best_move = alg[0]
 
   if depth == 1:
     var
-      run_color = if color == Color.BLACK: Color.WHITE else: Color.BLACK
+      run_color = color
       mult: int = if color == engine.board.to_move: 1 else: -1
 
       net_vals: seq[int] = @[]
 
     for i, s in states:
-
       # The evaluations spit out by the network
       net_vals = engine.evaluate_moves(s, run_color)
       net_vals = net_vals.map(proc (x: int): int = x * mult)
-
       # J is an index, v refers to the current val.
       for j, v in net_vals:
         # Updates alpha or beta variable depending on which cutoff to use.

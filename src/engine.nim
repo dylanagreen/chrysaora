@@ -116,12 +116,16 @@ proc evaluate_moves(engine: Engine, board_state: Tensor[int],
 
   for key, value in piece_numbers:
     var
-      pieces = board_state.find_piece(value)
-      table = value_table[key]
+      white_pieces = board_state.find_piece(value)
+      black_pieces = board_state.find_piece(-value)
+      white_table = value_table[key] * 10
+      black_table = white_table.flip_y()
 
-    if color == Color.BLACK: table = table.flip_y()
-    for pos in pieces:
-      eval += table[pos.y, pos.x] * 10# value
+    for pos in white_pieces:
+      eval += white_table[pos.y, pos.x]
+
+    for pos in black_pieces:
+      eval -= black_table[pos.y, pos.x]
 
   result = @[eval]
 
@@ -223,13 +227,13 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
   if depth == 1:
     var
       run_color = color
-      mult: int = if color == engine.board.to_move: 1 else: -1
+      mult: int = if engine.board.to_move == BLACK: -1 else: 1
       net_vals: seq[int] = @[]
 
     for i, s in states:
       # The evaluations spit out by the network
       net_vals = engine.evaluate_moves(s, run_color)
-      #net_vals = net_vals.map(proc (x: int): int = x * mult)
+      net_vals = net_vals.map(proc (x: int): int = x * mult)
       # J is an index, v refers to the current val.
       for j, v in net_vals:
         # Updates alpha or beta variable depending on which cutoff to use.
@@ -291,7 +295,9 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
       if cur_alpha >= cur_beta or not engine.compute:
         return
 
+
 proc find_move*(engine: Engine): string =
   let search_result = engine.minimax_search(engine.board, engine.max_depth,
                                             color = engine.board.to_move)
+
   return search_result.best_move

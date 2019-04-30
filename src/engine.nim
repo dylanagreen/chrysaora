@@ -203,16 +203,20 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
   if len(moves) == 0:
     let check = search_board.current_state.is_in_check(search_board.to_move)
     # In this situation we were the ones to get checkmated (or stalemated) so
-    # set the eval to 0 cuz we really don't want this.
-    if search_board.to_move == engine.board.to_move:
-      return
-    # If it's not us to move, but we found a stalemate that means we stalemated
-    # the other person and we don't want that either.
-    elif not check:
-      return
+    # set the eval to 0 cuz we really don't want this. If it's not us to move,
+    # but we found a stalemate we don't want that either.
+    # By multiplying by depth we consider closer checkmates worse/better
+    # depending if its against us or for us.
+    if search_board.to_move == engine.board.to_move or not check:
+      result.val = -depth*1000
     # Otherwise we found a checkmate and we really want this
     else:
-      return ("", 50)
+      result.val = depth*1000
+
+    # Since for black we look for negatives we need to flip the evaluations.
+    if engine.board.to_move == BLACK:
+      result.val = result.val * -1
+    return
 
   # Strips out the short algebraic moves from the sequence.
   let
@@ -266,8 +270,8 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
         new_board = engine.bypass_make_move(search_board, alg[i], states[i])
 
         # Best move from the next lower ply.
-        best_lower = engine.minimax_search(new_board, depth - 1, cur_alpha, cur_beta,
-                                           new_board.to_move)
+        best_lower = engine.minimax_search(new_board, depth - 1, cur_alpha,
+                                           cur_beta, new_board.to_move)
 
       var cur_val = best_lower.val# * -1
 

@@ -139,7 +139,7 @@ proc algebraic_to_uci*(parser: UCI, move: string): string =
   if "O-" in move:
     # Starting file
     result = "e"
-    let rank = if parser.board.to_move == Color.WHITE: 1 else: 8
+    let rank = if parser.board.to_move == WHITE: 1 else: 8
     result = result & $rank
 
     # Kingside castling

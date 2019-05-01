@@ -172,10 +172,10 @@ proc castle_algebraic_to_board_state(board: Board, move: string,
     rook_num = piece_numbers['R']
 
   # The rank that the king and rook are on.
-  let rank = if color == Color.WHITE: 7 else: 0
+  let rank = if color == WHITE: 7 else: 0
 
   # Flips the piece to negative if we're castling for black.
-  if not (color == Color.WHITE):
+  if not (color == WHITE):
     king_num = king_num * -1
     rook_num = rook_num * -1
 
@@ -197,28 +197,28 @@ proc castle_algebraic_to_board_state(board: Board, move: string,
 proc can_make_move(board: Board, start: Position, fin: Position,
                    piece: char): bool =
   var
-    mult = if board.to_move == Color.WHITE: 1 else: -1
+    mult = if board.to_move == WHITE: 1 else: -1
     state = clone(board.current_state * mult)
 
   if piece == 'P':
     var
       # Direction opposite that which the color's pawns move.
       # So 1 is downwards, opposite White's pawns going upwards.
-      d = if board.to_move == Color.WHITE: -1 else: 1
+      d = if board.to_move == WHITE: -1 else: 1
 
-      opposite_pawn = if board.to_move == Color.WHITE: -piece_numbers['P']
+      opposite_pawn = if board.to_move == WHITE: -piece_numbers['P']
                       else: piece_numbers['P']
 
       # The starting file for the pawn row, for double move checking
-      pawn_start = if board.to_move == Color.WHITE: 6 else: 1
+      pawn_start = if board.to_move == WHITE: 6 else: 1
 
       # The file the pawn needs to be on to take en passant.
-      ep_file = if board.to_move == Color.WHITE: 3 else: 4
+      ep_file = if board.to_move == WHITE: 3 else: 4
 
       # Ensures that this pawn would actually have to move forward and not
       # backward to get to the ending square. This is true if the pawn
       # moves backwards.
-      direc = if board.to_move == Color.WHITE: start.y < fin.y
+      direc = if board.to_move == WHITE: start.y < fin.y
               else: start.y > fin.y
 
     if direc:
@@ -352,16 +352,16 @@ proc is_in_check*(state: Tensor[int], color: Color): bool =
     # The direction a pawn must travel to take this color's king.
     # I.e. Black pawns must travel in the positive y (downward) direction
     # To take a white king.
-    d = if color == Color.WHITE: 1 else: -1
+    d = if color == WHITE: 1 else: -1
 
     # Color flipping for black instead of white.
-    mult = if color == Color.WHITE: -1 else: 1
+    mult = if color == WHITE: -1 else: 1
 
     # The king's number
-    king_num = if color == Color.WHITE: piece_numbers['K']
+    king_num = if color == WHITE: piece_numbers['K']
                else: -piece_numbers['K']
     # Check pawns first because they're the easiest.
-    pawn_num = if color == Color.WHITE: -piece_numbers['P']
+    pawn_num = if color == WHITE: -piece_numbers['P']
                else: piece_numbers['P']
 
     # For this I'll assume there's only one king.
@@ -405,16 +405,16 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
   # Castling is the easiest to check for legality.
   let
     # The rank the king is on.
-    king_rank = if board.to_move == Color.WHITE: 7 else: 0
+    king_rank = if board.to_move == WHITE: 7 else: 0
 
     # The king's number representation
-    king_num = if board.to_move == Color.WHITE: piece_numbers['K']
+    king_num = if board.to_move == WHITE: piece_numbers['K']
                else: -piece_numbers['K']
 
   # Kingside castling
   if new_move == "O-O" or new_move == "0-0":
     var
-      check_side = if board.to_move == Color.WHITE: "WKR" else: "BKR"
+      check_side = if board.to_move == WHITE: "WKR" else: "BKR"
       # The two spaces between the king and rook.
       between = board.current_state[king_rank, 5..6]
 
@@ -434,7 +434,7 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
   # Queenside castling
   elif new_move == "O-O-O" or new_move == "0-0-0":
     var
-      check_side = if board.to_move == Color.WHITE: "WQR" else: "BQR"
+      check_side = if board.to_move == WHITE: "WQR" else: "BQR"
       # The three spaces between the king and rook.
       between = board.current_state[king_rank, 1..3]
 
@@ -488,7 +488,7 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
 
   # Defults everything to pawn.
   var
-    mult = if board.to_move == Color.WHITE: 1 else: -1
+    mult = if board.to_move == WHITE: 1 else: -1
     piece_char = 'P'
     piece_num = piece_numbers['P'] * mult
     promotion_char = 'P'
@@ -543,13 +543,13 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
   var
     # Direction opposite that which the color's pawns move.
     # So 1 is downwards, opposite White's pawns going upwards.
-    d = if board.to_move == Color.WHITE: -1 else: 1
+    d = if board.to_move == WHITE: -1 else: 1
 
     # The file the pawn needs to be on to take en passant.
-    ep_file = if board.to_move == Color.WHITE: 3 else: 4
+    ep_file = if board.to_move == WHITE: 3 else: 4
 
     # The ending rank for pawn promotion
-    pawn_end = if board.to_move == Color.WHITE: 0 else: 7
+    pawn_end = if board.to_move == WHITE: 0 else: 7
 
     state = clone(board.current_state * mult)
 
@@ -584,7 +584,7 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
       # Bools check that we are adjacent to a pawn of the opposite color which
       # is a requirement of en_passant.
       let
-        opposite_pawn = if board.to_move == Color.WHITE: -piece_numbers['P']
+        opposite_pawn = if board.to_move == WHITE: -piece_numbers['P']
                         else: piece_numbers['P']
         ep_left = pos.x == fin.x - 1 and
                   board.current_state[pos.y, fin.x] == opposite_pawn
@@ -670,7 +670,7 @@ proc remove_moves_in_check(board: Board, moves: openArray[ShortAndLongMove],
 proc generate_pawn_moves*(board: Board, color: Color): seq[DisambigMove] =
   let
     # Color flipping for black instead of white.
-    mult: int = if color == Color.WHITE: 1 else: -1
+    mult: int = if color == WHITE: 1 else: -1
 
     # Direction of travel, reverse for black and white. Positive is going
     # downwards, negative is going upwards.
@@ -682,9 +682,9 @@ proc generate_pawn_moves*(board: Board, color: Color): seq[DisambigMove] =
     pawns = state.find_piece(pawn_num)
 
     # The ending rank for pawn promotions
-    endrank = if color == Color.WHITE: 7 else: 0
+    endrank = if color == WHITE: 7 else: 0
     # The starting rank for moving two spaces
-    startrank = if color == Color.WHITE: 6 else: 1
+    startrank = if color == WHITE: 6 else: 1
 
   var
     # The ending Position, this will change throughout the method.
@@ -793,7 +793,7 @@ proc generate_pawn_moves*(board: Board, color: Color): seq[DisambigMove] =
 proc generate_knight_moves*(board: Board, color: Color): seq[DisambigMove] =
   let
     # Color flipping for black instead of white.
-    mult = if color == Color.WHITE: 1 else: -1
+    mult = if color == WHITE: 1 else: -1
     state = board.current_state * mult
 
     # All possible knight moves, ignore flips.
@@ -844,7 +844,7 @@ proc generate_straight_moves(board: Board, color: Color, starts: seq[Position],
                              queen: bool = false): seq[DisambigMove] =
   let
     # Color flipping for black instead of white.
-    mult = if color == Color.WHITE: 1 else: -1
+    mult = if color == WHITE: 1 else: -1
     state = board.current_state * mult
 
     # Get the piece num for the algebraic move.
@@ -901,7 +901,7 @@ proc generate_straight_moves(board: Board, color: Color, starts: seq[Position],
 proc generate_rook_moves*(board: Board, color: Color): seq[DisambigMove] =
   let
     # Color flipping for black instead of white.
-    mult: int = if color == Color.WHITE: 1 else: -1
+    mult: int = if color == WHITE: 1 else: -1
     state = board.current_state * mult
 
     # Find the rooks
@@ -915,7 +915,7 @@ proc generate_diagonal_moves(board: Board, color: Color, starts: seq[Position],
                              queen: bool = false): seq[DisambigMove] =
   let
     # Color flipping for black instead of white.
-    mult: int = if color == Color.WHITE: 1 else: -1
+    mult: int = if color == WHITE: 1 else: -1
     state = board.current_state * mult
 
     # Get the piece num for the algebraic move.
@@ -965,7 +965,7 @@ proc generate_diagonal_moves(board: Board, color: Color, starts: seq[Position],
 proc generate_bishop_moves*(board: Board, color: Color): seq[DisambigMove] =
   let
     # Color flipping for black instead of white.
-    mult = if color == Color.WHITE: 1 else: -1
+    mult = if color == WHITE: 1 else: -1
     state = board.current_state * mult
 
     # Find the rooks
@@ -978,7 +978,7 @@ proc generate_bishop_moves*(board: Board, color: Color): seq[DisambigMove] =
 proc generate_queen_moves*(board: Board, color: Color): seq[DisambigMove] =
   let
     # Color flipping for black instead of white.
-    mult: int = if color == Color.WHITE: 1 else: -1
+    mult: int = if color == WHITE: 1 else: -1
     state = board.current_state * mult
 
     # Find the rooks
@@ -994,7 +994,7 @@ proc generate_queen_moves*(board: Board, color: Color): seq[DisambigMove] =
 proc generate_king_moves*(board: Board, color: Color): seq[DisambigMove] =
   let
     # Color flipping for black instead of white.
-    mult: int = if color == Color.WHITE: 1 else: -1
+    mult: int = if color == WHITE: 1 else: -1
     state = board.current_state * mult
 
     # Find the kings
@@ -1034,15 +1034,15 @@ proc generate_castle_moves*(board: Board, color: Color): seq[DisambigMove] =
   # the rook are clear, then return the castling algebraic (O-O or O-O-O)
   let
     # The rank that castling takes place on.
-    rank = if color == Color.WHITE: 7 else: 0
+    rank = if color == WHITE: 7 else: 0
 
     # The king's number on the board.
-    king_num = if color == Color.WHITE: piece_numbers['K']
+    king_num = if color == WHITE: piece_numbers['K']
                else: -1 * piece_numbers['K']
 
     # Key values to check in the castling table for castling rights.
-    kingside = if color == Color.WHITE: "WKR" else: "BKR"
-    queenside = if color == Color.WHITE: "WQR" else: "BQR"
+    kingside = if color == WHITE: "WKR" else: "BKR"
+    queenside = if color == WHITE: "WQR" else: "BQR"
 
   var
     # End_states will be a sequence of castling strings
@@ -1150,7 +1150,7 @@ proc make_move*(board: Board, move: string) =
 
   # Updates the castle table for castling rights.
   if piece == 'K' or castle_move:
-    if board.to_move == Color.WHITE:
+    if board.to_move == WHITE:
       board.castle_rights["WKR"] = false
       board.castle_rights["WQR"] = false
     else:
@@ -1192,26 +1192,26 @@ proc make_move*(board: Board, move: string) =
     # If there are no moves that get us out of check we need to see if we're in
     # check right now. If we are that's check mate. If we're not that's a stalemate.
     var
-      color = if board.to_move == Color.WHITE: Color.BLACK else: Color.WHITE
+      color = if board.to_move == WHITE: BLACK else: WHITE
       responses = board.generate_moves(color)
     if len(responses) == 0:
       var check = board.current_state.is_in_check(color)
       if check:
-        if board.to_move == Color.WHITE:
+        if board.to_move == WHITE:
           board.status = Status.WHITE_VICTORY
         else:
           board.status = Status.BLACK_VICTORY
       else:
         board.status = Status.DRAW
 
-  board.to_move = if board.to_move == Color.WHITE: Color.BLACK else: Color.WHITE
+  board.to_move = if board.to_move == WHITE: BLACK else: WHITE
   board.move_list.add(legality.alg)
 
 
 proc unmake_move(board: Board) =
   board.current_state = clone(board.game_states.pop())
   discard board.move_list.pop() # Take the last move off the move list as well.
-  board.to_move = if board.to_move == Color.BLACK: Color.WHITE else: Color.BLACK
+  board.to_move = if board.to_move == BLACK: WHITE else: BLACK
 
 
 proc to_fen*(board: Board): string =
@@ -1244,7 +1244,7 @@ proc to_fen*(board: Board): string =
 
   # The next field is the next person to move.
   fen.add(" ")
-  if board.to_move == Color.WHITE:
+  if board.to_move == WHITE:
     fen.add("w")
   else:
     fen.add("b")
@@ -1339,7 +1339,7 @@ proc load_fen*(fen: string): Board =
 
   # Who's moving this turn.
   var
-    side_to_move = if fields[1] == "w": Color.WHITE else: Color.BLACK
+    side_to_move = if fields[1] == "w": WHITE else: BLACK
     # Castling rights
     castle_dict = {"WQR": false, "WKR": false, "BQR": false,
                    "BKR": false}.toTable
@@ -1366,7 +1366,7 @@ proc load_fen*(fen: string): Board =
 
     # This ensures that the move list is the right length and that move clock
     # is only incremented after black moves.
-    if side_to_move == Color.WHITE:
+    if side_to_move == WHITE:
       num_plies = num_plies - 1
 
     # Just adds temporary digits to the move list so it's the right length
@@ -1525,6 +1525,6 @@ proc new_board*(start_board: Tensor[int]): Board =
                              "BKR": true}.toTable
   result = Board(half_move_clock: 0, game_states: @[],
                  current_state: start_board,
-                 castle_rights: start_castle_rights, to_move: Color.WHITE,
+                 castle_rights: start_castle_rights, to_move: WHITE,
                  status: Status.IN_PROGRESS, move_list: @[],
                  headers: initTable[string, string]())

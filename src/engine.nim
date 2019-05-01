@@ -137,7 +137,7 @@ proc evaluate_moves(engine: Engine, board_state: Tensor[int],
 proc bypass_make_move(engine: Engine, old_board: Board, move: string,
                       state: Tensor[int]): Board =
   let
-    to_move = if old_board.to_move == Color.WHITE: Color.BLACK else: Color.WHITE
+    to_move = if old_board.to_move == WHITE: BLACK else: WHITE
     castle_move = "O-O" in move or "0-0" in move
 
   var
@@ -152,7 +152,7 @@ proc bypass_make_move(engine: Engine, old_board: Board, move: string,
 
   # Updates the castle table for castling rights.
   if piece == 'K' or castle_move:
-    if old_board.to_move == Color.WHITE:
+    if old_board.to_move == WHITE:
       new_castle["WKR"] = false
       new_castle["WQR"] = false
     else:

@@ -51,6 +51,16 @@ let
   # The lowercase ascii alphabet.
   ascii_lowercase* = toSeq 'a'..'z'
 
+  # Table of algebraic squares.
+  alg_table = @[["a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8"],
+                ["a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7"],
+                ["a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6"],
+                ["a5", "b5", "c5", "d5", "e5", "f5", "g5", "h5"],
+                ["a4", "b4", "c4", "d4", "e4", "f4", "g4", "h4"],
+                ["a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3"],
+                ["a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2"],
+                ["a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1"]].toTensor
+
   # The reverse piece name -> piece number table.
   piece_numbers* = temp.toTable
 
@@ -84,36 +94,28 @@ proc row_column_to_algebraic(board: Board, start: Position, finish: Position,
     alg1: string = ""
     alg2: string = ""
 
+  # Adds the piece for non pawn moves.
   if abs(piece) > piece_numbers['P']:
-    alg1.add(piece_names[abs(piece)])
     alg2.add(piece_names[abs(piece)])
 
   # Add the starting Position to the fully disambiguated move.
-  alg2.add(ascii_lowercase[start.x]) # File = x
-  alg2.add($(8 - start.y)) # Rank = y
+  alg2.add(alg_table[start.y, start.x])
 
   # The x for captures
   if board.current_state[finish.y, finish.x] != 0:
-    # On pawn captures alg notation requires including the starting file.
-    # Since we may not include a piece character
-    if piece == piece_numbers['P']:
-      alg1.add(ascii_lowercase[start.x])
-    alg1.add("x")
     alg2.add("x")
 
   # We here append the ending Position to the move.
-  alg1.add(ascii_lowercase[finish.x]) # File = x
-  alg1.add($(8 - finish.y))   # Rank = y
-
-  alg2.add(ascii_lowercase[finish.x]) # File = x
-  alg2.add($(8 - finish.y))   # Rank = y
+  alg2.add(alg_table[finish.y, finish.x])
 
   if promotion != 0:
-    alg1.add("=")
-    alg1.add(piece_names[abs(promotion)])
-
     alg2.add("=")
     alg2.add(piece_names[abs(promotion)])
+
+  if piece == piece_numbers['P'] and 'x' in alg2:
+    alg1 = alg2[0] & alg2[2..^1]
+  else:
+    alg1 = alg2[0] & alg2[3..^1]
 
   result = (alg1, alg2)
 
@@ -137,29 +139,29 @@ proc long_algebraic_to_board_state(board: Board, move: string): Tensor[int] =
     file = ascii_lowercase.find(dest[0]) # File = x
     rank = 8 - parseInt($dest[1]) # Rank = y
 
-  let start = [rank, file]
+  let start: Position = (rank, file)
 
   # Gets the ending Position.
   dest = locs[1]
   file = ascii_lowercase.find(dest[0]) # File = x
   rank = 8 - parseInt($dest[1]) # Rank = y
 
-  let finish = [rank, file]
+  let finish: Position = (rank, file)
 
   # Gets the value of the piece that's moving.
-  var end_piece: int = board.current_state[start[0], start[1]]
+  var end_piece: int = board.current_state[start.y, start.x]
 
   # In case of promotions we want the pice to change upon moving.
   if "=" in move:
     end_piece = piece_numbers[piece] * sgn(end_piece)
 
-  result[start[0], start[1]] = 0
-  result[finish[0], finish[1]] = end_piece
+  result[start.y, start.x] = 0
+  result[finish.y, finish.x] = end_piece
 
   # Turns the pawn that gets taken en passant to 0. This pawn is on the
   # same rank as the pawn moving, and the same file as where the pawn ends.
   if "e.p." in move:
-    result[start[0], finish[1]] = 0
+    result[start.y, finish.x] = 0
 
 
 proc castle_algebraic_to_board_state(board: Board, move: string,

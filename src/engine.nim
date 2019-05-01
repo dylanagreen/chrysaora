@@ -8,7 +8,6 @@ import system
 import tables
 import terminal
 
-
 import arraymancer
 
 import board
@@ -134,8 +133,8 @@ proc evaluate_moves(engine: Engine, board_state: Tensor[int],
 # manually and then setting the board state to state. We can do this since all
 # the moves generated are legal, so we can skip the move legality checking which
 # is a major roadblock.
-proc bypass_make_move(engine: Engine, old_board: Board, move: string,
-                      state: Tensor[int]): Board =
+proc bypass_make_move*(old_board: Board, move: string, state: Tensor[int]):
+                       Board =
   let
     to_move = if old_board.to_move == WHITE: BLACK else: WHITE
     castle_move = "O-O" in move or "0-0" in move
@@ -267,7 +266,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
     for i, m in moves:
       # Generate a new board state for move generation.
       let
-        new_board = engine.bypass_make_move(search_board, alg[i], states[i])
+        new_board = bypass_make_move(search_board, alg[i], states[i])
 
         # Best move from the next lower ply.
         best_lower = engine.minimax_search(new_board, depth - 1, cur_alpha,

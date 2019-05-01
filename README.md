@@ -2,7 +2,7 @@
 
 Chrysaora may very well be the first serious attempt to build a world class chess engine in Nim.
 
-Chrysaora started as an attempt to use supervised learning and a small image classification styled network to play chess using Python. The results of this experiment are stored in chrysaora_py. The project has now shifted to building an experimental "hybrid" chess engine. This hybrid will have an evaluation function that consists of two parts:
+Chrysaora started as an attempt to use supervised learning and a small image classification styled network to play chess using Python. The results of this experiment are stored in [chrysaora_py](https://github.com/dylanagreen/chrysaora_py). The project has now shifted to building an experimental "hybrid" chess engine. This hybrid will have an evaluation function that consists of two parts:
 
 - A reinforcement learning trained neural network
 - A handcraft evaluation function top layer.

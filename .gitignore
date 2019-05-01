@@ -10,6 +10,7 @@ chrysaora_py/network
 
 # Binaries
 src/main
+src/perft
 tests/tboard
 
 # Logs

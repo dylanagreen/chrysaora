@@ -28,6 +28,7 @@ type
     move_list*: seq[string]
     status*: Status
     headers*: Table[string, string]
+    pinnedpieces: Table[Color, seq[tuple[pinned, by: string]]]
 
   # Custom Position type.
   Position* = tuple[y, x: int]
@@ -86,7 +87,6 @@ proc find_piece*(state: Tensor[int], piece: int): seq[Position] =
 # Convert the row and column Positions to an algebraic chess move.
 # Use open arrays here since finish or start may be passed as a fixed length
 # array or as a sequence as created by find_piece.
-# TODO: Rewrite so that alg1 is generated and simply appended to alg2 instead of building them simultaneously
 proc row_column_to_algebraic(board: Board, start: Position, finish: Position,
                              piece: int, promotion: int = 0):
                              tuple[short: string, long: string] =
@@ -1121,6 +1121,100 @@ proc is_checkmate*(state: Tensor[int], color: Color): bool =
     result = true
 
 
+template check_for_moves(moves: seq[DisambigMove]): void=
+  if len(moves) > 0:
+    noresponses = false
+    break movechecking
+
+
+# Make move does not do any legality checking, but simply updates castling
+# rights and sets the board state to the new one. Engine boolean is if this
+# is called from the engine, in which case we skip status updating for now.
+proc make_move*(board: Board, move: DisambigMove, engine: bool = false) =
+  let
+    to_move = if board.to_move == WHITE: BLACK else: WHITE
+    castle_move = "O-O" in move.algebraic or "0-0" in move.algebraic
+
+  var
+    new_castle = deepCopy(board.castle_rights)
+    piece = 'P'
+
+  for i, c in move.algebraic:
+    # If we have an = then this is the piece the pawn promotes to.
+    # Pawns can promote to rooks which would fubar the dict.
+    if c.isUpperAscii() and not ('=' in move.algebraic):
+      piece = c
+
+  # Updates the castle table for castling rights.
+  if piece == 'K' or castle_move:
+    if board.to_move == WHITE:
+      new_castle["WKR"] = false
+      new_castle["WQR"] = false
+    else:
+      new_castle["BKR"] = false
+      new_castle["BQR"] = false
+  elif piece == 'R':
+    # This line of code means that this method takes approximately the same
+    # length of time as make_move for Rook moves only.
+    # All other moves bypass going to long algebraic.
+    let long = board.short_algebraic_to_long_algebraic(move.algebraic)
+    # We can get the position the rook started from using slicing in
+    # the legal move, since legal returns a long algebraic move
+    # which fully disambiguates and gives us the starting square.
+    # So once the rook moves then we set it to false.
+    if long[1..2] == "a8":
+      new_castle["BQR"] = false
+    elif long[1..2] == "h8":
+      new_castle["BKR"] = false
+    elif long[1..2] == "a1":
+      new_castle["WQR"] = false
+    elif long[1..2] == "h1":
+      new_castle["WKR"] = false
+
+  # The earliest possible checkmate is after 4 plies. No reason to check earlier
+  if len(board.move_list) > 3 and not engine:
+    # If there are no moves that get us out of check we need to see if we're in
+    # check right now. If we are that's check mate. If we're not that's a stalemate.
+    var
+      noresponses = true
+      color = if board.to_move == WHITE: BLACK else: WHITE
+
+    # Progressively checking the moves allows us to break as soon as we find a
+    # move instead of generating all of them at once just to see if there
+    # are no possible moves.
+    block movechecking:
+      check_for_moves(board.generate_pawn_moves(color))
+      check_for_moves(board.generate_knight_moves(color))
+      check_for_moves(board.generate_rook_moves(color))
+      check_for_moves(board.generate_bishop_moves(color))
+      check_for_moves(board.generate_queen_moves(color))
+      check_for_moves(board.generate_king_moves(color))
+      check_for_moves(board.generate_castle_moves(color))
+
+    if noresponses:
+      var check = board.current_state.is_in_check(to_move)
+      if check:
+        if board.to_move == WHITE:
+          board.status = WHITE_VICTORY
+        else:
+          board.status = BLACK_VICTORY
+      else:
+        board.status = DRAW
+
+  # Does all the updates.
+  # Updates the half move clock.
+  if piece == 'P' or 'x' in move.algebraic:
+    board.half_move_clock = 0
+  else:
+    board.half_move_clock += 1
+
+  board.game_states.add(clone(board.current_state))
+  board.current_state = clone(move.state)
+  board.castle_rights = new_castle
+  board.to_move = to_move
+  board.move_list.add(move.algebraic)
+
+
 proc make_move*(board: Board, move: string) =
   let legality = board.check_move_legality(move)
 
@@ -1139,75 +1233,8 @@ proc make_move*(board: Board, move: string) =
   else:
     new_state = board.long_algebraic_to_boardstate(legality.alg)
 
-  # Add the current state to the list of game states and then change the state.
-  board.game_states.add(clone(board.current_state))
-  board.current_state = clone(new_state)
-
-  var piece = 'P'
-  for i, c in move:
-    # If we have an = then this is the piece the pawn promotes to.
-    # Pawns can promote to rooks which would fubar the dict.
-    if c.isUpperAscii() and not ('=' in move):
-      piece = c
-
-  # Updates the castle table for castling rights.
-  if piece == 'K' or castle_move:
-    if board.to_move == WHITE:
-      board.castle_rights["WKR"] = false
-      board.castle_rights["WQR"] = false
-    else:
-      board.castle_rights["BKR"] = false
-      board.castle_rights["BQR"] = false
-  elif piece == 'R':
-    # We can get the position the rook started from using slicing in
-    # the legal move, since legal returns a long algebraic move
-    # which fully disambiguates and gives us the starting square.
-    # So once the rook moves then we set it to false.
-    if legality.alg[1..2] == "a8":
-      board.castle_rights["BQR"] = false
-    elif legality.alg[1..2] == "h8":
-      board.castle_rights["BKR"] = false
-    elif legality.alg[1..2] == "a1":
-      board.castle_rights["WQR"] = false
-    elif legality.alg[1..2] == "h1":
-      board.castle_rights["WKR"] = false
-
-  # Updates the half move clock.
-  if piece == 'P' or 'x' in legality.alg:
-    board.half_move_clock = 0
-  else:
-    board.half_move_clock += 1
-
-  # We need to update castling this side if the rook gets taken without
-  # ever moving. We can't castle with a rook that doesn't exist.
-  if "xa8" in legality.alg:
-    board.castle_rights["BQR"] = false
-  elif "xh8" in legality.alg:
-    board.castle_rights["BKR"] = false
-  elif "xa1" in legality.alg:
-    board.castle_rights["WQR"] = false
-  elif "xh1" in legality.alg:
-    board.castle_rights["WKR"] = false
-
-  # The earliest possible checkmate is after 4 plies. No reason to check earlier
-  if len(board.move_list) > 3:
-    # If there are no moves that get us out of check we need to see if we're in
-    # check right now. If we are that's check mate. If we're not that's a stalemate.
-    var
-      color = if board.to_move == WHITE: BLACK else: WHITE
-      responses = board.generate_moves(color)
-    if len(responses) == 0:
-      var check = board.current_state.is_in_check(color)
-      if check:
-        if board.to_move == WHITE:
-          board.status = Status.WHITE_VICTORY
-        else:
-          board.status = Status.BLACK_VICTORY
-      else:
-        board.status = Status.DRAW
-
-  board.to_move = if board.to_move == WHITE: BLACK else: WHITE
-  board.move_list.add(legality.alg)
+  let big_move: DisambigMove = (legality.alg, new_state)
+  make_move(board, big_move)
 
 
 proc unmake_move(board: Board) =

@@ -1140,9 +1140,7 @@ proc make_move*(board: Board, move: DisambigMove, engine: bool = false) =
     to_move = if board.to_move == WHITE: BLACK else: WHITE
     castle_move = "O-O" in move.algebraic or "0-0" in move.algebraic
 
-  var
-    new_castle = deepCopy(board.castle_rights)
-    piece = 'P'
+  var piece = 'P'
 
   for i, c in move.algebraic:
     # If we have an = then this is the piece the pawn promotes to.
@@ -1153,11 +1151,11 @@ proc make_move*(board: Board, move: DisambigMove, engine: bool = false) =
   # Updates the castle table for castling rights.
   if piece == 'K' or castle_move:
     if board.to_move == WHITE:
-      new_castle["WKR"] = false
-      new_castle["WQR"] = false
+      board.castle_rights["WKR"] = false
+      board.castle_rights["WQR"] = false
     else:
-      new_castle["BKR"] = false
-      new_castle["BQR"] = false
+      board.castle_rights["BKR"] = false
+      board.castle_rights["BQR"] = false
   elif piece == 'R':
     # This line of code means that this method takes approximately the same
     # length of time as make_move for Rook moves only.
@@ -1168,13 +1166,24 @@ proc make_move*(board: Board, move: DisambigMove, engine: bool = false) =
     # which fully disambiguates and gives us the starting square.
     # So once the rook moves then we set it to false.
     if long[1..2] == "a8":
-      new_castle["BQR"] = false
+      board.castle_rights["BQR"] = false
     elif long[1..2] == "h8":
-      new_castle["BKR"] = false
+      board.castle_rights["BKR"] = false
     elif long[1..2] == "a1":
-      new_castle["WQR"] = false
+      board.castle_rights["WQR"] = false
     elif long[1..2] == "h1":
-      new_castle["WKR"] = false
+      board.castle_rights["WKR"] = false
+
+  # We need to update castling this side if the rook gets taken without
+  # ever moving. We can't castle with a rook that doesn't exist.
+  if "xa8" in move.algebraic:
+    board.castle_rights["BQR"] = false
+  elif "xh8" in move.algebraic:
+    board.castle_rights["BKR"] = false
+  elif "xa1" in move.algebraic:
+    board.castle_rights["WQR"] = false
+  elif "xh1" in move.algebraic:
+    board.castle_rights["WKR"] = false
 
   # The earliest possible checkmate is after 4 plies. No reason to check earlier
   if len(board.move_list) > 3 and not engine:
@@ -1215,7 +1224,6 @@ proc make_move*(board: Board, move: DisambigMove, engine: bool = false) =
 
   board.game_states.add(clone(board.current_state))
   board.current_state = clone(move.state)
-  board.castle_rights = new_castle
   board.to_move = to_move
   board.move_list.add(move.algebraic)
 

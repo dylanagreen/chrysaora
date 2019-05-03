@@ -5,6 +5,7 @@ import arraymancer
 import times
 
 import ../src/board
+import ../src/perft
 
 suite "start of game move generation":
   setup:
@@ -544,3 +545,76 @@ suite "loading/saving":
       test_board = load_pgn(test_pgn, "games")
       generated = test_board.to_fen()
     check(generated == test_fen)
+
+suite "perft tests":
+  test "position 1 depth 4":
+    var
+      search_board = new_board()
+      depth = 4
+      t1 = cpuTime()
+      num_nodes = perft_search(search_board, depth, search_board.to_move)
+      t2 = cpuTime()
+      time = t2 - t1
+
+    check(num_nodes == 197281)
+    echo "NPS: ", float(num_nodes) / time
+
+  test "position 2 depth 3":
+    var
+      search_board = load_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - ")
+      depth = 3
+      t1 = cpuTime()
+      num_nodes = perft_search(search_board, depth, search_board.to_move)
+      t2 = cpuTime()
+      time = t2 - t1
+
+    check(num_nodes == 97862)
+    echo "NPS: ", float(num_nodes) / time
+
+  test "position 3 depth 4":
+    var
+      search_board = load_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -")
+      depth = 4
+      t1 = cpuTime()
+      num_nodes = perft_search(search_board, depth, search_board.to_move)
+      t2 = cpuTime()
+      time = t2 - t1
+
+    check(num_nodes == 43238)
+    echo "NPS: ", float(num_nodes) / time
+
+  test "position 4 depth 4":
+    var
+      search_board = load_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1")
+      depth = 4
+      t1 = cpuTime()
+      num_nodes = perft_search(search_board, depth, search_board.to_move)
+      t2 = cpuTime()
+      time = t2 - t1
+
+    check(num_nodes == 422333)
+    echo "NPS: ", float(num_nodes) / time
+
+  test "position 5 depth 3":
+    var
+      search_board = load_fen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8")
+      depth = 3
+      t1 = cpuTime()
+      num_nodes = perft_search(search_board, depth, search_board.to_move)
+      t2 = cpuTime()
+      time = t2 - t1
+
+    check(num_nodes == 62379)
+    echo "NPS: ", float(num_nodes) / time
+
+  test "position 6 depth 3":
+    var
+      search_board = load_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10")
+      depth = 3
+      t1 = cpuTime()
+      num_nodes = perft_search(search_board, depth, search_board.to_move)
+      t2 = cpuTime()
+      time = t2 - t1
+
+    check(num_nodes == 89890)
+    echo "NPS: ", float(num_nodes) / time

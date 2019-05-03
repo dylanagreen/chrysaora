@@ -683,10 +683,13 @@ proc generate_pawn_moves*(board: Board, color: Color): seq[DisambigMove] =
     pawn_num = piece_numbers['P']
     pawns = state.find_piece(pawn_num)
 
-    # The ending rank for pawn promotions
-    endrank = if color == WHITE: 7 else: 0
-    # The starting rank for moving two spaces
-    startrank = if color == WHITE: 6 else: 1
+    # The ending file for pawn promotions
+    endfile = if color == WHITE: 0 else: 7
+    # The starting file for moving two spaces
+    startfile = if color == WHITE: 6 else: 1
+
+    # File to be on for en passant
+    epfile = if color == WHITE: 3 else: 4
 
   var
     # The ending Position, this will change throughout the method.
@@ -700,7 +703,7 @@ proc generate_pawn_moves*(board: Board, color: Color): seq[DisambigMove] =
     # En Passant first since we can take En Passant if there is a piece
     # directly in front of our pawn. However, requires the pawn on row 5 (from
     # bottom) Can't en passant if there's no other game states to check either.
-    if len(board.game_states) > 1 and pos.y == 4 + d:
+    if len(board.game_states) > 0 and pos.y == epfile:
       let previous_state = board.game_states[^1] * mult
       # Don't check en passant on the left if we're on the first file
       # Similarly don't check to the right if we're on the last file
@@ -714,32 +717,38 @@ proc generate_pawn_moves*(board: Board, color: Color): seq[DisambigMove] =
         pawn_moved_two = false
         different_pawn = false
 
+        opp_pawn = -piece_numbers['P']
+
       if left_allowed:
-        pawn_on_left = state[pos.y, pos.x - 1] == -1
-        pawn_moved_two = previous_state[pos.y + 2 * d, pos.x - 1] == -1
+        pawn_on_left = state[pos.y, pos.x - 1] == opp_pawn
+        pawn_moved_two = previous_state[pos.y + 2 * d, pos.x - 1] == opp_pawn
 
         # Need to ensure this doesn't trigger if a different pawn is hanging
         # out there. Thanks Lc0 for playing a move that necessitated this against
         # KomodoMCTS
-        different_pawn = not (state[pos.y + 2 * d, pos.x - 1] == -1)
+        different_pawn = not (state[pos.y + 2 * d, pos.x - 1] == opp_pawn)
         if pawn_on_left and pawn_moved_two and different_pawn:
           fin = (pos.y + d, pos.x - 1)
-          end_states.add(board.row_column_to_algebraic(pos, fin, pawn_num))
+          var temp_move = board.row_column_to_algebraic(pos, fin, pawn_num)
+          temp_move.long  = temp_move.long & "e.p."
+          end_states.add(temp_move)
 
       if right_allowed:
-        pawn_on_right = state[pos.y, pos.x + 1] == -1
-        pawn_moved_two = previous_state[pos.y + 2 * d, pos.x + 1] == -1
-        different_pawn = not (state[pos.y + 2 * d, pos.x + 1] == -1)
+        pawn_on_right = state[pos.y, pos.x + 1] == opp_pawn
+        pawn_moved_two = previous_state[pos.y + 2 * d, pos.x + 1] == opp_pawn
+        different_pawn = not (state[pos.y + 2 * d, pos.x + 1] == opp_pawn)
         if pawn_on_right and pawn_moved_two and different_pawn:
           fin = (pos.y + d, pos.x + 1)
-          end_states.add(board.row_column_to_algebraic(pos, fin, pawn_num))
+          var temp_move = board.row_column_to_algebraic(pos, fin, pawn_num)
+          temp_move.long  = temp_move.long & "e.p."
+          end_states.add(temp_move)
 
     # Makes sure the space in front of us is clear
     if state[pos.y + d, pos.x] == 0:
       # Pawn promotion
       # We do this first because pawns have to promote so we can't
       # just "move one forward" in this Position
-      if pos.y + d == endrank:
+      if pos.y + d == endfile:
         for key, val in piece_numbers:
           if not (key == 'P') and not (key == 'K'):
             fin = (pos.y + d, pos.x)
@@ -750,7 +759,7 @@ proc generate_pawn_moves*(board: Board, color: Color): seq[DisambigMove] =
         fin = (pos.y + d, pos.x)
         end_states.add(board.row_column_to_algebraic(pos, fin, pawn_num))
       # This is for moving two forward. Ensures that the space 2 ahead is clear
-      if pos.y == startrank and state[pos.y + 2 * d, pos.x] == 0:
+      if pos.y == startfile and state[pos.y + 2 * d, pos.x] == 0:
         fin = (pos.y + 2 * d, pos.x)
         end_states.add(board.row_column_to_algebraic(pos, fin, pawn_num))
 
@@ -760,9 +769,9 @@ proc generate_pawn_moves*(board: Board, color: Color): seq[DisambigMove] =
       fin = (pos.y + d, pos.x - 1)
 
       # Promotion upon taking
-      if pos.y + d == endrank:
+      if pos.y + d == endfile:
         for key, val in piece_numbers:
-          if not (key == 'P') or not (key == 'K'):
+          if not (key == 'P') and not (key == 'K'):
             end_states.add(board.row_column_to_algebraic(pos, fin,
                                                          pawn_num, val))
       else:
@@ -774,9 +783,9 @@ proc generate_pawn_moves*(board: Board, color: Color): seq[DisambigMove] =
       fin = (pos.y + d, pos.x + 1)
 
       # Promotion upon taking
-      if pos.y + d == endrank:
+      if pos.y + d == endfile:
         for key, val in piece_numbers:
-          if not (key == 'P') or not (key == 'K'):
+          if not (key == 'P') and not (key == 'K'):
             end_states.add(board.row_column_to_algebraic(pos, fin,
                                                          pawn_num, val))
       else:
@@ -843,7 +852,7 @@ proc generate_knight_moves*(board: Board, color: Color): seq[DisambigMove] =
 
 
 proc generate_straight_moves(board: Board, color: Color, starts: seq[Position],
-                             queen: bool = false): seq[DisambigMove] =
+                             queen: bool = false): seq[ShortAndLongMove] =
   let
     # Color flipping for black instead of white.
     mult = if color == WHITE: 1 else: -1
@@ -891,13 +900,9 @@ proc generate_straight_moves(board: Board, color: Color, starts: seq[Position],
             end_states.add(board.row_column_to_algebraic(pos, fin, piece_num))
 
   # Build a sequence of new_states that will get pruned by remove_moves_in_check
-  var new_states: seq[ShortAndLongMove] = @[]
   for i, move in end_states:
     var s = board.long_algebraic_to_boardstate(move[1])
-    new_states.add((move[0], move[1], s))
-
-  # Removes the illegal moves that leave you in check.
-  result = board.remove_moves_in_check(new_states, color)
+    result.add((move[0], move[1], s))
 
 
 proc generate_rook_moves*(board: Board, color: Color): seq[DisambigMove] =
@@ -909,12 +914,13 @@ proc generate_rook_moves*(board: Board, color: Color): seq[DisambigMove] =
     # Find the rooks
     rook_num = piece_numbers['R']
     rooks = state.find_piece(rook_num)
+    new_states = generate_straight_moves(board, color, rooks, queen = false)
 
-  result = generate_straight_moves(board, color, rooks, queen = false)
+  result = board.remove_moves_in_check(new_states, color)
 
 
 proc generate_diagonal_moves(board: Board, color: Color, starts: seq[Position],
-                             queen: bool = false): seq[DisambigMove] =
+                             queen: bool = false): seq[ShortAndLongMove] =
   let
     # Color flipping for black instead of white.
     mult: int = if color == WHITE: 1 else: -1
@@ -955,13 +961,9 @@ proc generate_diagonal_moves(board: Board, color: Color, starts: seq[Position],
             end_states.add(board.row_column_to_algebraic(pos, fin, piece_num))
 
   # Build a sequence of new_states that will get pruned by remove_moves_in_check
-  var new_states: seq[ShortAndLongMove] = @[]
   for i, move in end_states:
     var s = board.long_algebraic_to_boardstate(move[1])
-    new_states.add((move[0], move[1], s))
-
-  # Removes the illegal moves that leave you in check.
-  result = board.remove_moves_in_check(new_states, color)
+    result.add((move[0], move[1], s))
 
 
 proc generate_bishop_moves*(board: Board, color: Color): seq[DisambigMove] =
@@ -973,8 +975,9 @@ proc generate_bishop_moves*(board: Board, color: Color): seq[DisambigMove] =
     # Find the rooks
     bishop_num = piece_numbers['B']
     bishops = state.find_piece(bishop_num)
+    new_states = generate_diagonal_moves(board, color, bishops, queen = false)
 
-  result = generate_diagonal_moves(board, color, bishops, queen = false)
+  result = board.remove_moves_in_check(new_states, color)
 
 
 proc generate_queen_moves*(board: Board, color: Color): seq[DisambigMove] =
@@ -990,7 +993,9 @@ proc generate_queen_moves*(board: Board, color: Color): seq[DisambigMove] =
     diags = generate_diagonal_moves(board, color, queens, queen = true)
     straights = generate_straight_moves(board, color, queens, queen = true)
 
-  result = concat(diags, straights)
+    new_states = concat(diags, straights)
+
+  result = board.remove_moves_in_check(new_states, color)
 
 
 proc generate_king_moves*(board: Board, color: Color): seq[DisambigMove] =

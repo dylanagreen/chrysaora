@@ -37,7 +37,7 @@ var
 
   time = t2 - t1
 
-echo "Perft Start Position depth ", depth
+echo "Perft Position 1 depth ", depth
 echo "Number of nodes: ", num_nodes
 echo "NPS: ", float(num_nodes) / time
 echo "Time: ", time

@@ -16,7 +16,6 @@ var
   interpreter = UCI(board: new_board(), previous_pos: @[], engine: cur_engine)
 
 proc perft_search*(search_board: Board, depth: int = 1, color: Color): int =
-
   # Generates the moves for this node.
   let moves = search_board.generate_moves(search_board.to_move)
 
@@ -30,7 +29,6 @@ proc perft_search*(search_board: Board, depth: int = 1, color: Color): int =
     let new_board = deepCopy(search_board)
     new_board.make_move((m.algebraic, m.state), engine=true)
     let lower_moves = new_board.perft_search(depth-1, new_board.to_move)
-
     #[if depth == 2:
       interpreter.board = search_board
       echo interpreter.algebraic_to_uci(m.algebraic), ": ", lower_moves]#
@@ -42,9 +40,10 @@ when isMainModule:
   # Does all the actual timing. Sets up the board and depth before we time
   # for more accurate timekeeping.
   var
-    search_board = load_fen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/P7/1PP1NnPP/RNBQK2R b KQ -")
-
-    depth = 2
+    search_board = new_board()#load_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1")
+  search_board.long = true
+  var
+    depth = 4
     t1 = cpuTime()
     num_nodes = perft_search(search_board, depth, search_board.to_move)
     t2 = cpuTime()
@@ -52,7 +51,7 @@ when isMainModule:
 
     time = t2 - t1
 
-  echo "Perft Position 5 depth ", depth
+  echo "Perft Position 1 depth ", depth
   echo "Number of nodes: ", num_nodes
   echo "NPS: ", float(num_nodes) / time
   echo "Time: ", time

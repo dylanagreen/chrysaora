@@ -28,14 +28,24 @@ type
     move_list*: seq[string]
     status*: Status
     headers*: Table[string, string]
-    pinnedpieces: Table[Color, seq[tuple[pinned, by: string]]]
+
+    # A square behind a pawn that moves two, i.e. the square a pawn taking
+    # en passant would end on.
+    ep_square*: Table[Color, string]
+
+    # Whether every move should return the long algebraic regardles of whether
+    # it needs to or not. This helps when checking en passant and rook
+    # moves for updating the castling dict as we can short circuit and avoid
+    # finding the long algebraic form.
+    long*: bool
+
 
   # Custom Position type.
   Position* = tuple[y, x: int]
 
   # Custom move list types
   DisambigMove* = tuple[algebraic: string, state: Tensor[int]]
-  ShortAndLongMove = tuple[short: string, long: string, state: Tensor[int]]
+  ShortAndLongMove* = tuple[short: string, long: string, state: Tensor[int]]
 
 
 # The piece number -> piece name table.
@@ -62,6 +72,8 @@ let
                 ["a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2"],
                 ["a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1"]].toTensor
 
+  flat_alg_table = alg_table.reshape(64)
+
   # The reverse piece name -> piece number table.
   piece_numbers* = temp.toTable
 
@@ -87,7 +99,7 @@ proc find_piece*(state: Tensor[int], piece: int): seq[Position] =
 # Convert the row and column Positions to an algebraic chess move.
 # Use open arrays here since finish or start may be passed as a fixed length
 # array or as a sequence as created by find_piece.
-proc row_column_to_algebraic(board: Board, start: Position, finish: Position,
+proc row_column_to_algebraic*(board: Board, start: Position, finish: Position,
                              piece: int, promotion: int = 0):
                              tuple[short: string, long: string] =
   var
@@ -112,15 +124,18 @@ proc row_column_to_algebraic(board: Board, start: Position, finish: Position,
     alg2.add("=")
     alg2.add(piece_names[abs(promotion)])
 
-  if piece == piece_numbers['P'] and 'x' in alg2:
-    alg1 = alg2[0] & alg2[2..^1]
+  if piece == piece_numbers['P']:
+    if 'x' in alg2:
+      alg1 = alg2[0] & alg2[2..^1]
+    else:
+      alg1 = alg2[2..^1]
   else:
     alg1 = alg2[0] & alg2[3..^1]
 
   result = (alg1, alg2)
 
 
-proc long_algebraic_to_board_state(board: Board, move: string): Tensor[int] =
+proc long_algebraic_to_board_state*(board: Board, move: string): Tensor[int] =
   result = clone(board.current_state)
 
   var piece: char = 'P'       # Default to pawn, this generally is changed.
@@ -208,8 +223,7 @@ proc can_make_move(board: Board, start: Position, fin: Position,
       # So 1 is downwards, opposite White's pawns going upwards.
       d = if board.to_move == WHITE: -1 else: 1
 
-      opposite_pawn = if board.to_move == WHITE: -piece_numbers['P']
-                      else: piece_numbers['P']
+      opp_color = if board.to_move == WHITE: BLACK else: WHITE
 
       # The starting file for the pawn row, for double move checking
       pawn_start = if board.to_move == WHITE: 6 else: 1
@@ -248,29 +262,9 @@ proc can_make_move(board: Board, start: Position, fin: Position,
       if take_left or take_right:
         return true
 
-    # Bools check that we are adjacent to a pawn of the opposite color which
-    # is a requirement of en_passant.
-    let
-      ep_left = start.x == fin.x - 1 and
-                board.current_state[start.y, fin.x] == opposite_pawn
-      ep_right = start.x == fin.x + 1 and
-                 board.current_state[start.y, fin.x] == opposite_pawn
-
-      # We need to start on the correct file for en passant.
-      good_start = start.y == ep_file
-      # Makes sure the ending far enough from the edge for a good en passant.
-      good_end = fin.y in 1..6
-
-    # Can't en passant on turn 1 (or anything less than turn 3 I think)
-    # so if you got this far it's not a legal pawn move.
-    if len(board.game_states) > 1:
-      let previous_state = clone(board.game_states[^1])
-      if state[fin.y, fin.x] == 0 and (ep_left or ep_right) and good_start:
-        # Checks that in the previous state the pawn actually
-        # moved two spaces. This prevents trying an en passant
-        # move three moves after the pawn moved.
-        if good_end and previous_state[fin.y + d, fin.x] == opposite_pawn:
-          return true
+    if start.y == epfile:
+      if alg_table[fin.y, fin.x] == board.ep_square[opp_color]:
+        return true
 
   elif piece == 'N':
     var
@@ -662,7 +656,7 @@ proc remove_moves_in_check(board: Board, moves: openArray[ShortAndLongMove],
     if not check:
       # If the number of times that the short moves appears is more than 1 we
       # want to append the long move.
-      if all_short.count(m[0]) > 1:
+      if all_short.count(m[0]) > 1 or board.long:
         result.add((m[1], m[2]))
       else:
         result.add((m[0], m[2]))
@@ -672,7 +666,10 @@ proc remove_moves_in_check(board: Board, moves: openArray[ShortAndLongMove],
 proc generate_pawn_moves*(board: Board, color: Color): seq[DisambigMove] =
   let
     # Color flipping for black instead of white.
-    mult: int = if color == WHITE: 1 else: -1
+    mult = if color == WHITE: 1 else: -1
+
+    # Opposite color for ep
+    opp_color = if color == WHITE: BLACK else: WHITE
 
     # Direction of travel, reverse for black and white. Positive is going
     # downwards, negative is going upwards.
@@ -698,47 +695,15 @@ proc generate_pawn_moves*(board: Board, color: Color): seq[DisambigMove] =
     # End_states will be a sequence of tuples returned by row_column_to_algebraic
     end_states: seq[tuple[short: string, long: string]] = @[]
 
-  # Find all the pawn moves here lol.
   for pos in pawns:
     # En Passant first since we can take En Passant if there is a piece
-    # directly in front of our pawn. However, requires the pawn on row 5 (from
-    # bottom) Can't en passant if there's no other game states to check either.
-    if len(board.game_states) > 0 and pos.y == epfile:
-      let previous_state = board.game_states[^1] * mult
-      # Don't check en passant on the left if we're on the first file
-      # Similarly don't check to the right if we're on the last file
-      var
-        left_allowed = pos.x > 0
-        right_allowed = pos.x < 7
-
-        # Booleans for checking if en passant is legal or not.
-        pawn_on_left = false
-        pawn_on_right = false
-        pawn_moved_two = false
-        different_pawn = false
-
-        opp_pawn = -piece_numbers['P']
-
-      if left_allowed:
-        pawn_on_left = state[pos.y, pos.x - 1] == opp_pawn
-        pawn_moved_two = previous_state[pos.y + 2 * d, pos.x - 1] == opp_pawn
-
-        # Need to ensure this doesn't trigger if a different pawn is hanging
-        # out there. Thanks Lc0 for playing a move that necessitated this against
-        # KomodoMCTS
-        different_pawn = not (state[pos.y + 2 * d, pos.x - 1] == opp_pawn)
-        if pawn_on_left and pawn_moved_two and different_pawn:
-          fin = (pos.y + d, pos.x - 1)
-          var temp_move = board.row_column_to_algebraic(pos, fin, pawn_num)
-          temp_move.long  = temp_move.long & "e.p."
-          end_states.add(temp_move)
-
-      if right_allowed:
-        pawn_on_right = state[pos.y, pos.x + 1] == opp_pawn
-        pawn_moved_two = previous_state[pos.y + 2 * d, pos.x + 1] == opp_pawn
-        different_pawn = not (state[pos.y + 2 * d, pos.x + 1] == opp_pawn)
-        if pawn_on_right and pawn_moved_two and different_pawn:
-          fin = (pos.y + d, pos.x + 1)
+    # directly in front of our pawn.
+    if pos.y == epfile:
+      fin = (pos.y + d, 0)
+      # Check the two diagonals.
+      for x in [pos.x + 1, pos.x - 1]:
+        fin.x = x
+        if alg_table[fin.y, fin.x] == board.ep_square[opp_color]:
           var temp_move = board.row_column_to_algebraic(pos, fin, pawn_num)
           temp_move.long  = temp_move.long & "e.p."
           end_states.add(temp_move)
@@ -908,7 +873,7 @@ proc generate_straight_moves(board: Board, color: Color, starts: seq[Position],
 proc generate_rook_moves*(board: Board, color: Color): seq[DisambigMove] =
   let
     # Color flipping for black instead of white.
-    mult: int = if color == WHITE: 1 else: -1
+    mult = if color == WHITE: 1 else: -1
     state = board.current_state * mult
 
     # Find the rooks
@@ -923,7 +888,7 @@ proc generate_diagonal_moves(board: Board, color: Color, starts: seq[Position],
                              queen: bool = false): seq[ShortAndLongMove] =
   let
     # Color flipping for black instead of white.
-    mult: int = if color == WHITE: 1 else: -1
+    mult = if color == WHITE: 1 else: -1
     state = board.current_state * mult
 
     # Get the piece num for the algebraic move.
@@ -983,7 +948,7 @@ proc generate_bishop_moves*(board: Board, color: Color): seq[DisambigMove] =
 proc generate_queen_moves*(board: Board, color: Color): seq[DisambigMove] =
   let
     # Color flipping for black instead of white.
-    mult: int = if color == WHITE: 1 else: -1
+    mult = if color == WHITE: 1 else: -1
     state = board.current_state * mult
 
     # Find the rooks
@@ -1001,7 +966,7 @@ proc generate_queen_moves*(board: Board, color: Color): seq[DisambigMove] =
 proc generate_king_moves*(board: Board, color: Color): seq[DisambigMove] =
   let
     # Color flipping for black instead of white.
-    mult: int = if color == WHITE: 1 else: -1
+    mult = if color == WHITE: 1 else: -1
     state = board.current_state * mult
 
     # Find the kings
@@ -1126,6 +1091,19 @@ proc is_checkmate*(state: Tensor[int], color: Color): bool =
     result = true
 
 
+proc update_ep_square(board: Board, move: DisambigMove) =
+  let
+    loc = move.algebraic[^2..^1]
+    state = board.current_state.reshape(64)
+    #ranks = findAll(move.algebraic, rank_finder)
+
+  var square = if board.to_move == WHITE: flat_alg_table.find(loc) + 8
+               else: flat_alg_table.find(loc) - 8
+
+  if square > -1 and square  < 64 and state[square] == 0:
+    board.ep_square[board.to_move] = flat_alg_table[square]
+
+
 template check_for_moves(moves: seq[DisambigMove]): void=
   if len(moves) > 0:
     noresponses = false
@@ -1148,6 +1126,8 @@ proc make_move*(board: Board, move: DisambigMove, engine: bool = false) =
     if c.isUpperAscii() and not ('=' in move.algebraic):
       piece = c
 
+  if piece == 'P':
+    board.update_ep_square(move)
   # Updates the castle table for castling rights.
   if piece == 'K' or castle_move:
     if board.to_move == WHITE:
@@ -1225,6 +1205,8 @@ proc make_move*(board: Board, move: DisambigMove, engine: bool = false) =
   board.game_states.add(clone(board.current_state))
   board.current_state = clone(move.state)
   board.to_move = to_move
+  # Clear the ep square from the opposite color as just moved
+  board.ep_square[to_move] = ""
   board.move_list.add(move.algebraic)
 
 
@@ -1305,44 +1287,14 @@ proc to_fen*(board: Board): string =
   if not at_least_one:
     fen.add("-")
 
-  var last_move: string
-  const pieces = "RNQBK"
   # En passant target square next. From wikipedia: If a pawn has just
   # made a two-square move, this is the position "behind" the pawn.
-  var found: bool
   fen.add(" ")
-  if len(board.move_list) == 0:
+  var opp_color = if board.to_move == WHITE: BLACK else: WHITE
+  if board.ep_square[opp_color] == "":
     fen.add("-")
-    found = true
   else:
-    last_move = board.move_list[^1]
-    # If any piece is in the move, it obviously wasn't a pawn, so we
-    # have no en passant square. Even if it's a pawn promotion. You
-    # can't move two into a promotion.
-    for p in pieces:
-      if p in last_move:
-        fen.add("-")
-        found = true
-
-  if not found:
-    # Moves in move list are always in long algebraic, so if we get
-    # here we know that the first two characters are the start,
-    # and the second two are the end. If the difference is 2 then
-    # we can add the place in between to the fen.
-    var
-      endfile = ascii_lowercase.find(last_move[^2]) # File = x
-      endrank = 8 - parseInt($last_move[^1]) # Rank = y
-    let fin: Position = (endrank, endfile)
-
-    var
-      startfile = ascii_lowercase.find(last_move[0]) # File = x
-      startrank = 8 - parseInt($last_move[1]) # Rank = y
-    let start: Position = (startrank, startfile)
-
-    var diff = (abs(fin.y - start.y), abs(fin.x - start.x))
-    if diff == (2, 0):
-      fen.add($ascii_lowercase[fin.x])
-      fen.add($(8 - (start.y + fin.y) / 2))
+    fen.add(board.ep_square[opp_color])
 
   # Then the half move clock for the 50 move rule.
   fen.add(" ")
@@ -1417,11 +1369,14 @@ proc load_fen*(fen: string): Board =
       for i in 1..num_plies:
         temp_move_list.add($i & "Q")
 
+  var ep_square = {WHITE: "", BLACK: ""}.toTable
+
   result = Board(half_move_clock: half_move, game_states: @[],
                 current_state: board_state.toTensor,
                 castle_rights: castle_dict, to_move: side_to_move,
-                status: Status.IN_PROGRESS, move_list: temp_move_list,
-                headers: initTable[string, string]())
+                status: IN_PROGRESS, move_list: temp_move_list,
+                headers: initTable[string, string](), ep_square: ep_square,
+                long: false)
 
 
 proc load_pgn*(name: string, folder: string = "games"): Board =

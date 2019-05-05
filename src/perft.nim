@@ -48,7 +48,6 @@ when isMainModule:
     num_nodes = perft_search(search_board, depth, search_board.to_move)
     t2 = cpuTime()
 
-
     time = t2 - t1
 
   echo "Perft Position 1 depth ", depth

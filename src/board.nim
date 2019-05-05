@@ -640,8 +640,8 @@ proc check_move_legality*(board: Board, move: string):
   result = (true, long_move)
 
 
-proc remove_moves_in_check(board: Board, moves: openArray[ShortAndLongMove],
-                           color: Color): seq[DisambigMove] =
+proc remove_moves_in_check(board: Board, moves: seq[ShortAndLongMove],
+                           color: Color, final_moves: var seq[DisambigMove]) =
   # Shortcut for if there's no possible moves being disambiguated.
   if len(moves) == 0:
     return
@@ -657,13 +657,13 @@ proc remove_moves_in_check(board: Board, moves: openArray[ShortAndLongMove],
       # If the number of times that the short moves appears is more than 1 we
       # want to append the long move.
       if all_short.count(m[0]) > 1 or board.long:
-        result.add((m[1], m[2]))
+        final_moves.add((m[1], m[2]))
       else:
-        result.add((m[0], m[2]))
+        final_moves.add((m[0], m[2]))
 
 
 # I hate pawns.
-proc generate_pawn_moves*(board: Board, color: Color): seq[DisambigMove] =
+proc generate_pawn_moves*(board: Board, color: Color, moves: var seq[DisambigMove]) =
   let
     # Color flipping for black instead of white.
     mult = if color == WHITE: 1 else: -1
@@ -763,17 +763,19 @@ proc generate_pawn_moves*(board: Board, color: Color): seq[DisambigMove] =
     new_states.add((move[0], move[1], s))
 
   # Removes the illegal moves that leave you in check.
-  result = board.remove_moves_in_check(new_states, color)
+  board.remove_moves_in_check(new_states, color, moves)
 
+proc generate_pawn_moves*(board: Board, color: Color): seq[DisambigMove] =
+  board.generate_pawn_moves(color, result)
 
-proc generate_knight_moves*(board: Board, color: Color): seq[DisambigMove] =
+proc generate_knight_moves*(board: Board, color: Color, moves: var seq[DisambigMove]) =
   let
     # Color flipping for black instead of white.
     mult = if color == WHITE: 1 else: -1
     state = board.current_state * mult
 
     # All possible knight moves, ignore flips.
-    moves: array[4, Position] = [(2, 1), (2, -1), (-2, 1), (-2, -1)]
+    rays: array[4, Position] = [(2, 1), (2, -1), (-2, 1), (-2, -1)]
     # Find the knights
     knight_num = piece_numbers['N']
     knights = state.find_piece(knight_num)
@@ -783,7 +785,7 @@ proc generate_knight_moves*(board: Board, color: Color): seq[DisambigMove] =
     end_states: seq[tuple[short: string, long: string]] = @[]
 
   for pos in knights:
-    for m in moves:
+    for m in rays:
       var
         end1: Position = (pos.y + m.y, pos.x + m.x)
         end2: Position = (pos.y + m.x, pos.x + m.y) # Flip m
@@ -813,8 +815,10 @@ proc generate_knight_moves*(board: Board, color: Color): seq[DisambigMove] =
     new_states.add((move[0], move[1], s))
 
   # Removes the illegal moves that leave you in check.
-  result = board.remove_moves_in_check(new_states, color)
+  board.remove_moves_in_check(new_states, color, moves)
 
+proc generate_knight_moves*(board: Board, color: Color): seq[DisambigMove] =
+  board.generate_knight_moves(color, result)
 
 proc generate_straight_moves(board: Board, color: Color, starts: seq[Position],
                              queen: bool = false): seq[ShortAndLongMove] =
@@ -870,7 +874,7 @@ proc generate_straight_moves(board: Board, color: Color, starts: seq[Position],
     result.add((move[0], move[1], s))
 
 
-proc generate_rook_moves*(board: Board, color: Color): seq[DisambigMove] =
+proc generate_rook_moves*(board: Board, color: Color, moves: var seq[DisambigMove]) =
   let
     # Color flipping for black instead of white.
     mult = if color == WHITE: 1 else: -1
@@ -881,8 +885,10 @@ proc generate_rook_moves*(board: Board, color: Color): seq[DisambigMove] =
     rooks = state.find_piece(rook_num)
     new_states = generate_straight_moves(board, color, rooks, queen = false)
 
-  result = board.remove_moves_in_check(new_states, color)
+  board.remove_moves_in_check(new_states, color, moves)
 
+proc generate_rook_moves*(board: Board, color: Color): seq[DisambigMove] =
+  board.generate_rook_moves(color, result)
 
 proc generate_diagonal_moves(board: Board, color: Color, starts: seq[Position],
                              queen: bool = false): seq[ShortAndLongMove] =
@@ -931,7 +937,7 @@ proc generate_diagonal_moves(board: Board, color: Color, starts: seq[Position],
     result.add((move[0], move[1], s))
 
 
-proc generate_bishop_moves*(board: Board, color: Color): seq[DisambigMove] =
+proc generate_bishop_moves*(board: Board, color: Color, moves: var seq[DisambigMove]) =
   let
     # Color flipping for black instead of white.
     mult = if color == WHITE: 1 else: -1
@@ -942,10 +948,12 @@ proc generate_bishop_moves*(board: Board, color: Color): seq[DisambigMove] =
     bishops = state.find_piece(bishop_num)
     new_states = generate_diagonal_moves(board, color, bishops, queen = false)
 
-  result = board.remove_moves_in_check(new_states, color)
+  board.remove_moves_in_check(new_states, color, moves)
 
+proc generate_bishop_moves*(board: Board, color: Color): seq[DisambigMove] =
+  board.generate_bishop_moves(color, result)
 
-proc generate_queen_moves*(board: Board, color: Color): seq[DisambigMove] =
+proc generate_queen_moves*(board: Board, color: Color, moves: var seq[DisambigMove]) =
   let
     # Color flipping for black instead of white.
     mult = if color == WHITE: 1 else: -1
@@ -960,10 +968,12 @@ proc generate_queen_moves*(board: Board, color: Color): seq[DisambigMove] =
 
     new_states = concat(diags, straights)
 
-  result = board.remove_moves_in_check(new_states, color)
+  board.remove_moves_in_check(new_states, color, moves)
 
+proc generate_queen_moves*(board: Board, color: Color): seq[DisambigMove] =
+  board.generate_queen_moves(color, result)
 
-proc generate_king_moves*(board: Board, color: Color): seq[DisambigMove] =
+proc generate_king_moves*(board: Board, color: Color, moves: var seq[DisambigMove]) =
   let
     # Color flipping for black instead of white.
     mult = if color == WHITE: 1 else: -1
@@ -974,7 +984,7 @@ proc generate_king_moves*(board: Board, color: Color): seq[DisambigMove] =
     kings = state.find_piece(king_num)
 
     # All possible king moves
-    moves: array[8, Position] = [(-1, -1), (-1, 0), (-1, 1), (0, -1),
+    rays: array[8, Position] = [(-1, -1), (-1, 0), (-1, 1), (0, -1),
                                 (0, 1), (1, -1), (1, 0), (1, 1)]
 
   var
@@ -982,7 +992,7 @@ proc generate_king_moves*(board: Board, color: Color): seq[DisambigMove] =
     end_states: seq[tuple[short: string, long: string]] = @[]
 
   for pos in kings:
-    for m in moves:
+    for m in rays:
       var fin: Position = (pos.y + m.y, pos.x + m.x)
 
       # Ensures that the ending Position is inside the board and that we
@@ -997,10 +1007,12 @@ proc generate_king_moves*(board: Board, color: Color): seq[DisambigMove] =
     new_states.add((move[0], move[1], s))
 
   # Removes the illegal moves that leave you in check.
-  result = board.remove_moves_in_check(new_states, color)
+  board.remove_moves_in_check(new_states, color, moves)
 
+proc generate_king_moves*(board: Board, color: Color): seq[DisambigMove] =
+  board.generate_king_moves(color, result)
 
-proc generate_castle_moves*(board: Board, color: Color): seq[DisambigMove] =
+proc generate_castle_moves*(board: Board, color: Color, moves: var seq[DisambigMove]) =
   # Hardcoded because you can only castle from starting Positions.
   # Basically just need to check that the files between the king and
   # the rook are clear, then return the castling algebraic (O-O or O-O-O)
@@ -1059,20 +1071,19 @@ proc generate_castle_moves*(board: Board, color: Color): seq[DisambigMove] =
     new_states.add((move, move, s))
 
   # Removes the illegal moves that leave you in check.
-  result = board.remove_moves_in_check(new_states, color)
+  board.remove_moves_in_check(new_states, color, moves)
 
+proc generate_castle_moves*(board: Board, color: Color): seq[DisambigMove] =
+  board.generate_castle_moves(color, result)
 
 proc generate_moves*(board: Board, color: Color): seq[DisambigMove] =
-  let
-    pawns = board.generate_pawn_moves(color)
-    knights = board.generate_knight_moves(color)
-    rooks = board.generate_rook_moves(color)
-    bishops = board.generate_bishop_moves(color)
-    queens = board.generate_queen_moves(color)
-    kings = board.generate_king_moves(color)
-    castling = board.generate_castle_moves(color)
-
-  result = concat(castling, queens, rooks, bishops, knights, pawns, kings)
+  board.generate_pawn_moves(color, result)
+  board.generate_knight_moves(color, result)
+  board.generate_rook_moves(color, result)
+  board.generate_bishop_moves(color, result)
+  board.generate_queen_moves(color, result)
+  board.generate_king_moves(color, result)
+  board.generate_castle_moves(color, result)
 
 
 proc is_checkmate*(state: Tensor[int], color: Color): bool =

@@ -52,7 +52,7 @@ type
 const
   # These values are centipawn versions of values taken from "Beginner's Guide
   # to Winning Chess" the book that basically taught me all  my chess skills.
-  piece_names* = {100: 'P', 500: 'R', 310: 'N', 300: 'B', 900: 'Q', 1000: 'K'}.toTable
+  piece_names* = {100: 'P', 500: 'R', 310: 'N', 300: 'B', 900: 'Q', 1000: 'K'}.toOrderedTable
 
 var temp: seq[tuple[key: char, val: int]] = @[]
 for key, value in piece_names:

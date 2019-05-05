@@ -129,58 +129,6 @@ proc evaluate_moves(engine: Engine, board_state: Tensor[int],
   result = @[eval]
 
 
-# Bypasses making a move using board.make_move by updating the castle dict
-# manually and then setting the board state to state. We can do this since all
-# the moves generated are legal, so we can skip the move legality checking which
-# is a major roadblock.
-proc bypass_make_move*(old_board: Board, move: string, state: Tensor[int]):
-                       Board =
-  let
-    to_move = if old_board.to_move == WHITE: BLACK else: WHITE
-    castle_move = "O-O" in move or "0-0" in move
-
-  var
-    new_castle = deepCopy(old_board.castle_rights)
-    piece = 'P'
-
-  for i, c in move:
-    # If we have an = then this is the piece the pawn promotes to.
-    # Pawns can promote to rooks which would fubar the dict.
-    if c.isUpperAscii() and not ('=' in move):
-      piece = c
-
-  # Updates the castle table for castling rights.
-  if piece == 'K' or castle_move:
-    if old_board.to_move == WHITE:
-      new_castle["WKR"] = false
-      new_castle["WQR"] = false
-    else:
-      new_castle["BKR"] = false
-      new_castle["BQR"] = false
-  elif piece == 'R':
-    # This line of code means that this method takes approximately the same
-    # length of time as make_move for Rook moves only.
-    # All other moves bypass going to long algebraic.
-    let long = old_board.short_algebraic_to_long_algebraic(move)
-    # We can get the position the rook started from using slicing in
-    # the legal move, since legal returns a long algebraic move
-    # which fully disambiguates and gives us the starting square.
-    # So once the rook moves then we set it to false.
-    if long[1..2] == "a8":
-      new_castle["BQR"] = false
-    elif long[1..2] == "h8":
-      new_castle["BKR"] = false
-    elif long[1..2] == "a1":
-      new_castle["WQR"] = false
-    elif long[1..2] == "h1":
-      new_castle["WKR"] = false
-
-  result = new_board()
-  result.current_state = state
-  result.castle_rights = new_castle
-  result.to_move = to_move
-
-
 proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
                     alpha: int = -10000, beta: int = 10000, color: Color):
                     tuple[best_move: string, val: int] =
@@ -265,12 +213,12 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
   else:
     for i, m in moves:
       # Generate a new board state for move generation.
-      let
-        new_board = bypass_make_move(search_board, alg[i], states[i])
+      let new_board = deepCopy(search_board)
+      new_board.make_move((m.algebraic, m.state), engine=true)
 
         # Best move from the next lower ply.
-        best_lower = engine.minimax_search(new_board, depth - 1, cur_alpha,
-                                           cur_beta, new_board.to_move)
+      let best_lower = engine.minimax_search(new_board, depth - 1, cur_alpha,
+                                             cur_beta, new_board.to_move)
 
       var cur_val = best_lower.val# * -1
 

@@ -24,7 +24,7 @@ type
     half_move_clock*: int
     game_states*: seq[Tensor[int]]
     current_state*: Tensor[int]
-    castle_rights*: Table[string, bool]
+    castle_rights*: uint8#Table[string, bool]
     move_list*: seq[string]
     status*: Status
     headers*: Table[string, string]
@@ -410,11 +410,12 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
   # Kingside castling
   if new_move == "O-O" or new_move == "0-0":
     var
-      check_side = if board.to_move == WHITE: "WKR" else: "BKR"
+      check_side = if board.to_move == WHITE: (board.castle_rights and 0x8) == 0x8
+                   else: (board.castle_rights and 0x2) == 0x2
       # The two spaces between the king and rook.
       between = board.current_state[king_rank, 5..6]
 
-    if board.castle_rights[check_side] and sum(abs(between)) == 0:
+    if check_side and sum(abs(between)) == 0:
       # Need to check that we don't castle through check here.
       var new_state = clone(board.current_state)
       new_state[king_rank, 4] = 0
@@ -430,11 +431,12 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
   # Queenside castling
   elif new_move == "O-O-O" or new_move == "0-0-0":
     var
-      check_side = if board.to_move == WHITE: "WQR" else: "BQR"
+      check_side = if board.to_move == WHITE: (board.castle_rights and 0x4) == 0x4
+                   else: (board.castle_rights and 0x1) == 0x1
       # The three spaces between the king and rook.
       between = board.current_state[king_rank, 1..3]
 
-    if board.castle_rights[check_side] and sum(abs(between)) == 0:
+    if check_side and sum(abs(between)) == 0:
       # Need to check that we don't castle through check here.
       var new_state = clone(board.current_state)
       new_state[king_rank, 4] = 0
@@ -1025,8 +1027,10 @@ proc generate_castle_moves*(board: Board, color: Color, moves: var seq[DisambigM
                else: -1 * piece_numbers['K']
 
     # Key values to check in the castling table for castling rights.
-    kingside = if color == WHITE: "WKR" else: "BKR"
-    queenside = if color == WHITE: "WQR" else: "BQR"
+    kingside = if color == WHITE: (board.castle_rights and 0x8) == 0x8
+               else: (board.castle_rights and 0x2) == 0x2
+    queenside = if color == WHITE: (board.castle_rights and 0x4) == 0x4
+                else: (board.castle_rights and 0x1) == 0x1
 
   var
     # End_states will be a sequence of castling strings
@@ -1040,7 +1044,7 @@ proc generate_castle_moves*(board: Board, color: Color, moves: var seq[DisambigM
   if board.current_state.is_in_check(color):
     return
 
-  if board.castle_rights[kingside] and sum(abs(between)) == 0:
+  if kingside and sum(abs(between)) == 0:
     # Before we go ahead and append the move is legal we need to verify
     # that we don't castle through check. Since we remove moves
     # that end in check, and the king moves two during castling,
@@ -1055,7 +1059,7 @@ proc generate_castle_moves*(board: Board, color: Color, moves: var seq[DisambigM
 
   # Slice representing the two spaces between the king and the queenside rook.
   between = board.current_state[rank, 1..3]
-  if board.castle_rights[queenside] and sum(abs(between)) == 0:
+  if queenside and sum(abs(between)) == 0:
     # See reasoning above in kingside.
     var s = clone(board.current_state)
     s[rank, 4] = 0
@@ -1142,11 +1146,9 @@ proc make_move*(board: Board, move: DisambigMove, engine: bool = false) =
   # Updates the castle table for castling rights.
   if piece == 'K' or castle_move:
     if board.to_move == WHITE:
-      board.castle_rights["WKR"] = false
-      board.castle_rights["WQR"] = false
+      board.castle_rights = board.castle_rights and 0x3
     else:
-      board.castle_rights["BKR"] = false
-      board.castle_rights["BQR"] = false
+      board.castle_rights = board.castle_rights and 0xC
   elif piece == 'R':
     # This line of code means that this method takes approximately the same
     # length of time as make_move for Rook moves only.
@@ -1157,24 +1159,24 @@ proc make_move*(board: Board, move: DisambigMove, engine: bool = false) =
     # which fully disambiguates and gives us the starting square.
     # So once the rook moves then we set it to false.
     if long[1..2] == "a8":
-      board.castle_rights["BQR"] = false
+      board.castle_rights = board.castle_rights and 0xE
     elif long[1..2] == "h8":
-      board.castle_rights["BKR"] = false
+      board.castle_rights = board.castle_rights and 0xD
     elif long[1..2] == "a1":
-      board.castle_rights["WQR"] = false
+      board.castle_rights = board.castle_rights and 0xB
     elif long[1..2] == "h1":
-      board.castle_rights["WKR"] = false
+      board.castle_rights = board.castle_rights and 0x7
 
   # We need to update castling this side if the rook gets taken without
   # ever moving. We can't castle with a rook that doesn't exist.
   if "xa8" in move.algebraic:
-    board.castle_rights["BQR"] = false
+    board.castle_rights = board.castle_rights and 0xE
   elif "xh8" in move.algebraic:
-    board.castle_rights["BKR"] = false
+    board.castle_rights = board.castle_rights and 0xD
   elif "xa1" in move.algebraic:
-    board.castle_rights["WQR"] = false
+    board.castle_rights = board.castle_rights and 0xB
   elif "xh1" in move.algebraic:
-    board.castle_rights["WKR"] = false
+    board.castle_rights = board.castle_rights and 0x7
 
   # The earliest possible checkmate is after 4 plies. No reason to check earlier
   if len(board.move_list) > 3 and not engine:
@@ -1287,12 +1289,12 @@ proc to_fen*(board: Board): string =
   # The next field is castling rights.
   fen.add(" ")
   var
-    castle_names = {"WKR": "K", "WQR": "Q", "BKR": "k", "BQR": "q"}.toTable
+    castle_names = {0x8: "K", 0x4: "Q", 0x2: "k", 0x1: "q"}.toTable
     at_least_one = false
-  for key, val in board.castle_rights:
-    if val:
+  for key, val in castle_names:
+    if (uint8(key) and board.castle_rights) == uint8(key):
       at_least_one = true
-      fen.add(castle_names[key])
+      fen.add(val)
 
   # Adds a dash if there are no castling rights.
   if not at_least_one:
@@ -1346,11 +1348,10 @@ proc load_fen*(fen: string): Board =
   var
     side_to_move = if fields[1] == "w": WHITE else: BLACK
     # Castling rights
-    castle_dict = {"WQR": false, "WKR": false, "BQR": false,
-                   "BKR": false}.toTable
+    castle_dict: uint8 = 0
 
   let
-    castle_names = {'K': "WKR", 'Q': "WQR", 'k': "BKR", 'q': "BQR"}.toTable
+    castle_names = {'K': 0x8, 'Q': 0x4, 'k': 0x2, 'q': 0x1}.toTable
     castling_field = fields[2]
 
   # For each character in the castling field
@@ -1358,7 +1359,7 @@ proc load_fen*(fen: string): Board =
     if c == '-':
       break
     var key = castle_names[c]
-    castle_dict[key] = true
+    castle_dict = castle_dict or uint8(key)
 
   # Gets the half move clock if its in the fen.
   var half_move = 0
@@ -1529,10 +1530,8 @@ proc new_board*(): Board =
 
 # Creates a new board with the given state.
 proc new_board*(start_board: Tensor[int]): Board =
-  let start_castle_rights = {"WQR": true, "WKR": true, "BQR": true,
-                             "BKR": true}.toTable
   result = Board(half_move_clock: 0, game_states: @[],
                  current_state: start_board,
-                 castle_rights: start_castle_rights, to_move: WHITE,
+                 castle_rights: 0xF, to_move: WHITE,
                  status: Status.IN_PROGRESS, move_list: @[],
                  headers: initTable[string, string]())

@@ -24,7 +24,7 @@ type
     half_move_clock*: int
     game_states*: seq[Tensor[int]]
     current_state*: Tensor[int]
-    castle_rights*: uint8#Table[string, bool]
+    castle_rights*: uint8
     move_list*: seq[string]
     status*: Status
     headers*: Table[string, string]

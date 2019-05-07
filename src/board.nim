@@ -1109,13 +1109,12 @@ proc is_checkmate*(state: Tensor[int], color: Color): bool =
 proc update_ep_square(board: Board, move: DisambigMove) =
   let
     loc = move.algebraic[^2..^1]
-    state = board.current_state.reshape(64)
-    #ranks = findAll(move.algebraic, rank_finder)
 
   var square = if board.to_move == WHITE: flat_alg_table.find(loc) + 8
                else: flat_alg_table.find(loc) - 8
 
-  if square > -1 and square  < 64 and state[square] == 0:
+  if square > -1 and
+     square  < 64 and board.current_state[square div 8, square mod 8] == 0:
     board.ep_square[board.to_move] = flat_alg_table[square]
 
 

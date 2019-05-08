@@ -1510,7 +1510,14 @@ proc load_fen*(fen: string): Board =
     if c == '-':
       break
     var key = castle_names[c]
-    castle_dict = castle_dict or uint8(key) # Bitwise magic
+    castle_dict = castle_dict or key # Bitwise magic
+
+  var
+    ep_square = {WHITE: "", BLACK: ""}.toTable
+    opp_color = if side_to_move == WHITE: BLACK else: WHITE
+
+  if len(fields) > 3:
+    ep_square[opp_color] = fields[3]
 
   # Gets the half move clock if its in the fen.
   var half_move = 0
@@ -1532,7 +1539,6 @@ proc load_fen*(fen: string): Board =
       for i in 1..num_plies:
         temp_move_list.add($i & "Q")
 
-  var ep_square = {WHITE: "", BLACK: ""}.toTable
 
   result = Board(half_move_clock: half_move, game_states: @[],
                 current_state: board_state.toTensor,

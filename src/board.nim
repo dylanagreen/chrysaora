@@ -1,7 +1,6 @@
 import math
 import os
 import re
-import sets
 import sequtils
 import strutils
 import system
@@ -9,6 +8,8 @@ import tables
 import times
 
 import arraymancer
+
+import bitboard
 
 type
   Color* = enum
@@ -1286,11 +1287,12 @@ proc make_move*(board: Board, move: DisambigMove, engine: bool = false) =
   if piece == 'P':
     board.update_ep_square(move)
   # Updates the castle table for castling rights.
+  # This block removes castling from both sides if the king moves.
   if piece == 'K' or castle_move:
     if board.to_move == WHITE:
-      board.castle_rights = board.castle_rights and 0x3
+      board.castle_rights = board.castle_rights and BLACK_CASTLING
     else:
-      board.castle_rights = board.castle_rights and 0xC
+      board.castle_rights = board.castle_rights and WHITE_CASTLING
   elif piece == 'R':
     # This line of code means that this method takes approximately the same
     # length of time as make_move for Rook moves only.
@@ -1301,25 +1303,25 @@ proc make_move*(board: Board, move: DisambigMove, engine: bool = false) =
     # which fully disambiguates and gives us the starting square.
     # So once the rook moves then we set it to false.
     if long[1..2] == "a8":
-      board.castle_rights = board.castle_rights and 0xE
+      board.castle_rights = board.castle_rights and (not BLACK_QUEENSIDE)
     elif long[1..2] == "h8":
-      board.castle_rights = board.castle_rights and 0xD
+      board.castle_rights = board.castle_rights and (not BLACK_KINGSIDE)
     elif long[1..2] == "a1":
-      board.castle_rights = board.castle_rights and 0xB
+      board.castle_rights = board.castle_rights and (not WHITE_QUEENSIDE)
     elif long[1..2] == "h1":
-      board.castle_rights = board.castle_rights and 0x7
+      board.castle_rights = board.castle_rights and (not WHITE_KINGSIDE)
 
   board.update_piece_list(piece, move)
   # We need to update castling this side if the rook gets taken without
   # ever moving. We can't castle with a rook that doesn't exist.
   if "xa8" in move.algebraic:
-    board.castle_rights = board.castle_rights and 0xE
+    board.castle_rights = board.castle_rights and (not BLACK_QUEENSIDE)
   elif "xh8" in move.algebraic:
-    board.castle_rights = board.castle_rights and 0xD
+    board.castle_rights = board.castle_rights and (not BLACK_KINGSIDE)
   elif "xa1" in move.algebraic:
-    board.castle_rights = board.castle_rights and 0xB
+    board.castle_rights = board.castle_rights and (not WHITE_QUEENSIDE)
   elif "xh1" in move.algebraic:
-    board.castle_rights = board.castle_rights and 0x7
+    board.castle_rights = board.castle_rights and (not WHITE_KINGSIDE)
 
   # The earliest possible checkmate is after 4 plies. No reason to check earlier
   if len(board.move_list) > 3 and not engine:
@@ -1432,10 +1434,11 @@ proc to_fen*(board: Board): string =
   # The next field is castling rights.
   fen.add(" ")
   var
-    castle_names = {0x8: "K", 0x4: "Q", 0x2: "k", 0x1: "q"}.toTable
+    castle_names = {WHITE_KINGSIDE: "K", WHITE_QUEENSIDE: "Q",
+                    BLACK_KINGSIDE: "k", BLACK_QUEENSIDE: "q"}.toTable
     at_least_one = false
   for key, val in castle_names:
-    if (uint8(key) and board.castle_rights) == uint8(key):
+    if (key and board.castle_rights) == key:
       at_least_one = true
       fen.add(val)
 
@@ -1509,7 +1512,8 @@ proc load_fen*(fen: string): Board =
     castle_dict: uint8 = 0
 
   let
-    castle_names = {'K': 0x8, 'Q': 0x4, 'k': 0x2, 'q': 0x1}.toTable
+    castle_names = {'K': WHITE_KINGSIDE, 'Q': WHITE_QUEENSIDE,
+                    'k': BLACK_KINGSIDE, 'q': BLACK_QUEENSIDE}.toTable
     castling_field = fields[2]
 
   # For each character in the castling field

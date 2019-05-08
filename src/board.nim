@@ -91,7 +91,6 @@ let
 
 # Forward declarations for use of this later.
 proc new_board*(): Board
-proc new_board*(start_board: Tensor[int]): Board
 
 # Put these first in case I need to print the board or a piece_list for
 # debug purposes.
@@ -1660,12 +1659,3 @@ proc new_board*(): Board =
   # Just loads the starting fen so we can change piece numbering without
   # having to change a hard coded tensor.
   result = load_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
-
-
-# Creates a new board with the given state.
-proc new_board*(start_board: Tensor[int]): Board =
-  result = Board(half_move_clock: 0, game_states: @[],
-                 current_state: start_board,
-                 castle_rights: 0xF, to_move: WHITE,
-                 status: Status.IN_PROGRESS, move_list: @[],
-                 headers: initTable[string, string]())

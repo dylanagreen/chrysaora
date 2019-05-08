@@ -2,6 +2,8 @@ import unittest
 import tables
 import sets
 import arraymancer
+import sequtils
+import tables
 import times
 
 import ../src/board
@@ -219,7 +221,7 @@ suite "checkmate verification":
 
     check(alg == expected)
 
-    var checkmate = test_board.current_state.is_checkmate(test_board.to_move)
+    var checkmate = test_board.is_checkmate(test_board.to_move)
     check(checkmate == true)
 
   test "black":
@@ -238,7 +240,7 @@ suite "checkmate verification":
 
     check(alg == expected)
 
-    var checkmate = test_board.current_state.is_checkmate(test_board.to_move)
+    var checkmate = test_board.is_checkmate(test_board.to_move)
     check(checkmate == true)
 
 suite "short algebraic conversion":

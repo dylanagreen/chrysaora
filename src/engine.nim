@@ -148,7 +148,8 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
 
   # If there are no moves then someone either got checkmated or stalemated.
   if len(moves) == 0:
-    let check = search_board.current_state.is_in_check(search_board.to_move)
+    let check = search_board.is_in_check(search_board.to_move,
+                                         search_board.current_state)
     # In this situation we were the ones to get checkmated (or stalemated) so
     # set the eval to 0 cuz we really don't want this. If it's not us to move,
     # but we found a stalemate we don't want that either.

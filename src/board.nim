@@ -1190,34 +1190,24 @@ proc update_piece_list(board: Board, piece: char, move: DisambigMove) =
   # TODO Make this prettier?
   if "O-O" in move.algebraic:
     var
-      king_start: string
+      king_start = if board.to_move == WHITE: "e1" else: "e8"
+      king_start_square = flat_alg_table.find(king_start)
+      king_end_square: int
       king_end: string
-      rook_start: string
-      rook_end: string
+      rook_start = if board.to_move == WHITE: "1" else: "8"
+      rook_end = if board.to_move == WHITE: "1" else: "8"
 
-    if board.to_move == WHITE:
-      king_start = "e1"
-      if move.algebraic == "O-O":
-        king_end = "g1"
-        rook_end = "f1"
-        rook_start = "h1"
-      else:
-        king_end = "c1"
-        rook_end = "d1"
-        rook_start = "a1"
+    if move.algebraic == "O-O":
+      king_end_square = king_start_square + 2
+      rook_start = "h" & rook_start
+      rook_end = "f" & rook_end
     else:
-      king_start = "e8"
-      if move.algebraic == "O-O":
-        king_end = "g8"
-        rook_end = "f8"
-        rook_start = "h8"
-      else:
-        king_end = "c8"
-        rook_end = "d8"
-        rook_start = "a8"
-    let
-      king_end_square = flat_alg_table.find(king_end)
-      rook_end_square = flat_alg_table.find(rook_end)
+      king_end_square = king_start_square - 2
+      rook_start = "a" & rook_start
+      rook_end = "d" & rook_end
+
+    king_end = flat_alg_table[king_end_square]
+    let rook_end_square = flat_alg_table.find(rook_end)
     for p in board.piece_list[board.to_move]:
       if p.name == 'K':
         p.pos = (king_end_square div 8, king_end_square mod 8)

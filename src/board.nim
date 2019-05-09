@@ -26,6 +26,9 @@ type
     pos: Position
     square: string
 
+    # The square that's pinning this piece.
+    pinned: string
+
   Board* = ref object
     to_move*: Color
     half_move_clock*: int
@@ -57,7 +60,8 @@ type
 const
   # These values are centipawn versions of values taken from "Beginner's Guide
   # to Winning Chess" the book that basically taught me all  my chess skills.
-  piece_names* = {100: 'P', 500: 'R', 310: 'N', 300: 'B', 900: 'Q', 1000: 'K'}.toOrderedTable
+  piece_names* = {100: 'P', 500: 'R', 310: 'N',
+                  300: 'B', 900: 'Q', 1000: 'K'}.toOrderedTable
 
 var temp: seq[tuple[key: char, val: int]] = @[]
 for key, value in piece_names:
@@ -429,23 +433,20 @@ proc is_in_check*(board: Board, color: Color, state: Tensor[int]): bool =
     elif king.x + 1 < 8 and state[king.y - d, king.x + 1] == pawn_num:
       return true
 
-  for key, val in piece_names:
+  for piece in board.piece_list[opp_color]:
     # We already did pawns, don't need overkill checking for those.
-    if val == 'P': continue
+    if piece.name == 'P': continue
 
-    var attackers = board.find_piece(opp_color, val)
+    # The piece has been taken in the new state if this is true
+    if state[piece.pos.y, piece.pos.x] != piece_numbers[piece.name] * mult:
+      continue
 
-    for pos in attackers:
-      # The piece has been taken in the new state if this is true
-      if state[pos.y, pos.x] != key * mult:
-        continue
+    # To move needs to exist since it's accessed in can make move, but since
+    # we already checked pawns we don't actually need it to be accurate.
+    let temp_board = Board(current_state: state * mult, to_move: WHITE)
 
-      # To move needs to exist since it's accessed in can make move, but since
-      # we already checked pawns we don't actually need it to be accurate.
-      let temp_board = Board(current_state: state * mult, to_move: WHITE)
-
-      if can_make_move(temp_board, pos, king, val):
-        return true
+    if can_make_move(temp_board, piece.pos, king, piece.name):
+      return true
 
 
 proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
@@ -724,7 +725,7 @@ proc remove_moves_in_check(board: Board, moves: seq[ShortAndLongMove],
 
     if not check:
       # If the number of times that the short moves appears is more than 1 we
-      # want to append the long move.
+      # want to append the long move instead.
       if all_short.count(m[0]) > 1 or board.long:
         final_moves.add((m[1], m[2]))
       else:
@@ -1485,11 +1486,11 @@ proc load_fen*(fen: string): Board =
           rank.add(-piece_numbers[c.toUpperASCII()])
           piece_list[BLACK].add(Piece(name: c.toUpperASCII(),
                                       square: flat_alg_table[i],
-                                      pos: (i div 8, i mod 8)))
+                                      pos: (i div 8, i mod 8), pinned: ""))
         else:
           rank.add(piece_numbers[c])
           piece_list[WHITE].add(Piece(name: c, square: flat_alg_table[i],
-                                      pos: (i div 8, i mod 8)))
+                                      pos: (i div 8, i mod 8), pinned: ""))
         i += 1
     # At the end of the row add it to the board_state
     board_state.add(rank)

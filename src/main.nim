@@ -25,7 +25,7 @@ let
   time_params = {"wtime" : -1, "btime" : -1, "winc" : -1, "binc" : -1}.toTable
   cur_engine = Engine(board: cur_board, time_params: time_params, compute: true,
                   max_depth: 3)
-  interpreter = UCI(board: cur_board, previous_pos: @[], engine: cur_engine)
+  interpreter = UCI(board: cur_board, previous_cmd: @[], engine: cur_engine)
 
 addHandler(fileLog)
 logging.debug("Input: ", cmd)

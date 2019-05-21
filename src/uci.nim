@@ -7,6 +7,7 @@ import terminal
 import arraymancer
 
 import board
+import bitboard
 import engine
 
 type
@@ -20,7 +21,7 @@ type
     # A record of the previous "position" command. I use this to compare to the
     # current one, allowing the engine to only make the two new moves.
     # This avoids a slow down when the list of moves becomes unmanagably long.
-    previous_pos*: seq[string]
+    previous_cmd*: seq[string]
 
 
 # Authorship information
@@ -94,8 +95,8 @@ proc set_up_position(parser: UCI, cmd: openArray[string]) =
   # Checks that all the moves except the last two are identical to the previous
   # position command. If they are then we can start the moves from the last two.
   # Need to ensure the lengths of the two even match up to try.
-  if len(parser.previous_pos) == len(cmd) - 2:
-    same = parser.previous_pos.join(" ") == cmd[0..^3].join(" ")
+  if len(parser.previous_cmd) == len(cmd) - 2:
+    same = parser.previous_cmd.join(" ") == cmd[0..^3].join(" ")
 
   # If we load from a fen just load the board from the fen.
   # We don't want to load the fen again if we're skipping moves, hence not same
@@ -131,7 +132,7 @@ proc set_up_position(parser: UCI, cmd: openArray[string]) =
     logging.debug("Reset Board")
     parser.board = new_board()
 
-  parser.previous_pos = @cmd
+  parser.previous_cmd = @cmd
 
 
 proc algebraic_to_uci*(parser: UCI, move: string): string =
@@ -225,7 +226,7 @@ proc decrypt_uci*(parser: UCI, cmd: string) =
     quit()
   elif to_exec == "ucinewgame":
     parser.board = new_board()
-    parser.previous_pos = @[]
+    parser.previous_cmd = @[]
   elif to_exec == "setoption":
     echo "temp"
     #set_option(fields)

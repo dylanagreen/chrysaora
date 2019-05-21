@@ -11,6 +11,8 @@ import terminal
 import arraymancer
 
 import board
+import bitboard
+import movegen
 
 type
   Engine* = ref object
@@ -109,14 +111,17 @@ proc check_for_stop(): bool =
       result = true
 
 
-proc evaluate_moves(engine: Engine, board_state: Tensor[int],
-                    color: Color): seq[int] =
-  var eval = sum(board_state)
+proc evaluate_moves(engine: Engine, board: Board, color: Color): seq[int] =
+  # Starts by summing to get the straight piece value difference
+  var eval = sum(board.current_state)
 
+  # This loops over the pieces and gets their evaluations from the piece-square
+  # tables up above and adds them to the table if they're white, or subtracts
+  # if they're black.
   for key, value in piece_numbers:
     var
-      white_pieces = board_state.find_piece(value)
-      black_pieces = board_state.find_piece(-value)
+      white_pieces = board.find_piece(WHITE, key)
+      black_pieces = board.find_piece(BLACK, key)
       white_table = value_table[key] * 10
       black_table = white_table.flip_y()
 
@@ -140,7 +145,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
     # The decision between if we are doing an alpha cutoff or a beta cutoff.
     cutoff_type = if color == engine.board.to_move: "alpha" else: "beta"
 
-    moves = search_board.generate_moves(search_board.to_move)
+    moves = search_board.generate_all_moves(search_board.to_move)
 
   var
     cur_alpha = alpha
@@ -148,8 +153,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
 
   # If there are no moves then someone either got checkmated or stalemated.
   if len(moves) == 0:
-    let check = search_board.is_in_check(search_board.to_move,
-                                         search_board.current_state)
+    let check = search_board.is_in_check(search_board.to_move)
     # In this situation we were the ones to get checkmated (or stalemated) so
     # set the eval to 0 cuz we really don't want this. If it's not us to move,
     # but we found a stalemate we don't want that either.
@@ -168,8 +172,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
 
   # Strips out the short algebraic moves from the sequence.
   let
-    alg = moves.map(proc (x: DisambigMove): string = x.algebraic)
-    states = moves.map(proc (x: DisambigMove): Tensor[int] = x.state)
+    alg = moves.map(proc (x: Move): string = x.algebraic)
 
   # Val is the evaluation of the best possible move.
   # These are some default values, start the best_move with the first move.
@@ -182,9 +185,11 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
       mult: int = if engine.board.to_move == BLACK: -1 else: 1
       net_vals: seq[int] = @[]
 
-    for i, s in states:
+    for i, m in moves:
+      let new_board = deepCopy(search_board)
+      new_board.make_move(m)
       # The evaluations spit out by the network
-      net_vals = engine.evaluate_moves(s, run_color)
+      net_vals = engine.evaluate_moves(new_board, run_color)
       net_vals = net_vals.map(proc (x: int): int = x * mult)
       # J is an index, v refers to the current val.
       for j, v in net_vals:
@@ -215,7 +220,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
     for i, m in moves:
       # Generate a new board state for move generation.
       let new_board = deepCopy(search_board)
-      new_board.make_move((m.algebraic, m.state), engine=true)
+      new_board.make_move(m, skip=true)
 
         # Best move from the next lower ply.
       let best_lower = engine.minimax_search(new_board, depth - 1, cur_alpha,

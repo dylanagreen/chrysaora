@@ -853,47 +853,39 @@ proc update_piece_bitmaps(board: Board, move: Move) =
   var
     bit_start = ((7 - move.start.y) * 8 + move.start.x)
     bit_end = ((7 - move.fin.y) * 8 + move.fin.x)
+    update = 0'u64
+
+  # Set the bits in the update, which with xor will clear the start and set
+  # the end or vice versa if we're going in reverse.
+  update.setBit(bit_end)
+  if "e.p." in move.algebraic:
+    var ep_clear: uint64
+    if board.to_move == WHITE:
+      ep_clear = update shr 8
+      board.BLACK_PIECES = board.BLACK_PIECES xor ep_clear
+    else:
+      ep_clear = update shl 8
+      board.WHITE_PIECES = board.WHITE_PIECES xor ep_clear
+  elif "x" in move.algebraic:
+    if board.to_move == WHITE:
+      board.BLACK_PIECES = board.BLACK_PIECES xor update
+    else:
+      board.WHITE_PIECES = board.WHITE_PIECES xor update
+
+  update.setBit(bit_start)
+  if "O-O" in move.algebraic:
+    if move.algebraic == "O-O":
+      update.setBit((7 - move.start.y) * 8 + 7)
+      update.setBit((7 - move.fin.y) * 8 + 5)
+    else:
+      update.setBit((7 - move.start.y) * 8)
+      update.setBit((7 - move.fin.y) * 8 + 3)
 
   if board.to_move == WHITE:
-    board.WHITE_PIECES.clearBit(bit_start)
-    # If there's a black piece there, now there isn't as it got taken. If there
-    # isn't then this won't do anything. Avoids needing another boolean check.
-    board.BLACK_PIECES.clearBit(bit_end)
-    board.WHITE_PIECES.setBit(bit_end)
-
-    if "O-O" in move.algebraic:
-      if move.algebraic == "O-O":
-        bit_start = ((7 - move.start.y) * 8 + 7)
-        bit_end = ((7 - move.fin.y) * 8 + 5)
-      else:
-        bit_start = ((7 - move.start.y) * 8 + 0)
-        bit_end = ((7 - move.fin.y) * 8 + 3)
-
-      board.WHITE_PIECES.clearBit(bit_start)
-      board.BLACK_PIECES.clearBit(bit_end)
-      board.WHITE_PIECES.setBit(bit_end)
-    elif "e.p." in move.algebraic:
-      board.BLACK_PIECES.clearBit(bit_end - 8)
+    board.WHITE_PIECES = board.WHITE_PIECES xor update
 
   else:
-    board.BLACK_PIECES.clearBit(bit_start)
-    board.WHITE_PIECES.clearBit(bit_end)
-    board.BLACK_PIECES.setBit(bit_end)
-
-    if "O-O" in move.algebraic:
-      if move.algebraic == "O-O":
-        bit_start = ((7 - move.start.y) * 8 + 7)
-        bit_end = ((7 - move.fin.y) * 8 + 5)
-      else:
-        bit_start = ((7 - move.start.y) * 8 + 0)
-        bit_end = ((7 - move.fin.y) * 8 + 3)
-
-      board.BLACK_PIECES.clearBit(bit_start)
-      board.WHITE_PIECES.clearBit(bit_end)
-      board.BLACK_PIECES.setBit(bit_end)
-    elif "e.p." in move.algebraic:
-      board.WHITE_PIECES.clearBit(bit_end + 8)
-
+    board.BLACK_PIECES = board.BLACK_PIECES xor update
 
 
 template check_for_moves(moves: seq[Move]): void=

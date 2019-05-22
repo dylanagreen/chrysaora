@@ -243,7 +243,7 @@ proc init_magic_tables*() =
       # Carry-Rippler trick to traverse all subsets.
       occupied = (occupied - mask) and mask
 
-    occupied = uint64(0)
+    occupied = 0'u64
     mask = generate_diagonal_moves(occupied, start_pos) and not edges
     shift = uint64(popcount(mask))
     start = if i == 0: 0'u64

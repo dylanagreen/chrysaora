@@ -186,11 +186,11 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
       net_vals: seq[int] = @[]
 
     for i, m in moves:
-      let new_board = deepCopy(search_board)
-      new_board.make_move(m)
+      search_board.make_move(m)
       # The evaluations spit out by the network
-      net_vals = engine.evaluate_moves(new_board, run_color)
+      net_vals = engine.evaluate_moves(search_board, run_color)
       net_vals = net_vals.map(proc (x: int): int = x * mult)
+      search_board.unmake_move()
       # J is an index, v refers to the current val.
       for j, v in net_vals:
         # Updates alpha or beta variable depending on which cutoff to use.
@@ -219,13 +219,12 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
   else:
     for i, m in moves:
       # Generate a new board state for move generation.
-      let new_board = deepCopy(search_board)
-      new_board.make_move(m, skip=true)
+      search_board.make_move(m, skip=true)
 
         # Best move from the next lower ply.
-      let best_lower = engine.minimax_search(new_board, depth - 1, cur_alpha,
-                                             cur_beta, new_board.to_move)
-
+      let best_lower = engine.minimax_search(search_board, depth - 1, cur_alpha,
+                                             cur_beta, search_board.to_move)
+      search_board.unmake_move()
       var cur_val = best_lower.val# * -1
 
       # Updates alpha or beta variable depending on which cutoff to use.

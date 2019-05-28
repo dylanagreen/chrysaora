@@ -14,13 +14,20 @@ bitboard.init_simple_tables()
 bitboard.init_magic_tables()
 
 proc remove_moves_in_check(board: Board, moves: seq[Move], color: Color): seq[Move] =
+  let orig_color = board.to_move
+  board.to_move = color
   for m in moves:
-    var new_board = deepCopy(board)
-    new_board.to_move = color
+
     # Need skip to be true so we don't end up in an "is in check" loop.
-    new_board.make_move(m, true)
-    if not new_board.is_in_check(color):
+    board.update_piece_list(m)
+    board.update_piece_bitmaps(m)
+
+    if not board.is_in_check(color):
       result.add(m)
+
+    board.revert_piece_list(m)
+    board.update_piece_bitmaps(m)
+  board.to_move = orig_color
 
 
 proc disambiguate_moves(moves: seq[tuple[short, long: Move]]): seq[Move] =
@@ -76,9 +83,8 @@ proc bits_to_algebraic(possible_moves: uint64, start_pos: Position,
                        seq[tuple[short, long: Move]] =
   var possible_moves = possible_moves
   # Loops through, gets the LSB, and then pops it off.
-  # TODO: Abstract this
   var fin = possible_moves.firstSetBit()
-  while fin > 0:
+  while possible_moves > 0'u64:
     # Resets the LSB with xor.
     possible_moves = possible_moves and (possible_moves - 1)
     # We have to add one because bits are 1 indexed but the tables are 0 indexed.
@@ -99,7 +105,7 @@ proc pawn_bits_to_algebraic(possible_moves: uint64, color: Color, board: Board,
   # Loops through, gets the LSB, and then pops it off.
   # TODO: Abstract this
   var fin = possible_moves.firstSetBit()
-  while fin > 0:
+  while possible_moves > 0'u64:
     # Resets the LSB with xor.
     possible_moves = possible_moves and (possible_moves - 1)
     # We have to add one because bits are 1 indexed but the tables are 0 indexed.
@@ -298,7 +304,7 @@ proc generate_castle_moves*(board: Board, color: Color): seq[Move] =
                else: board.castle_rights.testBit(1)
     queenside = if color == WHITE: board.castle_rights.testBit(2)
                 else: board.castle_rights.testBit(0)
-
+    orig_color = board.to_move
   var
     # Slice representing the two spaces between the king and the kingside rook.
     between = board.current_state[rank, 5..6]
@@ -308,6 +314,8 @@ proc generate_castle_moves*(board: Board, color: Color): seq[Move] =
   if board.is_in_check(color):
     return
 
+  board.to_move = color
+
   if kingside and sum(abs(between)) == 0:
     # Before we go ahead and append the move is legal we need to verify
     # that we don't castle through check. Since we remove moves
@@ -315,27 +323,36 @@ proc generate_castle_moves*(board: Board, color: Color): seq[Move] =
     # it is sufficient therefore to simply check that moving the king
     # one space in the kingside direction doesn't put us in check.
     var
-      new_board = deepCopy(board)
       alg = if color == WHITE: "Kf1" else: "Kf8"
-    new_board.to_move = color
-    new_board.make_move(Move(start: (rank, 4), fin: (rank, 5), algebraic: alg), true)
+      move = Move(start: (rank, 4), fin: (rank, 5), algebraic: alg)
 
-    if not new_board.is_in_check(color):
+    board.update_piece_list(move)
+    board.update_piece_bitmaps(move)
+
+    if not board.is_in_check(color):
       result.add(Move(start: (rank, 4), fin: (rank, 6), algebraic: "O-O"))
+
+    board.revert_piece_list(move)
+    board.update_piece_bitmaps(move)
 
   # Slice representing the two spaces between the king and the queenside rook.
   between = board.current_state[rank, 1..3]
   if queenside and sum(abs(between)) == 0:
     # See reasoning above in kingside.
     var
-      new_board = deepCopy(board)
       alg = if color == WHITE: "Kd1" else: "Kd8"
-    new_board.to_move = color
-    new_board.make_move(Move(start: (rank, 4), fin: (rank, 3), algebraic: alg), true)
+      move = Move(start: (rank, 4), fin: (rank, 3), algebraic: alg)
 
-    if not new_board.is_in_check(color):
+    board.update_piece_list(move)
+    board.update_piece_bitmaps(move)
+
+    if not board.is_in_check(color):
       result.add(Move(start: (rank, 4), fin: (rank, 2), algebraic: "O-O-O"))
 
+    board.revert_piece_list(move)
+    board.update_piece_bitmaps(move)
+
+  board.to_move = orig_color
   result = board.remove_moves_in_check(result, color)
 
 

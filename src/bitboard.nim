@@ -10,13 +10,13 @@ type
 const
   # Note that this is backwards to basically every chess engine I've ever
   # seen. Most of them do black in the 4/8 bits and white in 1/2. Oops.
-  BLACK_QUEENSIDE*:uint8 = 0x1
-  BLACK_KINGSIDE*:uint8 = 0x2
-  WHITE_QUEENSIDE*:uint8 = 0x4
-  WHITE_KINGSIDE*:uint8 = 0x8
+  BLACK_QUEENSIDE*:uint32 = 0x1
+  BLACK_KINGSIDE*:uint32 = 0x2
+  WHITE_QUEENSIDE*:uint32 = 0x4
+  WHITE_KINGSIDE*:uint32 = 0x8
 
-  BLACK_CASTLING*:uint8 = BLACK_KINGSIDE or BLACK_QUEENSIDE
-  WHITE_CASTLING*:uint8 = WHITE_KINGSIDE or WHITE_QUEENSIDE
+  BLACK_CASTLING*:uint32 = BLACK_KINGSIDE or BLACK_QUEENSIDE
+  WHITE_CASTLING*:uint32 = WHITE_KINGSIDE or WHITE_QUEENSIDE
 
   A_FILE*: uint64 = 0x0101010101010101'u64
   B_FILE*: uint64 = A_FILE shl 1

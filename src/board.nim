@@ -37,8 +37,9 @@ type
     half_move_clock*: int
     game_states*: seq[Tensor[int]]
     current_state*: Tensor[int]
-    castle_rights*: uint8
-    move_list*: seq[string]
+    castle_rights*: uint32
+    castle_history*: array[8, int]
+    move_list*: seq[Move]
     status*: Status
     headers*: Table[string, string]
 
@@ -100,11 +101,16 @@ let
   illegal_piece_finder = re"[A-Z]"
 
 
-# Forward declarations for use of this later.
+# Forward declarations for use of this later. These are mostly declared so
+# that I can use them in movegen.nim.
 proc new_board*(): Board
 proc make_move*(board: Board, move: Move, skip: bool= false)
+proc unmake_move*(board: Board)
 proc is_in_check*(board: Board, color: Color): bool
 
+proc update_piece_list*(board: Board, move: Move)
+proc revert_piece_list*(board: Board, move: Move)
+proc update_piece_bitmaps*(board: Board, move: Move)
 
 # Finds the piece in the board using the piece list.
 proc find_piece*(board: Board, color: Color, name: char): seq[Position] =
@@ -223,23 +229,6 @@ proc long_algebraic_to_board_state*(board: Board, move: string): Tensor[int] =
   # same rank as the pawn moving, and the same file as where the pawn ends.
   if "e.p." in move:
     result[start.y, finish.x] = 0
-
-
-proc move_to_tensor*(board: Board, move: Move): Tensor[int] =
-  result = clone(board.current_state)
-  result[move.fin.y, move.fin.x] = result[move.start.y, move.start.x]
-  result[move.start.y, move.start.x] = 0
-
-  # Moves the rook for castling moves.
-  if "O-O" in move.algebraic:
-    if move.algebraic == "O-O":
-      result[move.fin.y, 5] = result[move.start.y, 7]
-      result[move.start.y, 7] = 0
-    else:
-      result[move.fin.y, 3] = result[move.start.y, 0]
-      result[move.start.y, 0] = 0
-  elif "e.p." in move.algebraic:
-    result[move.start.y, move.fin.x] = 0
 
 
 proc castle_algebraic_to_board_state(board: Board, move: string,
@@ -475,34 +464,22 @@ proc is_in_check*(board: Board, color: Color): bool =
     # I.e. Black pawns must travel in the positive y (downward) direction
     # To take a white king.
     d = if color == WHITE: 1 else: -1
-
     opp_color = if color == WHITE: BLACK else: WHITE
-
-    # Check pawns first because they're the easiest.
-    pawn_num = if color == WHITE: -piece_numbers['P']
-               else: piece_numbers['P']
 
   var
     # For this I'll assume there's only one king.
     king = board.find_piece(color, 'K')[0]
 
-  # Need to ensure that the king is on any rank but the last one.
-  # No pawns can put you in check in the last rank anyway.
-  if king.y - d in 0..7:
-    if king.x - 1 > -1 and board.current_state[king.y - d, king.x - 1] == pawn_num:
-      return true
-    elif king.x + 1 < 8 and board.current_state[king.y - d, king.x + 1] == pawn_num:
-      return true
-
   for piece in board.piece_list[opp_color]:
-    # We already did pawns, don't need overkill checking for those.
-    if piece.name == 'P': continue
+    if piece.name == 'P':
+      if piece.pos == (king.y - d, king.x - 1) or
+         piece.pos == (king.y - d, king.x + 1):
+          return true
 
     let attacks = board.generate_attack_mask(piece.name, piece.pos)
 
     if attacks.testBit((7 - king.y) * 8 + king.x):
       return true
-
 
 
 proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
@@ -792,14 +769,13 @@ proc update_ep_square(board: Board, move: Move) =
     board.ep_square[board.to_move] = flat_alg_table[square]
 
 
-proc update_piece_list(board: Board, move: Move) =
+proc update_piece_list*(board: Board, move: Move) =
   var
     opp_color = if board.to_move == WHITE: BLACK else: WHITE
     end_alg = alg_table[move.fin.y, move.fin.x]
 
   # Castling is totally different so avoid doing everything else first.
   # This is a bit of a disaster.
-  # TODO Make this prettier?
   if "O-O" in move.algebraic:
     var
       rook_start: Position
@@ -849,7 +825,61 @@ proc update_piece_list(board: Board, move: Move) =
       break
 
 
-proc update_piece_bitmaps(board: Board, move: Move) =
+proc revert_piece_list*(board: Board, move: Move) =
+  var
+    opp_color = if board.to_move == WHITE: BLACK else: WHITE
+
+  # Castling is totally different so avoid doing everything else first.
+  if "O-O" in move.algebraic:
+    var
+      rook_start: Position
+      rook_end: Position
+
+    if move.algebraic == "O-O":
+      rook_start = (move.fin.y, 5)
+      rook_end = (move.fin.y, 7)
+    else:
+      rook_start = (move.fin.y, 3)
+      rook_end = (move.fin.y, 0)
+
+    let king_end = alg_table[move.start.y, move.start.x]
+    let rook_end_square = alg_table[rook_end.y, rook_end.x]
+    for p in board.piece_list[board.to_move]:
+      if p.name == 'K':
+        p.pos = move.start
+        p.square = king_end
+      elif p.name == 'R' and p.pos == rook_start:
+        p.pos = rook_end
+        p.square = rook_end_square
+    return
+
+  # Adds back a piece that was taken using the mailbox board state to see
+  # what used to be there.
+  if 'x' in move.algebraic:
+    var piece_name = piece_names[abs(board.current_state[move.fin.y, move.fin.x])]
+    board.piece_list[opp_color].add(Piece(name: piece_name,
+                                          square: alg_table[move.fin.y, move.fin.x],
+                                          pos: (move.fin.y, move.fin.x)))
+  # Need to handle en passant on its own since it's weird.
+  elif "e.p." in move.algebraic:
+    board.piece_list[opp_color].add(Piece(name: 'P',
+                                          square: alg_table[move.start.y, move.fin.x],
+                                          pos: (move.start.y, move.fin.x)))
+
+  for p in board.piece_list[board.to_move]:
+    if p.pos == move.fin:
+      p.pos = move.start
+      p.square = alg_table[move.start.y, move.start.x]
+
+      # Revert promotion
+      if '=' in move.algebraic:
+        p.name = 'P'
+
+      # No need to continue searching.
+      break
+
+
+proc update_piece_bitmaps*(board: Board, move: Move) =
   var
     bit_start = ((7 - move.start.y) * 8 + move.start.x)
     bit_end = ((7 - move.fin.y) * 8 + move.fin.x)
@@ -893,10 +923,37 @@ template check_for_moves(moves: seq[Move]): void=
     noresponses = false
     break movechecking
 
+
+template move_to_tensor*(move: Move) =
+  #result = clone(board.current_state)
+  let sign = sgn(board.current_state[move.start.y, move.start.x])
+  # This allows us to handle promotions with "grace".
+  piece = if piece == 'O': 'K' elif '=' in move.algebraic: move.algebraic[^1] else: piece
+  board.current_state[move.fin.y, move.fin.x] = sign * piece_numbers[piece]
+  board.current_state[move.start.y, move.start.x] = 0
+
+  # Moves the rook for castling moves.
+  if "O-O" in move.algebraic:
+    if move.algebraic == "O-O":
+      board.current_state[move.fin.y, 5] = board.current_state[move.start.y, 7]
+      board.current_state[move.start.y, 7] = 0
+    else:
+      board.current_state[move.fin.y, 3] = board.current_state[move.start.y, 0]
+      board.current_state[move.start.y, 0] = 0
+  # Deletes the pawn we take in en passant.
+  elif "e.p." in move.algebraic:
+    board.current_state[move.start.y, move.fin.x] = 0
+
+
+
 proc make_move*(board: Board, move: Move, skip: bool = false) =
   let
     to_move = if board.to_move == WHITE: BLACK else: WHITE
     castle_move = "O-O" in move.algebraic or "0-0" in move.algebraic
+    # The index to update in the castling history.
+    index = 7 - board.castle_rights.countLeadingZeroBits() div 4
+
+  board.castle_history[index] += 1
 
   var piece = 'P'
 
@@ -908,14 +965,19 @@ proc make_move*(board: Board, move: Move, skip: bool = false) =
 
   if piece == 'P':
     board.update_ep_square(move)
+
   # Updates the castle table for castling rights.
   # This block removes castling from both sides if the king moves.
   if piece == 'K' or castle_move:
+    # This line moves the current castling rights to the left and duplicates
+    # it into the first four bits. 15 is the value of all four first bits set.
+    board.castle_rights = (board.castle_rights and 15'u32) or (board.castle_rights shl 4)
     if board.to_move == WHITE:
-      board.castle_rights = board.castle_rights and BLACK_CASTLING
+      board.castle_rights = board.castle_rights and (BLACK_CASTLING or not 15'u32)
     else:
-      board.castle_rights = board.castle_rights and WHITE_CASTLING
+      board.castle_rights = board.castle_rights and (WHITE_CASTLING or not 15'u32)
   elif piece == 'R':
+    board.castle_rights = (board.castle_rights and 15'u32) or (board.castle_rights shl 4)
     # Can use the magic of tuple equality for this now.
     if move.start == (0, 0):
       board.castle_rights = board.castle_rights and (not BLACK_QUEENSIDE)
@@ -926,22 +988,28 @@ proc make_move*(board: Board, move: Move, skip: bool = false) =
     elif move.start == (7, 7):
       board.castle_rights = board.castle_rights and (not WHITE_KINGSIDE)
 
+  # We need to update castling this side if the rook gets taken without
+  # ever moving. We can't castle with a rook that doesn't exist.
+  if board.to_move == WHITE:
+    if "xa8" in move.algebraic:
+      board.castle_rights = (board.castle_rights and 15'u32) or (board.castle_rights shl 4)
+      board.castle_rights = board.castle_rights and (not BLACK_QUEENSIDE)
+    elif "xh8" in move.algebraic:
+      board.castle_rights = (board.castle_rights and 15'u32) or (board.castle_rights shl 4)
+      board.castle_rights = board.castle_rights and (not BLACK_KINGSIDE)
+  else:
+    if "xa1" in move.algebraic:
+      board.castle_rights = (board.castle_rights and 15'u32) or (board.castle_rights shl 4)
+      board.castle_rights = board.castle_rights and (not WHITE_QUEENSIDE)
+    elif "xh1" in move.algebraic:
+      board.castle_rights = (board.castle_rights and 15'u32) or (board.castle_rights shl 4)
+      board.castle_rights = board.castle_rights and (not WHITE_KINGSIDE)
+
+
   # Need to update the piece positions in the bit maps before we check for
   # checkmate.
   board.update_piece_list(move)
   board.update_piece_bitmaps(move)
-
-  # We need to update castling this side if the rook gets taken without
-  # ever moving. We can't castle with a rook that doesn't exist.
-  if "xa8" in move.algebraic:
-    board.castle_rights = board.castle_rights and (not BLACK_QUEENSIDE)
-  elif "xh8" in move.algebraic:
-    board.castle_rights = board.castle_rights and (not BLACK_KINGSIDE)
-  elif "xa1" in move.algebraic:
-    board.castle_rights = board.castle_rights and (not WHITE_QUEENSIDE)
-  elif "xh1" in move.algebraic:
-    board.castle_rights = board.castle_rights and (not WHITE_KINGSIDE)
-
 
   # Does all the updates.
   # Updates the half move clock.
@@ -951,12 +1019,13 @@ proc make_move*(board: Board, move: Move, skip: bool = false) =
     board.half_move_clock += 1
 
   board.game_states.add(clone(board.current_state))
-  board.current_state = board.move_to_tensor(move)
+
+  move_to_tensor(move)
 
   board.to_move = to_move
   # Clear the ep square from the opposite color as its no longer in play
   board.ep_square[to_move] = ""
-  board.move_list.add(move.algebraic)
+  board.move_list.add(move)
 
   # The earliest possible checkmate is after 4 plies. No reason to check earlier
   if len(board.move_list) > 3 and not skip:
@@ -1035,10 +1104,31 @@ proc make_move*(board: Board, move: string) =
   make_move(board, big_move)
 
 
-proc unmake_move(board: Board) =
-  board.current_state = clone(board.game_states.pop())
-  discard board.move_list.pop() # Take the last move off the move list as well.
-  board.to_move = if board.to_move == BLACK: WHITE else: BLACK
+proc unmake_move*(board: Board) =
+  board.current_state = clone(board.game_states.pop()) # Reverts the mailbox board.
+  var move = board.move_list.pop() # Take the last move off the move list.
+  # We can extract the ep square from the previous move. We have to do this
+  # before we change the to_move, since we need the to_move of the move two
+  # turns ago (which is the same as the to_move as right now)
+  if len(board.move_list) > 0:
+    board.update_ep_square(board.move_list[^1])
+  board.to_move = if board.to_move == WHITE: BLACK else: WHITE # Invert color
+  board.ep_square[board.to_move] = ""
+  board.revert_piece_list(move) # Move that piece list back.
+  board.update_piece_bitmaps(move) # Reverts the piece bitmaps to the old state.
+  board.status = IN_PROGRESS # Whatever it was now, before it was in progress.
+
+  # Reverts the castling state or reduces the castle history depending.
+  # Need this if block here because if it's 0 the compiler likes to do its own thing.
+  let index = if board.castle_rights == 0'u32: 0
+              else: 7 - (board.castle_rights.countLeadingZeroBits() div 4)
+
+  if board.castle_history[index] == 0:
+    board.castle_rights = board.castle_rights shr 4
+    if index > 0:
+      board.castle_history[index - 1] -= 1
+  else:
+    board.castle_history[index] -= 1
 
 
 proc to_fen*(board: Board): string =
@@ -1154,6 +1244,7 @@ proc load_fen*(fen: string): Board =
           rank.add(piece_numbers[c])
           piece_list[WHITE].add(Piece(name: c, square: flat_alg_table[i],
                                       pos: (i div 8, i mod 8), pinned: ""))
+
           var j = (7 - i div 8) * 8 + i mod 8
           white_pieces = white_pieces or uint64(0x1 shl j)
         i += 1
@@ -1164,7 +1255,7 @@ proc load_fen*(fen: string): Board =
   var
     side_to_move = if fields[1] == "w": WHITE else: BLACK
     # Castling rights
-    castle_dict: uint8 = 0
+    castle_dict: uint32 = 0
 
   let
     castle_names = {'K': WHITE_KINGSIDE, 'Q': WHITE_QUEENSIDE,
@@ -1190,7 +1281,7 @@ proc load_fen*(fen: string): Board =
   if len(fields) > 4:
     half_move = parseInt(fields[4])
 
-  var temp_move_list: seq[string] = @[]
+  var temp_move_list: seq[Move] = @[]
   if len(fields) > 5:
     var num_plies = parseInt(fields[5]) * 2
 
@@ -1203,15 +1294,16 @@ proc load_fen*(fen: string): Board =
     # for saving a fen.
     if num_plies > 1:
       for i in 1..num_plies:
-        temp_move_list.add($i & "Q")
+        temp_move_list.add(Move(start: (0, 0), fin: (0, 0), algebraic: $i & "Q"))
 
-
+  var castle_history: array[8, int] = [0, 0, 0, 0, 0, 0, 0, 0]
   result = Board(half_move_clock: half_move, game_states: @[],
                 current_state: board_state.toTensor,
                 castle_rights: castle_dict, to_move: side_to_move,
                 status: IN_PROGRESS, move_list: temp_move_list,
                 headers: initTable[string, string](), ep_square: ep_square,
-                long: false, piece_list: piece_list, BLACK_PIECES: black_pieces,
+                long: false, piece_list: piece_list,
+                castle_history: castle_history, BLACK_PIECES: black_pieces,
                 WHITE_PIECES: white_pieces)
 
 
@@ -1311,7 +1403,7 @@ proc save_pgn*(board: Board) =
 
     if len(board.move_list) > 0:
       for i, m in board.move_list:
-        var line = $m & " "
+        var line = $m.algebraic & " "
 
         # Adds the move number every 2 plies.
         if i mod 2 == 0:

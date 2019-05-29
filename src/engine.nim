@@ -89,12 +89,6 @@ let
                  'P': pawn_table, 'Q': queen_table, 'B': bishop_table}.toTable
 
 
-proc flip_y(state: Tensor[int]): Tensor[int]=
-  result = ones[int]([8, 8])
-  for i in 0..<state.shape[0]:
-    result[7-i, 0..^1] = state[i, 0..^1]
-
-
 # Set up the selector
 var selector: Selector[int] = newSelector[int]()
 registerHandle(selector, int(getFileHandle(stdin)), {Event.READ}, 0)
@@ -123,13 +117,12 @@ proc evaluate_moves(engine: Engine, board: Board, color: Color): seq[int] =
       white_pieces = board.find_piece(WHITE, key)
       black_pieces = board.find_piece(BLACK, key)
       white_table = value_table[key] * 10
-      black_table = white_table.flip_y()
 
     for pos in white_pieces:
       eval += white_table[pos.y, pos.x]
 
     for pos in black_pieces:
-      eval -= black_table[pos.y, pos.x]
+      eval -= white_table[7 - pos.y, pos.x]
 
   result = @[eval]
 

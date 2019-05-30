@@ -27,6 +27,9 @@ type
     # The maximum search depth of the engine.
     max_depth*: int
 
+    # The color the engine is playing as.
+    color*: Color
+
 # Piece-square tables. These tables are partially designed based on those on
 # the chess programming wiki and partially self designed based on my own
 # knowledge and understanding of the game.
@@ -105,7 +108,7 @@ proc check_for_stop(): bool =
       result = true
 
 
-proc evaluate_moves(engine: Engine, board: Board, color: Color): seq[int] =
+proc evaluate_moves(engine: Engine, board: Board): seq[int] =
   # Starts by summing to get the straight piece value difference
   var eval = sum(board.current_state)
 
@@ -136,7 +139,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
 
   let
     # The decision between if we are doing an alpha cutoff or a beta cutoff.
-    cutoff_type = if color == engine.board.to_move: "alpha" else: "beta"
+    cutoff_type = if color == engine.color: "alpha" else: "beta"
 
     moves = search_board.generate_all_moves(search_board.to_move)
 
@@ -152,14 +155,14 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
     # but we found a stalemate we don't want that either.
     # By multiplying by depth we consider closer checkmates worse/better
     # depending if its against us or for us.
-    if search_board.to_move == engine.board.to_move or not check:
+    if search_board.to_move == engine.color or not check:
       result.val = -depth*1000
     # Otherwise we found a checkmate and we really want this
     else:
       result.val = depth*1000
 
     # Since for black we look for negatives we need to flip the evaluations.
-    if engine.board.to_move == BLACK:
+    if engine.color == BLACK:
       result.val = result.val * -1
     return
 
@@ -169,19 +172,18 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
 
   # Val is the evaluation of the best possible move.
   # These are some default values, start the best_move with the first move.
-  result.val = if color == engine.board.to_move: -1000 else: 1000
+  result.val = if color == engine.color: -1000 else: 1000
   result.best_move = alg[0]
 
   if depth == 1:
     var
-      run_color = color
-      mult: int = if engine.board.to_move == BLACK: -1 else: 1
+      mult: int = if engine.color == BLACK: -1 else: 1
       net_vals: seq[int] = @[]
 
     for i, m in moves:
       search_board.make_move(m)
       # The evaluations spit out by the network
-      net_vals = engine.evaluate_moves(search_board, run_color)
+      net_vals = engine.evaluate_moves(search_board)
       net_vals = net_vals.map(proc (x: int): int = x * mult)
       search_board.unmake_move()
       # J is an index, v refers to the current val.
@@ -246,7 +248,8 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
 
 
 proc find_move*(engine: Engine): string =
+  engine.color = engine.board.to_move
   let search_result = engine.minimax_search(engine.board, engine.max_depth,
-                                            color = engine.board.to_move)
+                                            color = engine.color)
 
   return search_result.best_move

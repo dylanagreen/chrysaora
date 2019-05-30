@@ -49,27 +49,28 @@ proc disambiguate_moves(moves: seq[tuple[short, long: Move]]): seq[Move] =
 
 
 proc generate_attack_mask*(board: Board, piece: char, pos: Position): uint64 =
+  let square = (7 - pos.y) * 8 + pos.x
   case piece
   of 'N':
-    return KNIGHT_TABLE[((7 - pos.y)*8 + pos.x)]
+    return KNIGHT_TABLE[square]
   of 'K':
-    return KING_TABLE[((7 - pos.y)*8 + pos.x)]
+    return KING_TABLE[square]
   of 'R':
     let
-      magic = ROOK_INDEX[((7 - pos.y)*8 + pos.x)]
+      magic = ROOK_INDEX[square]
       occupied = board.BLACK_PIECES or board.WHITE_PIECES
       index = sliding_index(occupied, magic)
     return ROOK_TABLE[magic.start + index]
   of 'B':
     let
-      magic = BISHOP_INDEX[((7 - pos.y)*8 + pos.x)]
+      magic = BISHOP_INDEX[square]
       occupied = board.BLACK_PIECES or board.WHITE_PIECES
       index = sliding_index(occupied, magic)
     return BISHOP_TABLE[magic.start + index]
   of 'Q':
     let
-      magic1 = ROOK_INDEX[((7 - pos.y)*8 + pos.x)]
-      magic2 = BISHOP_INDEX[((7 - pos.y)*8 + pos.x)]
+      magic1 = ROOK_INDEX[square]
+      magic2 = BISHOP_INDEX[square]
       occupied = board.BLACK_PIECES or board.WHITE_PIECES
       index1 = sliding_index(occupied, magic1)
       index2 = sliding_index(occupied, magic2)
@@ -96,6 +97,38 @@ proc bits_to_algebraic(possible_moves: uint64, start_pos: Position,
 
     # Sets fin to the next LSB, which will be 0 if there are no bits set.
     fin = possible_moves.firstSetBit()
+
+
+proc generate_piece_moves(board: Board, color: Color, piece: char): seq[Move] =
+  let starts = board.find_piece(color, piece)
+  var long: seq[tuple[short, long: Move]]
+
+  for pos in starts:
+    var possible_moves = board.generate_attack_mask(piece, pos)
+
+    # We can only move to places not occupied by our own pieces.
+    possible_moves = if color == BLACK: possible_moves and (not board.BLACK_PIECES)
+                     else: possible_moves and (not board.WHITE_PIECES)
+
+    long = long.concat(bits_to_algebraic(possible_moves, pos, piece, board))
+
+  result = board.remove_moves_in_check(long.disambiguate_moves(), color)
+
+
+proc generate_knight_moves*(board: Board, color: Color): seq[Move] =
+  result = generate_piece_moves(board, color, 'N')
+
+proc generate_king_moves*(board: Board, color: Color): seq[Move] =
+  result = generate_piece_moves(board, color, 'K')
+
+proc generate_bishop_moves*(board: Board, color: Color): seq[Move] =
+  result = generate_piece_moves(board, color, 'B')
+
+proc generate_rook_moves*(board: Board, color: Color): seq[Move] =
+  result = generate_piece_moves(board, color, 'R')
+
+proc generate_queen_moves*(board: Board, color: Color): seq[Move] =
+  result = generate_piece_moves(board, color, 'Q')
 
 
 proc pawn_bits_to_algebraic(possible_moves: uint64, color: Color, board: Board,
@@ -147,69 +180,6 @@ proc pawn_bits_to_algebraic(possible_moves: uint64, color: Color, board: Board,
 
     # Sets fin to the next LSB, which will be 0 if there are no bits set.
     fin = possible_moves.firstSetBit()
-
-
-proc generate_jump_moves(board: Board, color: Color, table: openArray[uint64], piece: char): seq[Move] =
-  let starts = board.find_piece(color, piece)
-  var long: seq[tuple[short, long: Move]]
-
-  for pos in starts:
-    var possible_moves = table[((7 - pos.y)*8 + pos.x)]
-
-    # We can only move to places not occupied by our own pieces.
-    possible_moves = if color == BLACK: possible_moves and (not board.BLACK_PIECES)
-                     else: possible_moves and (not board.WHITE_PIECES)
-
-    long = long.concat(bits_to_algebraic(possible_moves, pos, piece, board))
-
-  result = board.remove_moves_in_check(long.disambiguate_moves(), color)
-
-
-proc generate_knight_moves*(board: Board, color: Color): seq[Move] =
-  result = generate_jump_moves(board, color, KNIGHT_TABLE, 'N')
-
-
-proc generate_king_moves*(board: Board, color: Color): seq[Move] =
-  result = generate_jump_moves(board, color, KING_TABLE, 'K')
-
-
-proc generate_slide_moves(board: Board, color: Color, indices: openArray[Magic], table: openArray[uint64], piece: char): seq[tuple[short, long: Move]]=
-  let starts = board.find_piece(color, piece)
-
-  for pos in starts:
-    let
-      # Due to some weird nonsense with indexing (tensor coordinates go from top
-      # to bottom rather than reverse) we need to subtract from 63 to get the
-      # indexing to be 0 = a1.
-      magic = indices[((7 - pos.y)*8 + pos.x)]
-      occupied = board.BLACK_PIECES or board.WHITE_PIECES
-      index = sliding_index(occupied, magic)
-
-    var possible_moves = table[magic.start + index]
-
-    # We can only move to places not occupied by our own pieces.
-    possible_moves = if color == BLACK: possible_moves and (not board.BLACK_PIECES)
-                     else: possible_moves and (not board.WHITE_PIECES)
-
-    result = result.concat(bits_to_algebraic(possible_moves, pos, piece, board))
-
-
-proc generate_bishop_moves*(board: Board, color: Color): seq[Move] =
-  result = generate_slide_moves(board, color, BISHOP_INDEX, BISHOP_TABLE, 'B').disambiguate_moves()
-  result = board.remove_moves_in_check(result, color)
-
-
-proc generate_rook_moves*(board: Board, color: Color): seq[Move] =
-  result = generate_slide_moves(board, color, ROOK_INDEX, ROOK_TABLE, 'R').disambiguate_moves()
-  result = board.remove_moves_in_check(result, color)
-
-
-proc generate_queen_moves*(board: Board, color: Color): seq[Move] =
-  let
-    rook_moves = generate_slide_moves(board, color, ROOK_INDEX, ROOK_TABLE, 'Q')
-    bishop_moves = generate_slide_moves(board, color, BISHOP_INDEX, BISHOP_TABLE, 'Q')
-  result = concat(rook_moves, bishop_moves).disambiguate_moves()
-  result = board.remove_moves_in_check(result, color)
 
 
 proc generate_pawn_moves*(board: Board, color: Color): seq[Move] =

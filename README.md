@@ -6,7 +6,7 @@ Chrysaora started as an attempt to use supervised learning and a small image cla
 - A reinforcement learning trained neural network
 - A handcraft evaluation function top layer.
 
-At present I see a few ways to integrate the two, none of which I have settled on yet. Chrysaora also features an alpha-beta pruned minimax search. 
+At present I see a few ways to integrate the two, none of which I have settled on yet. Chrysaora also features an alpha-beta pruned minimax search.
 
 ## Support
 Chrysaora will be supported until I get my PhD (in Physics), it wins a season of the TCEC or Nim dies, whichever comes first.
@@ -42,13 +42,13 @@ I'd like to say a very special thank you to the following engines, which I consu
 - [Lc0](https://github.com/LeelaChessZero/lc0), for paving the way for NN engines
 - [Giraffe](https://github.com/ianfab/Giraffe), for providing the network structure for Chrysaora
 
-Additionally I'd like to thank the Chess Programming Wiki for its help in getting the project start.
+Additionally I'd like to thank the Chess Programming Wiki for its help in getting the project started.
 
 ## Why a hybrid?
 
 Neural Network based chess engines seem to be the "new era" so to speak in computer chess, especially so since Lc0 just won the superfinal in S15 of the TCEC. NN based engines come with their own set of problems, however. The general width and size of the NN required to play chess at the level that LC0 plays at is massive, explaining a major part of why NN based engines tend to be so much slower than traditional hand crafted engines. Consider that if Lc0 could achieve the nps that Stockfish does it would be, in my opinion, unbeatable.
 
-By hybridizing a NN with a handcrafted evaluation function, I hope to achieve similar playing performance to top level engines with a much narrower network structure. The much narrower network should compute faster, and if my coding and optimization prowess is up to the task, achieve a potentially higher nodes per second. 
+By hybridizing a NN with a handcrafted evaluation function, I hope to achieve similar playing performance to top level engines with a much narrower network structure. The much narrower network should compute faster, and if my coding and optimization prowess is up to the task, achieve a potentially higher nodes per second.
 
 On the other hand it could blow up in my face.
 

@@ -395,69 +395,6 @@ proc can_make_move(board: Board, start: Position, fin: Position,
       return true
 
 
-proc is_in_check*(board: Board, color: Color, state: Tensor[int]): bool =
-  let
-    # The direction a pawn must travel to take this color's king.
-    # I.e. Black pawns must travel in the positive y (downward) direction
-    # To take a white king.
-    d = if color == WHITE: 1 else: -1
-
-    # Color flipping for black instead of white.
-    mult = if color == WHITE: -1 else: 1
-
-    opp_color = if color == WHITE: BLACK else: WHITE
-
-    # Check pawns first because they're the easiest.
-    pawn_num = if color == WHITE: -piece_numbers['P']
-               else: piece_numbers['P']
-
-    # The king's number
-    king_num = if color == WHITE: piece_numbers['K']
-               else: -piece_numbers['K']
-
-  var
-    # For this I'll assume there's only one king.
-    king = board.find_piece(color, 'K')[0]
-
-  # Special case for if the king moved. Need to check two out in case the
-  # king castled.
-  if state[king.y, king.x] != king_num:
-    let
-      low_x = if king.x <= 1: 0 else: king.x - 2
-      low_y = if king.y <= 1: 0 else: king.y - 2
-      high_x = if king.x >= 6: 7 else: king.x + 2
-      high_y = if king.y >= 6: 7 else: king.y + 2
-
-    for y in low_y..high_y:
-      for x in low_x..high_x:
-        if state[y, x] == king_num:
-          king = (y, x)
-          break
-
-  # Need to ensure that the king is on any rank but the last one.
-  # No pawns can put you in check in the last rank anyway.
-  if king.y - d in 0..7:
-    if king.x - 1 > -1 and state[king.y - d, king.x - 1] == pawn_num:
-      return true
-    elif king.x + 1 < 8 and state[king.y - d, king.x + 1] == pawn_num:
-      return true
-
-  for piece in board.piece_list[opp_color]:
-    # We already did pawns, don't need overkill checking for those.
-    if piece.name == 'P': continue
-
-    # The piece has been taken in the new state if this is true
-    if state[piece.pos.y, piece.pos.x] != piece_numbers[piece.name] * mult:
-      continue
-
-    # To move needs to exist since it's accessed in can make move, but since
-    # we already checked pawns we don't actually need it to be accurate.
-    let temp_board = Board(current_state: state * mult, to_move: WHITE)
-
-    if can_make_move(temp_board, piece.pos, king, piece.name):
-      return true
-
-
 proc is_in_check*(board: Board, color: Color): bool =
   let
     # The direction a pawn must travel to take this color's king.
@@ -490,8 +427,7 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
     return
 
   # You're not allowed to castle out of check.
-  var check = board.is_in_check(board.to_move)
-  if ("O-O" in move or "0-0" in move) and check:
+  if ("O-O" in move or "0-0" in move) and board.is_in_check(board.to_move):
     return
 
   # Slices off the checkmate character for parsing. This is largely so that
@@ -504,10 +440,6 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
     # The rank the king is on.
     king_rank = if board.to_move == WHITE: 7 else: 0
 
-    # The king's number representation
-    king_num = if board.to_move == WHITE: piece_numbers['K']
-               else: -piece_numbers['K']
-
   # Kingside castling
   if new_move == "O-O" or new_move == "0-0":
     var
@@ -518,11 +450,18 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
 
     if check_side and sum(abs(between)) == 0:
       # Need to check that we don't castle through check here.
-      var new_state = clone(board.current_state)
-      new_state[king_rank, 4] = 0
-      new_state[king_rank, 5] = king_num
+      var
+        alg = if board.to_move == WHITE: "Kf1" else: "Kf8"
+        test_move = Move(start: (king_rank, 4), fin: (king_rank, 5), algebraic: alg)
 
-      check = board.is_in_check(board.to_move, new_state)
+      board.update_piece_list(test_move)
+      board.update_piece_bitmaps(test_move)
+
+      let check = board.is_in_check(board.to_move)
+
+      board.revert_piece_list(test_move)
+      board.update_piece_bitmaps(test_move)
+
       if not check:
         return new_move
       else:
@@ -539,11 +478,18 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
 
     if check_side and sum(abs(between)) == 0:
       # Need to check that we don't castle through check here.
-      var new_state = clone(board.current_state)
-      new_state[king_rank, 4] = 0
-      new_state[king_rank, 3] = king_num
+      var
+        alg = if board.to_move == WHITE: "Kd1" else: "Kd8"
+        test_move = Move(start: (king_rank, 4), fin: (king_rank, 3), algebraic: alg)
 
-      check = board.is_in_check(board.to_move, new_state)
+      board.update_piece_list(test_move)
+      board.update_piece_bitmaps(test_move)
+
+      let check = board.is_in_check(board.to_move)
+
+      board.revert_piece_list(test_move)
+      board.update_piece_bitmaps(test_move)
+
       if not check:
         return new_move
       else:
@@ -664,15 +610,17 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
   # would end with you in check. This exists in case you try to move a piece
   # that's pinned.
   proc good_move(start: Position, fin: Position, piece_num: int,
-                 ep: bool = false): bool =
-    var s = clone(board.current_state)
-    s[start.y, start.x] = 0
-    s[fin.y, fin.x] = piece_num
+                 alg: string): bool =
+    var test_move = Move(start: start, fin: fin, algebraic: alg)
 
-    if ep:
-      s[start.y, fin.x] = 0
+    board.update_piece_list(test_move)
+    board.update_piece_bitmaps(test_move)
 
-    result = not board.is_in_check(board.to_move, s)
+    result = not board.is_in_check(board.to_move)
+
+    board.revert_piece_list(test_move)
+    board.update_piece_bitmaps(test_move)
+
     return
 
   for pos in found_pieces:
@@ -703,18 +651,23 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
           # move three moves after the pawn moved.
           if good_end and previous_state[fin.y + d, fin.x] == opposite_pawn:
             ep = true
-    let
-      can_make = can_make_move(board, pos, fin, piece_char)
-      no_check = good_move(pos, fin, piece_num, ep)
 
-    if can_make and no_check:
+    let can_make = can_make_move(board, pos, fin, piece_char)
+
+    if can_make:
       if promotion:
         result = board.row_column_to_algebraic(pos, fin, piece_num,
-                                               promotion_piece)[1]
+                                                promotion_piece)[1]
       else:
         result = board.row_column_to_algebraic(pos, fin, piece_num)[1]
       if ep:
         result = result & "e.p."
+
+      let no_check = good_move(pos, fin, piece_num, result)
+
+      if not no_check:
+        result = ""
+
       return
 
 
@@ -733,9 +686,22 @@ proc check_move_legality*(board: Board, move: string):
   # "".  Doesn't check castling ending in check, however, hence why this
   # is here. Castling shortcuts in short_algebraic.
   if "O-O" in long_move or "0-0" in long_move:
-    var end_state = board.castle_algebraic_to_boardstate(long_move,
-                                                         board.to_move)
-    check = board.is_in_check(board.to_move, end_state)
+    #var end_state = board.castle_algebraic_to_boardstate(long_move,
+     #                                                    board.to_move)
+    let rank = if board.to_move == WHITE: 7 else: 0
+    var test_move: Move
+    if long_move == "O-O":
+      test_move = Move(start: (rank, 4), fin: (rank, 6), algebraic: long_move)
+    else:
+      test_move = Move(start: (rank, 4), fin: (rank, 2), algebraic: long_move)
+
+    board.update_piece_list(test_move)
+    board.update_piece_bitmaps(test_move)
+
+    check = board.is_in_check(board.to_move)
+
+    board.revert_piece_list(test_move)
+    board.update_piece_bitmaps(test_move)
 
   if check:
     return

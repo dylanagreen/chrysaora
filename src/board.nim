@@ -231,38 +231,6 @@ proc long_algebraic_to_board_state*(board: Board, move: string): Tensor[int] =
     result[start.y, finish.x] = 0
 
 
-proc castle_algebraic_to_board_state(board: Board, move: string,
-                                     color: Color): Tensor[int] =
-  result = clone(board.current_state)
-
-  var
-    # Piece numbers for placing.
-    king_num = piece_numbers['K']
-    rook_num = piece_numbers['R']
-
-  # The rank that the king and rook are on.
-  let rank = if color == WHITE: 7 else: 0
-
-  # Flips the piece to negative if we're castling for black.
-  if not (color == WHITE):
-    king_num = king_num * -1
-    rook_num = rook_num * -1
-
-  # Kingside castling
-  if move == "O-O" or move == "0-0":
-    result[rank, 7] = 0       # The rook
-    result[rank, 4] = 0       # The king
-    result[rank, 6] = king_num
-    result[rank, 5] = rook_num
-
-  # Queenside castling
-  elif move == "O-O-O" or move == "0-0-0":
-    result[rank, 0] = 0       # The rook
-    result[rank, 4] = 0       # The king
-    result[rank, 2] = king_num
-    result[rank, 3] = rook_num
-
-
 proc can_make_move(board: Board, start: Position, fin: Position,
                    piece: char): bool =
   var
@@ -318,81 +286,9 @@ proc can_make_move(board: Board, start: Position, fin: Position,
       if alg_table[fin.y, fin.x] == board.ep_square[opp_color]:
         return true
 
-  elif piece == 'N':
-    var
-      slope: Position = (abs(fin.y - start.y), abs(fin.x - start.x))
-
-    # Avoids a divide by 0 error. If it's on the same rank or file
-    # the knight can't get the king anyway.
-    if slope.x == 0 or slope.y == 0:
-      return
-    if slope == (1, 2) or slope == (2, 1):
-      return true
-
-  elif piece == 'R' or piece == 'Q':
-    # If we only move one space then we found the piece already.
-    if start.y == fin.y and abs(start.x - fin.x) == 1:
-      return true
-    elif start.x == fin.x and abs(start.y - fin.y) == 1:
-      return true
-    else:
-      # The slide a start would have to take to get to the end.
-      var slide = @[0].toTensor
-
-      if start.y == fin.y:
-        # Slides from the start to the fin, left to right.
-        if start.x < fin.x:
-          slide = state[fin.y, start.x + 1 ..< fin.x]
-        # Slides from the fin to the start, left to right.
-        else:
-          slide = state[fin.y, fin.x + 1 ..< start.x]
-        slide = abs(slide)
-        if sum(slide) == 0:
-          return true
-
-      if start.x == fin.x:
-        # Slides from the start to the fin, top down.
-        if start.y < fin.y:
-          slide = state[start.y + 1 ..< fin.y, fin.x]
-        # Slides from the fin to the start, top down.
-        else:
-          slide = state[fin.y + 1 ..< start.y, fin.x]
-        slide = abs(slide)
-        if sum(slide) == 0:
-          return true
-
-  if piece == 'B' or piece == 'Q':
-    # First we check that the piece is even on a diagonal from the fin.
-    # The following code finds the absolute value of the slope as well
-    # as the slope value from the start to the fin.
-    var
-      slope: tuple[y, x: float] = (float(start.y - fin.y),
-                                   float(start.x - fin.x))
-      abs_slope: tuple[y, x: float] = (abs(slope.y), abs(slope.x))
-      max = max([abs_slope.y, abs_slope.x])
-
-    slope = (slope[0] / max, slope[1] / max)
-    abs_slope = (abs_slope[0] / max, abs_slope[1] / max)
-
-    # If the absolute slope is 1,1 then it's a diagonal.
-    if abs_slope.x == 1.0 and abs_slope.y == 1.0:
-      var cur_pos: Position = start
-      # Now we have to check that the space between the two is empty.
-      for i in 1..7:
-        cur_pos = (fin.y + i * int(slope.y), fin.x + i * int(slope.x))
-
-        if not (state[cur_pos.y, cur_pos.x] == 0):
-          break
-      # This will execute if the Position that caused the for loop to
-      # break is the start itboard, otherwise this does not execute.
-      # Or the queen. Same thing.
-      if cur_pos == start:
-        return true
-
-  if piece == 'K':
-    let diff = [abs(start.y - fin.y), abs(start.x - fin.x)]
-    if sum(diff) == 1 or diff == [1, 1]:
-      return true
+  else:
+    let moves = board.generate_attack_mask(piece, start)
+    return moves.testBit((7 - fin.y) * 8 + fin.x)
 
 
 proc is_in_check*(board: Board, color: Color): bool =

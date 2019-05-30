@@ -13,20 +13,23 @@ import board
 bitboard.init_simple_tables()
 bitboard.init_magic_tables()
 
+proc check_move_for_check*(board: Board, move: Move, color: Color): bool =
+  board.update_piece_list(move)
+  board.update_piece_bitmaps(move)
+
+  result = board.is_in_check(color)
+
+  board.revert_piece_list(move)
+  board.update_piece_bitmaps(move)
+
+
 proc remove_moves_in_check(board: Board, moves: seq[Move], color: Color): seq[Move] =
   let orig_color = board.to_move
   board.to_move = color
   for m in moves:
-
-    # Need skip to be true so we don't end up in an "is in check" loop.
-    board.update_piece_list(m)
-    board.update_piece_bitmaps(m)
-
-    if not board.is_in_check(color):
+    if not board.check_move_for_check(m, color):
       result.add(m)
 
-    board.revert_piece_list(m)
-    board.update_piece_bitmaps(m)
   board.to_move = orig_color
 
 
@@ -294,16 +297,10 @@ proc generate_castle_moves*(board: Board, color: Color): seq[Move] =
     # one space in the kingside direction doesn't put us in check.
     var
       alg = if color == WHITE: "Kf1" else: "Kf8"
-      move = Move(start: (rank, 4), fin: (rank, 5), algebraic: alg)
+      test_move = Move(start: (rank, 4), fin: (rank, 5), algebraic: alg)
 
-    board.update_piece_list(move)
-    board.update_piece_bitmaps(move)
-
-    if not board.is_in_check(color):
+    if not board.check_move_for_check(test_move, color):
       result.add(Move(start: (rank, 4), fin: (rank, 6), algebraic: "O-O"))
-
-    board.revert_piece_list(move)
-    board.update_piece_bitmaps(move)
 
   # Slice representing the two spaces between the king and the queenside rook.
   between = board.current_state[rank, 1..3]
@@ -311,16 +308,10 @@ proc generate_castle_moves*(board: Board, color: Color): seq[Move] =
     # See reasoning above in kingside.
     var
       alg = if color == WHITE: "Kd1" else: "Kd8"
-      move = Move(start: (rank, 4), fin: (rank, 3), algebraic: alg)
+      test_move = Move(start: (rank, 4), fin: (rank, 3), algebraic: alg)
 
-    board.update_piece_list(move)
-    board.update_piece_bitmaps(move)
-
-    if not board.is_in_check(color):
+    if not board.check_move_for_check(test_move, color):
       result.add(Move(start: (rank, 4), fin: (rank, 2), algebraic: "O-O-O"))
-
-    board.revert_piece_list(move)
-    board.update_piece_bitmaps(move)
 
   board.to_move = orig_color
   result = board.remove_moves_in_check(result, color)

@@ -454,13 +454,7 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
         alg = if board.to_move == WHITE: "Kf1" else: "Kf8"
         test_move = Move(start: (king_rank, 4), fin: (king_rank, 5), algebraic: alg)
 
-      board.update_piece_list(test_move)
-      board.update_piece_bitmaps(test_move)
-
-      let check = board.is_in_check(board.to_move)
-
-      board.revert_piece_list(test_move)
-      board.update_piece_bitmaps(test_move)
+      let check = board.check_move_for_check(test_move, board.to_move)
 
       if not check:
         return new_move
@@ -482,13 +476,7 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
         alg = if board.to_move == WHITE: "Kd1" else: "Kd8"
         test_move = Move(start: (king_rank, 4), fin: (king_rank, 3), algebraic: alg)
 
-      board.update_piece_list(test_move)
-      board.update_piece_bitmaps(test_move)
-
-      let check = board.is_in_check(board.to_move)
-
-      board.revert_piece_list(test_move)
-      board.update_piece_bitmaps(test_move)
+      let check =  board.check_move_for_check(test_move, board.to_move)
 
       if not check:
         return new_move
@@ -612,15 +600,7 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
   proc good_move(start: Position, fin: Position, piece_num: int,
                  alg: string): bool =
     var test_move = Move(start: start, fin: fin, algebraic: alg)
-
-    board.update_piece_list(test_move)
-    board.update_piece_bitmaps(test_move)
-
-    result = not board.is_in_check(board.to_move)
-
-    board.revert_piece_list(test_move)
-    board.update_piece_bitmaps(test_move)
-
+    result = not board.check_move_for_check(test_move, board.to_move)
     return
 
   for pos in found_pieces:
@@ -695,13 +675,7 @@ proc check_move_legality*(board: Board, move: string):
     else:
       test_move = Move(start: (rank, 4), fin: (rank, 2), algebraic: long_move)
 
-    board.update_piece_list(test_move)
-    board.update_piece_bitmaps(test_move)
-
-    check = board.is_in_check(board.to_move)
-
-    board.revert_piece_list(test_move)
-    board.update_piece_bitmaps(test_move)
+    check = board.check_move_for_check(test_move, board.to_move)
 
   if check:
     return

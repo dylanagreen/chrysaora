@@ -1105,7 +1105,7 @@ proc make_move*(board: Board, move: string) =
 
 
 proc unmake_move*(board: Board) =
-  board.current_state = clone(board.game_states.pop()) # Reverts the mailbox board.
+  board.current_state = board.game_states.pop() # Reverts the mailbox board.
   var move = board.move_list.pop() # Take the last move off the move list.
   # We can extract the ep square from the previous move. We have to do this
   # before we change the to_move, since we need the to_move of the move two

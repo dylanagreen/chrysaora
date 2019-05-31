@@ -25,9 +25,47 @@ proc check_move_for_check*(board: Board, move: Move, color: Color): bool =
 
 proc remove_moves_in_check(board: Board, moves: seq[Move], color: Color): seq[Move] =
   let orig_color = board.to_move
+  var
+    test = false
+    check = board.is_in_check(color)
+    # The pieces squares are technically attacked too.
+    attacks = if color == WHITE: board.BLACK_ATTACKS or board.BLACK_PIECES
+              else: board.WHITE_ATTACKS or board.WHITE_PIECES
   board.to_move = color
   for m in moves:
-    if not board.check_move_for_check(m, color):
+    # We already removed all the illegal king moves, this is overkill
+    # Except in certain cases where the king could move along the attack vector
+    # In a direction that hasn't been generated before.
+    if m.algebraic[0] == 'K':
+      if check:
+        test = true
+      else:
+        result.add(m)
+        continue
+    # Need to check castling moves
+    elif m.algebraic[0] == 'O':
+      if attacks.testBit((7 - m.fin.y) * 8 + m.fin.x):
+        continue
+    # There are rare cases where taking a pawn en passant could leave you in
+    # check. The easiest way right now to verify this doesn't happen is to
+    # just check every ep move. Perft 3 has an example of such a position with
+    # first move e2e4.
+    elif len(m.algebraic) > 5 and m.algebraic[^4..^1] == "e.p.":
+      test = true
+
+    # This checks if the piece is attacked right now. It can only be pinned if it is.
+    test = test or attacks.testBit((7 - m.start.y) * 8 + m.start.x)
+
+    # If we're in check and the ending isn't on the attack vectors then it's
+    # not even a good move since it can't possibly get us out.
+    if check and not test:
+      if attacks.testBit((7 - m.fin.y) * 8 + m.fin.x):
+        test = true
+      else:
+        continue
+
+    # This should short circuit if we don't need to test that move and auto add it.
+    if not test or not board.check_move_for_check(m, color):
       result.add(m)
 
   board.to_move = orig_color
@@ -51,9 +89,16 @@ proc disambiguate_moves(moves: seq[tuple[short, long: Move]]): seq[Move] =
         result.add(m.short)
 
 
-proc generate_attack_mask*(board: Board, piece: char, pos: Position): uint64 =
+proc generate_attack_mask*(board: Board, piece: char, pos: Position, color: Color = WHITE): uint64 =
   let square = (7 - pos.y) * 8 + pos.x
   case piece
+  of 'P':
+    if color == WHITE:
+      result.setBit(square)
+      return (result shl 7 and not H_FILE) or (result shl 9 and not A_FILE)
+    else:
+      result.setBit(square)
+      return (result shr 7 and not A_FILE) or (result shr 9 and not H_FILE)
   of 'N':
     return KNIGHT_TABLE[square]
   of 'K':
@@ -112,6 +157,12 @@ proc generate_piece_moves(board: Board, color: Color, piece: char): seq[Move] =
     # We can only move to places not occupied by our own pieces.
     possible_moves = if color == BLACK: possible_moves and (not board.BLACK_PIECES)
                      else: possible_moves and (not board.WHITE_PIECES)
+
+    # Efficiently removes king moves that leave us in check.
+    if piece == 'K':
+      # We need to remove the pieces themselves from the attack maps here.
+      possible_moves = if color == BLACK: possible_moves and (not board.WHITE_ATTACKS)
+                       else: possible_moves and (not board.BLACK_ATTACKS)
 
     long = long.concat(bits_to_algebraic(possible_moves, pos, piece, board))
 

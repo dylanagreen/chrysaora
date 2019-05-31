@@ -55,8 +55,13 @@ type
 
     piece_list*: Table[Color, seq[Piece]]
 
+    # Bitmaps of all the pieces for a color
     WHITE_PIECES*: uint64
     BLACK_PIECES*: uint64
+
+    # Bitmaps for all the attacks by a certain color.
+    WHITE_ATTACKS*: uint64
+    BLACK_ATTACKS*: uint64
 
   # Custom move list types
   DisambigMove* = tuple[algebraic: string, state: Tensor[int]]
@@ -308,11 +313,11 @@ proc is_in_check*(board: Board, color: Color): bool =
       if piece.pos == (king.y - d, king.x - 1) or
          piece.pos == (king.y - d, king.x + 1):
           return true
+    else:
+      let attacks = board.generate_attack_mask(piece.name, piece.pos)
 
-    let attacks = board.generate_attack_mask(piece.name, piece.pos)
-
-    if attacks.testBit((7 - king.y) * 8 + king.x):
-      return true
+      if attacks.testBit((7 - king.y) * 8 + king.x):
+        return true
 
 
 proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
@@ -754,6 +759,17 @@ proc update_piece_bitmaps*(board: Board, move: Move) =
     board.BLACK_PIECES = board.BLACK_PIECES xor update
 
 
+proc update_attack_bitmaps(board: Board, color: Color) =
+  if color == WHITE: board.WHITE_ATTACKS = 0 else: board.BLACK_ATTACKS = 0
+  for piece in board.piece_list[color]:
+    # Gets the attacks for this piece then adds them to the mask using or.
+    let attacks = board.generate_attack_mask(piece.name, piece.pos, color)
+    if color == WHITE:
+      board.WHITE_ATTACKS = board.WHITE_ATTACKS or attacks
+    else:
+      board.BLACK_ATTACKS = board.BLACK_ATTACKS or attacks
+
+
 template check_for_moves(moves: seq[Move]): void=
   if len(moves) > 0:
     noresponses = false
@@ -863,6 +879,10 @@ proc make_move*(board: Board, move: Move, skip: bool = false) =
   board.ep_square[to_move] = ""
   board.move_list.add(move)
 
+  # For now update both attack bitmaps.
+  board.update_attack_bitmaps(WHITE)
+  board.update_attack_bitmaps(BLACK)
+
   # The earliest possible checkmate is after 4 plies. No reason to check earlier
   if len(board.move_list) > 3 and not skip:
     # If there are no moves that get us out of check we need to see if we're in
@@ -965,6 +985,10 @@ proc unmake_move*(board: Board) =
       board.castle_history[index - 1] -= 1
   else:
     board.castle_history[index] -= 1
+
+  # For now update both attack bitmaps.
+  board.update_attack_bitmaps(WHITE)
+  board.update_attack_bitmaps(BLACK)
 
 
 proc to_fen*(board: Board): string =
@@ -1140,7 +1164,11 @@ proc load_fen*(fen: string): Board =
                 headers: initTable[string, string](), ep_square: ep_square,
                 long: false, piece_list: piece_list,
                 castle_history: castle_history, BLACK_PIECES: black_pieces,
-                WHITE_PIECES: white_pieces)
+                WHITE_PIECES: white_pieces, BLACK_ATTACKS: 0'u64,
+                WHITE_ATTACKS: 0'u64)
+
+  result.update_attack_bitmaps(WHITE)
+  result.update_attack_bitmaps(BLACK)
 
 
 proc load_pgn*(name: string, folder: string = "games"): Board =
@@ -1257,6 +1285,5 @@ proc save_pgn*(board: Board) =
 
 # Creates a new board from scratch.
 proc new_board*(): Board =
-  # Just loads the starting fen so we can change piece numbering without
-  # having to change a hard coded tensor.
+  # Just loads the starting fen so we can change piece numbering easily
   result = load_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")

@@ -110,24 +110,16 @@ proc check_for_stop(): bool =
 
 proc evaluate_move(engine: Engine, board: Board): int =
   # Starts by summing to get the straight piece value difference
-  var eval = sum(board.current_state)
+  result = sum(board.current_state)
 
   # This loops over the pieces and gets their evaluations from the piece-square
   # tables up above and adds them to the table if they're white, or subtracts
   # if they're black.
-  for key, value in piece_numbers:
-    var
-      white_pieces = board.find_piece(WHITE, key)
-      black_pieces = board.find_piece(BLACK, key)
-      white_table = value_table[key] * 10
+  for piece in board.piece_list[WHITE]:
+    result = result + value_table[piece.name][piece.pos.y, piece.pos.x] * 10
 
-    for pos in white_pieces:
-      eval += white_table[pos.y, pos.x]
-
-    for pos in black_pieces:
-      eval -= white_table[7 - pos.y, pos.x]
-
-  result = eval
+  for piece in board.piece_list[BLACK]:
+    result = result + value_table[piece.name][7 - piece.pos.y, piece.pos.x] * -10
 
 
 proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,

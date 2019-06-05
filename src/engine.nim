@@ -108,7 +108,7 @@ proc check_for_stop(): bool =
       result = true
 
 
-proc evaluate_moves(engine: Engine, board: Board): seq[int] =
+proc evaluate_move(engine: Engine, board: Board): int =
   # Starts by summing to get the straight piece value difference
   var eval = sum(board.current_state)
 
@@ -127,117 +127,72 @@ proc evaluate_moves(engine: Engine, board: Board): seq[int] =
     for pos in black_pieces:
       eval -= white_table[7 - pos.y, pos.x]
 
-  result = @[eval]
+  result = eval
 
 
 proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
-                    alpha: int = -10000, beta: int = 10000, color: Color):
+                    alpha: int = -50000, beta: int = 50000, color: Color):
                     tuple[best_move: string, val: int] =
   # If we recieve the stop command don't go any deeper just return best move.
   if check_for_stop():
     engine.compute = false
 
-  let
-    # The decision between if we are doing an alpha cutoff or a beta cutoff.
-    cutoff_type = if color == engine.color: "alpha" else: "beta"
-
-    moves = search_board.generate_all_moves(search_board.to_move)
+  result.val = if color == engine.color: -50000 else: 50000
 
   var
     cur_alpha = alpha
     cur_beta = beta
 
-  # If there are no moves then someone either got checkmated or stalemated.
-  if len(moves) == 0:
-    let check = search_board.is_in_check(search_board.to_move)
-    # In this situation we were the ones to get checkmated (or stalemated) so
-    # set the eval to 0 cuz we really don't want this. If it's not us to move,
-    # but we found a stalemate we don't want that either.
-    # By multiplying by depth we consider closer checkmates worse/better
-    # depending if its against us or for us.
-    if search_board.to_move == engine.color or not check:
-      result.val = -depth*1000
-    # Otherwise we found a checkmate and we really want this
-    else:
-      result.val = depth*1000
-
-    # Since for black we look for negatives we need to flip the evaluations.
-    if engine.color == BLACK:
-      result.val = result.val * -1
+  if depth == 0:
+    result.val = engine.evaluate_move(search_board)
+    # Flip the sign for Black moves.
+    if engine.color == BLACK: result.val = result.val * -1
     return
-
-  # Strips out the short algebraic moves from the sequence.
-  let
-    alg = moves.map(proc (x: Move): string = x.algebraic)
-
-  # Val is the evaluation of the best possible move.
-  # These are some default values, start the best_move with the first move.
-  result.val = if color == engine.color: -1000 else: 1000
-  result.best_move = alg[0]
-
-  if depth == 1:
-    var
-      mult: int = if engine.color == BLACK: -1 else: 1
-      net_vals: seq[int] = @[]
-
-    for i, m in moves:
-      search_board.make_move(m)
-      # The evaluations spit out by the network
-      net_vals = engine.evaluate_moves(search_board)
-      net_vals = net_vals.map(proc (x: int): int = x * mult)
-      search_board.unmake_move()
-      # J is an index, v refers to the current val.
-      for j, v in net_vals:
-        # Updates alpha or beta variable depending on which cutoff to use.
-        if cutoff_type == "alpha":
-          # If we're doing alpha cut offs we're looking for the maximum on
-          # this ply, so if the valuation is more than the highest so far
-          # we update it.
-          if result.val < v:
-            result.best_move = alg[j+i]
-            result.val = v
-          cur_alpha = max([cur_alpha, result.val])
-        else:
-          # If we're doing beta cut offs we're looking for the minimum on
-          # this ply, so if the valuation is less than the lowest so far
-          # we update it.
-          if result.val > v:
-            result.best_move = alg[j+i]
-            result.val = v
-          cur_beta = min([cur_beta, result.val])
-
-        # Once alpha exceeds beta, i.e. once the minimum score that the engine
-        # will receieve on a node (alpha) exceeds the maximum score that the
-        # engine predicts for the opponent (beta)
-        if cur_alpha >= cur_beta:
-          return
   else:
-    for i, m in moves:
+    let moves = search_board.generate_all_moves(search_board.to_move)
+
+    #If there are no moves then someone either got checkmated or stalemated.
+    if len(moves) == 0:
+      let check = search_board.is_in_check(search_board.to_move)
+      # In this situation we were the ones to get checkmated (or stalemated).
+      # By multiplying by depth we consider closer checkmates worse/better.
+      # Regardless of whether we're black or white the val will be negative if
+      # we don't want it and positive if we do.
+      if search_board.to_move == engine.color or not check:
+        result.val = -depth * 5000
+      # Otherwise we found a checkmate and we really want this
+      else:
+        result.val = depth * 5000
+      return
+
+    for m in moves:
+      echo depth, " ", m.algebraic
       # Generate a new board state for move generation.
       search_board.make_move(m, skip=true)
 
         # Best move from the next lower ply.
       let best_lower = engine.minimax_search(search_board, depth - 1, cur_alpha,
                                              cur_beta, search_board.to_move)
+      # Unmake the move
       search_board.unmake_move()
-      var cur_val = best_lower.val# * -1
 
-      # Updates alpha or beta variable depending on which cutoff to use.
-      if cutoff_type == "alpha":
+      # Updates the best found move so far. We look for the max if it's our
+      # color and min if it's not (the guiding principle of minimax...)
+      if color == engine.color:
+        if best_lower.val > result.val:
+          result.best_move = m.algebraic
+          result.val = best_lower.val
+
         # If we're doing alpha cut offs we're looking for the maximum on
-        # this ply, so if the valuation is more than the highest so far
-        # we update it.
-        if result.val < cur_val:
-          result.best_move = alg[i]
-          result.val = cur_val
+        # this ply, so if the valuation is more than the highest we update it.
         cur_alpha = max([cur_alpha, result.val])
       else:
+        if best_lower.val < result.val:
+          result.best_move = m.algebraic
+          result.val = best_lower.val
+
         # If we're doing beta cut offs we're looking for the minimum on
-        # this ply, so if the valuation is less than the lowest so far
-        # we update it.
-        if result.val > cur_val:
-          result.best_move = alg[i]
-          result.val = cur_val
+        # this ply, so if the valuation is less than the lowest we update it.
         cur_beta = min([cur_beta, result.val])
 
       # Once alpha exceeds beta, i.e. once the minimum score that

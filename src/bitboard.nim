@@ -1,4 +1,5 @@
 import bitops
+import random
 import strutils
 
 type
@@ -130,6 +131,8 @@ var
   ROOK_INDEX*: array[64, Magic]
   BISHOP_INDEX*: array[64, Magic]
 
+  ZOBRIST_TABLE*: array[64*12, uint64]
+
 
 proc generate_straight_moves(occupied: uint64, start: Position): uint64 =
   var
@@ -258,3 +261,17 @@ proc init_magic_tables*() =
 
       # Carry-Rippler trick to traverse all subsets.
       occupied = (occupied - mask) and mask
+
+
+# Initializes the bitstrings for the zobrist hashing.
+proc init_zobrist*() =
+  # Initialize random number generator with a seed for reproducibility
+  var r = initRand(1106)
+  # Loops over each square
+  for s in 0..63:
+    # Loops over the 12 possible pieces.
+    for p in 0..11:
+      var num = r.next()
+      while num in ZOBRIST_TABLE:
+        num = r.next()
+      ZOBRIST_TABLE[s + p * 64] = num

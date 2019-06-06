@@ -1,17 +1,18 @@
 # I/O files for Chrysaora
-chrysaora_py/results/
-chrysaora_py/__pycache__/
-chrysaora_py/tests/__pycache__/
-chrysaora_py/logs/
+chrysaora/results/
+chrysaora//logs/
 
 # Training data for the network
-chrysaora_py/split
-chrysaora_py/network
 
 # Binaries
 src/main
 src/perft
 tests/tboard
+tests/tmovegen
 
 # Logs
 src/logs
+
+# VSCode related files.
+*tempCodeRunner*
+.vscode

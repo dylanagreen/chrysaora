@@ -315,6 +315,23 @@ suite "loading/saving":
       generated = test_board.to_fen()
     check(generated == test_fen)
 
+suite "zobrist tests":
+  test "make/unmake startpos":
+    var
+      board = new_board()
+      zobrist = board.zobrist
+    board.make_move("e2e4")
+    board.unmake_move()
+    check(board.zobrist == zobrist)
+
+  test "make/unmake position 6 capture":
+    var
+      board = load_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10")
+      zobrist = board.zobrist
+    board.make_move("Bc4xf7")
+    board.unmake_move()
+    check(board.zobrist == zobrist)
+
 suite "perft tests":
   test "position 1 depth 4":
     var

@@ -63,6 +63,9 @@ type
     WHITE_ATTACKS*: uint64
     BLACK_ATTACKS*: uint64
 
+    # The zobrist hash representing this board state.
+    zobrist*: uint64
+
   # Custom move list types
   DisambigMove* = tuple[algebraic: string, state: Tensor[int]]
   ShortAndLongMove* = tuple[short: string, long: string, state: Tensor[int]]
@@ -105,12 +108,13 @@ let
   piece_finder = re"[PRNQKB]"
   illegal_piece_finder = re"[A-Z]"
 
+# Initializes the zobrist table.
+bitboard.init_zobrist()
 
 # Forward declarations for use of this later. These are mostly declared so
 # that I can use them in movegen.nim.
 proc new_board*(): Board
 proc make_move*(board: Board, move: Move, skip: bool= false)
-proc unmake_move*(board: Board)
 proc is_in_check*(board: Board, color: Color): bool
 
 proc update_piece_list*(board: Board, move: Move)
@@ -770,6 +774,40 @@ proc update_attack_bitmaps(board: Board, color: Color) =
       board.BLACK_ATTACKS = board.BLACK_ATTACKS or attacks
 
 
+proc update_zobrist(board: Board, move: Move) =
+  # Step 1: XOR out the piece at the start
+  let
+    piece = piece_names[abs(board.current_state[move.start.y, move.start.x])]
+    nums = ['P', 'N', 'R', 'B', 'Q', 'K']
+
+  var
+    piece_num = nums.find(piece)
+    square = move.start.y * 8 + move.start.x
+  if board.to_move == BLACK: piece_num = piece_num + 6
+
+  board.zobrist = board.zobrist xor ZOBRIST_TABLE[square + piece_num * 64]
+
+  # Step 2: XOR out the piece that gets taken
+  if board.current_state[move.fin.y, move.fin.x] != 0 or "e.p." in move.algebraic:
+    var enemy_num = 0
+    if "e.p." in move.algebraic:
+      # These need to be opposite since it's the opposite color we take.
+      # So white takes a black pawn (6)
+      enemy_num = if board.to_move == WHITE: 6 else: 0
+      square = move.start.y * 8 + move.fin.x
+    else:
+      let end_piece = piece_names[abs(board.current_state[move.fin.y, move.fin.x])]
+      enemy_num = nums.find(end_piece)
+      if board.to_move == WHITE: piece_num = piece_num + 6
+      square = move.fin.y * 8 + move.fin.x
+
+    board.zobrist = board.zobrist xor ZOBRIST_TABLE[square + enemy_num * 64]
+
+  # Step 3: XOR in the piece at the end.
+  square = move.fin.y * 8 + move.fin.x
+  board.zobrist = board.zobrist xor ZOBRIST_TABLE[square + piece_num * 64]
+
+
 template check_for_moves(moves: seq[Move]): void=
   if len(moves) > 0:
     noresponses = false
@@ -859,9 +897,10 @@ proc make_move*(board: Board, move: Move, skip: bool = false) =
 
 
   # Need to update the piece positions in the bit maps before we check for
-  # checkmate.
+  # checkmate. Update zobrist hash at the same time.
   board.update_piece_list(move)
   board.update_piece_bitmaps(move)
+  board.update_zobrist(move)
 
   # Does all the updates.
   # Updates the half move clock.
@@ -972,6 +1011,7 @@ proc unmake_move*(board: Board) =
   board.ep_square[board.to_move] = ""
   board.revert_piece_list(move) # Move that piece list back.
   board.update_piece_bitmaps(move) # Reverts the piece bitmaps to the old state.
+  board.update_zobrist(move) # Rever the zobrist since it's xor operated.
   board.status = IN_PROGRESS # Whatever it was now, before it was in progress.
 
   # Reverts the castling state or reduces the castle history depending.
@@ -1165,7 +1205,7 @@ proc load_fen*(fen: string): Board =
                 long: false, piece_list: piece_list,
                 castle_history: castle_history, BLACK_PIECES: black_pieces,
                 WHITE_PIECES: white_pieces, BLACK_ATTACKS: 0'u64,
-                WHITE_ATTACKS: 0'u64)
+                WHITE_ATTACKS: 0'u64, zobrist: 111017'u64)
 
   result.update_attack_bitmaps(WHITE)
   result.update_attack_bitmaps(BLACK)

@@ -81,12 +81,12 @@ proc disambiguate_moves(moves: seq[tuple[short, long: Move]]): seq[Move] =
 
   # Loop through the move/board state sequence.
   for i, m in moves:
-      # If the number of times that the short moves appears is more than 1 we
-      # want to append the long move instead.
-      if all_short.count(m.short.algebraic) > 1:
-        result.add(m.long)
-      else:
-        result.add(m.short)
+    # If the number of times that the short moves appears is more than 1 we
+    # want to append the long move instead.
+    if all_short.count(m.short.algebraic) > 1:
+      result.add(m.long)
+    else:
+      result.add(m.short)
 
 
 proc generate_attack_mask*(board: Board, piece: char, pos: Position, color: Color = WHITE): uint64 =
@@ -140,8 +140,8 @@ proc bits_to_algebraic(possible_moves: uint64, start_pos: Position,
     let
       end_pos: Position = (7 - ((fin - 1) div 8), (fin - 1) mod 8)
       move_tuple = board.row_column_to_algebraic(start_pos, end_pos, piece_numbers[piece])
-    result.add((Move(start: start_pos, fin: end_pos, algebraic: move_tuple.short),
-                Move(start: start_pos, fin: end_pos, algebraic: move_tuple.long)))
+    result.add((Move(start: start_pos, fin: end_pos, algebraic: move_tuple.short, uci: move_tuple.uci),
+                Move(start: start_pos, fin: end_pos, algebraic: move_tuple.long, uci: move_tuple.uci)))
 
     # Sets fin to the next LSB, which will be 0 if there are no bits set.
     fin = possible_moves.firstSetBit()
@@ -224,13 +224,13 @@ proc pawn_bits_to_algebraic(possible_moves: uint64, color: Color, board: Board,
         if not (key == 'P') and not (key == 'K'):
           let move_tuple = board.row_column_to_algebraic(pos, end_pos,
                                                          piece_numbers['P'], val)
-          result.add((Move(start: pos, fin: end_pos, algebraic: move_tuple.short),
-                      Move(start: pos, fin: end_pos, algebraic: move_tuple.long)))
+          result.add((Move(start: pos, fin: end_pos, algebraic: move_tuple.short, uci: move_tuple.uci),
+                      Move(start: pos, fin: end_pos, algebraic: move_tuple.long, uci: move_tuple.uci)))
     else:
       var move_tuple = board.row_column_to_algebraic(pos, end_pos, piece_numbers['P'])
-      if ep: move_tuple = (move_tuple.short & "e.p.", move_tuple.long & "e.p.")
-      result.add((Move(start: pos, fin: end_pos, algebraic: move_tuple.short),
-                  Move(start: pos, fin: end_pos, algebraic: move_tuple.long)))
+      if ep: move_tuple = (move_tuple.short & "e.p.", move_tuple.long & "e.p.", move_tuple.uci)
+      result.add((Move(start: pos, fin: end_pos, algebraic: move_tuple.short, uci: move_tuple.uci),
+                  Move(start: pos, fin: end_pos, algebraic: move_tuple.long, uci: move_tuple.uci)))
 
     # Sets fin to the next LSB, which will be 0 if there are no bits set.
     fin = possible_moves.firstSetBit()
@@ -315,6 +315,7 @@ proc generate_pawn_captures*(board: Board, color: Color): seq[Move] =
   result = result.concat(pawn_bits_to_algebraic(possible_moves, color, board, dir = "right").disambiguate_moves())
   result = board.remove_moves_in_check(result, color)
 
+
 proc generate_castle_moves*(board: Board, color: Color): seq[Move] =
   # Hardcoded because you can only castle from starting Positions.
   # Basically just need to check that the files between the king and
@@ -338,6 +339,8 @@ proc generate_castle_moves*(board: Board, color: Color): seq[Move] =
   if board.is_in_check(color):
     return
 
+  # Change the board to_move for testing that the generating color doesn't
+  # castle through check.
   board.to_move = color
 
   if kingside and sum(abs(between)) == 0:
@@ -348,10 +351,11 @@ proc generate_castle_moves*(board: Board, color: Color): seq[Move] =
     # one space in the kingside direction doesn't put us in check.
     var
       alg = if color == WHITE: "Kf1" else: "Kf8"
+      uci = if color == WHITE: "e1g1" else: "e8g8"
       test_move = Move(start: (rank, 4), fin: (rank, 5), algebraic: alg)
 
     if not board.check_move_for_check(test_move, color):
-      result.add(Move(start: (rank, 4), fin: (rank, 6), algebraic: "O-O"))
+      result.add(Move(start: (rank, 4), fin: (rank, 6), algebraic: "O-O", uci: uci))
 
   # Slice representing the two spaces between the king and the queenside rook.
   between = board.current_state[rank, 1..3]
@@ -359,10 +363,11 @@ proc generate_castle_moves*(board: Board, color: Color): seq[Move] =
     # See reasoning above in kingside.
     var
       alg = if color == WHITE: "Kd1" else: "Kd8"
+      uci = if color == WHITE: "e1c1" else: "e8c8"
       test_move = Move(start: (rank, 4), fin: (rank, 3), algebraic: alg)
 
     if not board.check_move_for_check(test_move, color):
-      result.add(Move(start: (rank, 4), fin: (rank, 2), algebraic: "O-O-O"))
+      result.add(Move(start: (rank, 4), fin: (rank, 2), algebraic: "O-O-O", uci: uci))
 
   board.to_move = orig_color
   result = board.remove_moves_in_check(result, color)

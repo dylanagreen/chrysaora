@@ -199,10 +199,9 @@ proc compute(parser: UCI, cmd: openArray[string]) =
 
   logging.debug("Finding move.")
   let
-    move = parser.engine.find_move()
-    uci_move = parser.algebraic_to_uci(move)
+    uci_move = parser.engine.find_move()
 
-  logging.debug("Found move: ", move)
+  logging.debug("Found move: ", uci_move)
 
   # Sends the move to the gui.
   send_command("bestmove " & uci_move)

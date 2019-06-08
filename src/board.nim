@@ -31,6 +31,8 @@ type
     start*: Position
     fin*: Position
     algebraic*: string
+    # Uci version of the string for pv reporting.
+    uci*: string
 
   Board* = ref object
     to_move*: Color
@@ -157,38 +159,36 @@ proc `$`*(piece: Piece): string=
 # Convert the row and column Positions to an algebraic chess move.
 proc row_column_to_algebraic*(board: Board, start: Position, finish: Position,
                              piece: int, promotion: int = 0):
-                             tuple[short: string, long: string] =
-  var
-    alg1: string = ""
-    alg2: string = ""
+                             tuple[short: string, long: string, uci: string] =
 
   # Adds the piece for non pawn moves.
   if abs(piece) > piece_numbers['P']:
-    alg2.add(piece_names[abs(piece)])
+    result.long.add(piece_names[abs(piece)])
 
   # Add the starting Position to the fully disambiguated move.
-  alg2.add(alg_table[start.y, start.x])
+  result.long.add(alg_table[start.y, start.x])
+  result.uci.add(alg_table[start.y, start.x])
 
   # The x for captures
   if board.current_state[finish.y, finish.x] != 0:
-    alg2.add("x")
+    result.long.add("x")
 
-  # We here append the ending Position to the move.
-  alg2.add(alg_table[finish.y, finish.x])
+  # Append the ending Position to the move.
+  result.long.add(alg_table[finish.y, finish.x])
+  result.uci.add(alg_table[finish.y, finish.x])
 
   if promotion != 0:
-    alg2.add("=")
-    alg2.add(piece_names[abs(promotion)])
+    result.long.add("=")
+    result.long.add(piece_names[abs(promotion)])
+    result.uci.add(piece_names[abs(promotion)].toLowerAscii())
 
   if piece == piece_numbers['P']:
-    if 'x' in alg2:
-      alg1 = alg2[0] & alg2[2..^1]
+    if 'x' in result.long:
+      result.short = result.long[0] & result.long[2..^1]
     else:
-      alg1 = alg2[2..^1]
+      result.short = result.long[2..^1]
   else:
-    alg1 = alg2[0] & alg2[3..^1]
-
-  result = (alg1, alg2)
+    result.short = result.long[0] & result.long[3..^1]
 
 
 # This import needs to be after the type and constant declaration since those

@@ -1,3 +1,4 @@
+import algorithm
 import logging
 import os
 import random
@@ -42,9 +43,9 @@ type
     # The number of nodes searched this search iteration.
     nodes: int
 
-    # The Principal Variation we're currently studying.
-    # I always think of Pressure-Volume plots when I see this.
-    pv: seq[EvalMove]
+    # The moves at the root node and their corresponding evals for move ordering
+    root_moves: seq[Move]
+    root_evals: seq[tuple[move: Move, eval: int]]
 
 
 # Piece-square tables. These tables are partially designed based on those on
@@ -160,7 +161,8 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
     if engine.color == BLACK: result[0].eval = result[0].eval * -1
     return
   else:
-    let moves = search_board.generate_all_moves(search_board.to_move)
+    let moves = if depth == engine.cur_depth: engine.root_moves
+                else: search_board.generate_all_moves(search_board.to_move)
 
     #If there are no moves then someone either got checkmated or stalemated.
     if len(moves) == 0:
@@ -205,11 +207,28 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
         # this ply, so if the valuation is less than the lowest we update it.
         cur_beta = min([cur_beta, result[0].eval])
 
+      if depth == engine.cur_depth:
+        engine.root_evals.add((m, result[0].eval))
+
       # Once alpha exceeds beta, i.e. once the minimum score that
       # the engine will receieve on a node (alpha) exceeds the
       # maximum score that the engine predicts for the opponent (beta)
       if cur_alpha >= cur_beta or not engine.compute:
         return
+
+
+
+# Sorts the root moves to put the highest evaluated one first to try and proc
+# more cutoffs.
+proc sort_root_moves(engine: Engine) =
+  # Comparison where lower eval is ranked lower
+  proc comparison(x, y: tuple[move: Move, eval: int]): int =
+    if x.eval < y.eval: -1 else: 1
+
+  engine.root_evals.sort(comparison, order=SortOrder.Descending)
+
+  # Extracts the new sorted root moves from the sorted evals.
+  engine.root_moves = engine.root_evals.map(proc(x: tuple[move: Move, eval: int]): Move = x.move)
 
 
 # I know this is duplicated from UCI but I didn't want to have to try and
@@ -230,12 +249,14 @@ proc search(engine: Engine, max_depth: int): EvalMove =
     time: int
     nps: int
 
+  # Generates our route node moves.
+  engine.root_moves = engine.board.generate_all_moves(engine.board.to_move)
+
   # Iterative deepening framework.
   for d in 1..max_depth:
+    engine.root_evals = @[]
     # Clear the number of nodes before starting.
     engine.nodes = 0
-    # Makes sure the pv is the right length.
-    engine.pv.add(("", 0))
 
     # Records the current depth.
     engine.cur_depth = d
@@ -250,6 +271,11 @@ proc search(engine: Engine, max_depth: int): EvalMove =
 
     let pv = moves.map(proc(x: EvalMove): string = x.best_move).join(" ")
     send_command(&"info depth {d} seldepth {d} score cp {result.eval} nodes {engine.nodes} nps {nps} time {time} pv {pv}")
+
+    # Use the magic of iterative deepning to sort moves for more cutoffs.
+    # Not much of a reason to sort this after depth 1.
+    #if d == 1:
+    engine.sort_root_moves()
 
 
 proc find_move*(engine: Engine): string =

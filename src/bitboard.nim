@@ -131,7 +131,7 @@ var
   ROOK_INDEX*: array[64, Magic]
   BISHOP_INDEX*: array[64, Magic]
 
-  ZOBRIST_TABLE*: array[64*12, uint64]
+  ZOBRIST_TABLE*: array[64*12 + 2, uint64]
 
 
 proc generate_straight_moves(occupied: uint64, start: Position): uint64 =
@@ -275,3 +275,10 @@ proc init_zobrist*() =
       while num in ZOBRIST_TABLE:
         num = r.next()
       ZOBRIST_TABLE[s + p * 64] = num
+
+  # The two side to move entries.
+  for i in 0..1:
+    var num = r.next()
+    while num in ZOBRIST_TABLE:
+      num = r.next()
+    ZOBRIST_TABLE[ZOBRIST_TABLE.len() + i - 2] = num

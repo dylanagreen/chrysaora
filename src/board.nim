@@ -156,6 +156,13 @@ proc `$`*(piece: Piece): string=
   result = result & "Square: " & piece.square & " "
 
 
+proc `$`*(move: Move): string=
+  result = "(Start: " & $move.start
+  result = result & ", End: " & $move.fin
+  result = result & ", Algebraic: " & move.algebraic
+  result = result & ", UCI: " & move.uci & ")"
+
+
 # Convert the row and column Positions to an algebraic chess move.
 proc row_column_to_algebraic*(board: Board, start: Position, finish: Position,
                              piece: int, promotion: int = 0):
@@ -806,6 +813,11 @@ proc update_zobrist(board: Board, move: Move) =
   # Step 3: XOR in the piece at the end.
   square = move.fin.y * 8 + move.fin.x
   board.zobrist = board.zobrist xor ZOBRIST_TABLE[square + piece_num * 64]
+
+  board.zobrist = board.zobrist xor uint64(board.castle_rights)
+
+  board.zobrist = if board.to_move == WHITE: board.zobrist xor ZOBRIST_TABLE[^1]
+                  else: board.zobrist xor ZOBRIST_TABLE[^2]
 
 
 template check_for_moves(moves: seq[Move]): void=

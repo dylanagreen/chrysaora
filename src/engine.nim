@@ -21,6 +21,23 @@ type
 
   EvalMove = tuple[best_move: string, eval: int]
 
+  # Object for transposition table entries.
+  Transposition* = ref object
+    # Zobrist hash for the board position represented by this entry.
+    zobrist: uint64
+
+    # The score and score type. Score type is used for if the score returned
+    # on an alpha-beta cutoff in which case it's an approximation and not
+    # the true score and we need to know that.
+    eval: int
+    score_type: string
+
+    # The previously found best refutation move, to search first from this pos
+    refutation: Move
+
+    # The depth at which we put this entry in.
+    depth: int
+
   Engine* = ref object
     # An internal representation of the board.
     board*: Board
@@ -46,6 +63,9 @@ type
     # The moves at the root node and their corresponding evals for move ordering
     root_moves: seq[Move]
     root_evals: seq[tuple[move: Move, eval: int]]
+
+
+var tt: array[200, Transposition]
 
 
 # Piece-square tables. These tables are partially designed based on those on
@@ -161,8 +181,10 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
     if engine.color == BLACK: result[0].eval = result[0].eval * -1
     return
   else:
-    let moves = if depth == engine.cur_depth: engine.root_moves
-                else: search_board.generate_all_moves(search_board.to_move)
+    var
+      moves = if depth == engine.cur_depth: engine.root_moves
+              else: search_board.generate_all_moves(search_board.to_move)
+      best_move: Move
 
     #If there are no moves then someone either got checkmated or stalemated.
     if len(moves) == 0:
@@ -177,6 +199,26 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
       else:
         result[0].eval = depth * 5000
       return
+
+    # Before we start the search let's see if we can cut it off early with
+    # Transposition hit
+    let
+      # We use mod as our hash function. Partially because it's easy.
+      index = search_board.zobrist mod uint64(tt.len())
+      hit = tt[index]
+    # We only want to access the table if the full state is the same. With
+    # small tables collisions are more likely so this resolves them.
+    # Is nil checks that the index has even been filled before.
+    if not hit.isNil and hit.zobrist == search_board.zobrist:
+      # If the current depth is less than the tt one then we can use it, as
+      # the tt one will be more "accurate." If we are searching a deeper
+      # depth than the table, then we don't use the table, since we will
+      # get a better measure of how good the move is. In this case we
+      # search the previously best found refutation first.
+      if depth < hit.depth:
+        return @[(hit.refutation.uci, hit.eval)]
+      else:
+        moves.insert(hit.refutation)
 
     for m in moves:
       # Generate a new board state for move generation.
@@ -193,6 +235,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
       # color and min if it's not (the guiding principle of minimax...)
       if color == engine.color:
         if best_lower[0].eval > result[0].eval:
+          best_move = m
           result = @[(m.uci, best_lower[0].eval)].concat(best_lower)
 
         # If we're doing alpha cut offs we're looking for the maximum on
@@ -201,6 +244,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
 
       else:
         if best_lower[0].eval < result[0].eval:
+          best_move = m
           result = @[(m.uci, best_lower[0].eval)].concat(best_lower)
 
         # If we're doing beta cut offs we're looking for the minimum on
@@ -214,7 +258,18 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
       # the engine will receieve on a node (alpha) exceeds the
       # maximum score that the engine predicts for the opponent (beta)
       if cur_alpha >= cur_beta or not engine.compute:
+        let cutoff_type = if color == engine.color: "alpha"
+                          else: "beta"
+        tt[index] = Transposition(refutation: m, zobrist: search_board.zobrist,
+                                  eval: result[0].eval, score_type: cutoff_type,
+                                  depth: depth)
         return
+
+    # Adds the score to the transposition table.
+    # I put the things in different orders to the tabbing would be nice.
+    tt[index] = Transposition(refutation: best_move, eval: result[0].eval,
+                              zobrist: search_board.zobrist, score_type: "pure",
+                              depth: depth)
 
 
 

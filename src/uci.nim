@@ -42,7 +42,8 @@ proc identify*() =
   for key, value in id:
     send_command(["id", key, value].join(" "))
 
-  # Don't have any options to send yet!
+  # Id the options
+  send_command("option name Hash type spin default 16 min 1 max 4096")
 
   # Writes the ok command at the end.
   send_command("uciok")
@@ -87,10 +88,21 @@ proc uci_to_algebraic(parser: UCI, move: string): string =
       result = $piece_name & move
 
 
-#proc set_option(option: openArray[string]) =
+proc set_option(option: seq[string]) =
+  if option[2] == "Hash":
+    try:
+      var size = parseFloat(option[^1])
+
+      # Multiplying by 12.5 gets the number of entries. We multiply by 1000 to
+      # convert megabytes to bytes, then divide by 80 (the number of bytes in
+      # each transposition entry.)
+      size = size * 12.5
+      engine.tt = newSeq[Transposition](int(floor(size)))
+    except:
+      echo "Invalid hash size input, defaulting to 16."
 
 
-proc set_up_position(parser: UCI, cmd: openArray[string]) =
+proc set_up_position(parser: UCI, cmd: seq[string]) =
   var same = false
   # Checks that all the moves except the last two are identical to the previous
   # position command. If they are then we can start the moves from the last two.
@@ -227,8 +239,7 @@ proc decrypt_uci*(parser: UCI, cmd: string) =
     parser.board = new_board()
     parser.previous_cmd = @[]
   elif to_exec == "setoption":
-    echo "temp"
-    #set_option(fields)
+    set_option(fields)
 
 
 proc receive_command*(): string =

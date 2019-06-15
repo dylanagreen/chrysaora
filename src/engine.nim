@@ -24,19 +24,19 @@ type
   # Object for transposition table entries.
   Transposition* = ref object
     # Zobrist hash for the board position represented by this entry.
-    zobrist: uint64
+    zobrist*: uint64
 
     # The score and score type. Score type is used for if the score returned
     # on an alpha-beta cutoff in which case it's an approximation and not
     # the true score and we need to know that.
-    eval: int
-    score_type: string
+    eval*: int
+    score_type*: string
 
     # The previously found best refutation move, to search first from this pos
-    refutation: Move
+    refutation*: Move
 
     # The depth at which we put this entry in.
-    depth: int
+    depth*: int
 
   Engine* = ref object
     # An internal representation of the board.
@@ -65,7 +65,7 @@ type
     root_evals: seq[tuple[move: Move, eval: int]]
 
 
-var tt: array[200, Transposition]
+var tt* = newSeq[Transposition](200)
 
 
 # Piece-square tables. These tables are partially designed based on those on

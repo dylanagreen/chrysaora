@@ -4,12 +4,12 @@ Chrysaora may very well be the first serious attempt to build a world class ches
 Chrysaora started as an attempt to use supervised learning and a small image classification styled network to play chess using Python. The results of this experiment are stored in [chrysaora_py](https://github.com/dylanagreen/chrysaora_py). The project has now shifted to building an experimental "hybrid" chess engine. This hybrid will have an evaluation function that consists of two parts:
 
 - A reinforcement learning trained neural network
-- A handcraft evaluation function top layer.
+- A handcrafted element, used for quiescence searching and depth-1 move ordering.
 
-At present I see a few ways to integrate the two, none of which I have settled on yet. Chrysaora also features an alpha-beta pruned minimax search.
+At present I see a few ways to integrate the two, none of which I have settled on yet. 
 
 ## Support
-Chrysaora will be supported until I get my PhD (in Physics), it wins a season of the TCEC or Nim dies, whichever comes first.
+Chrysaora will be supported until I get my PhD (in Physics), it wins a season of the TCEC, or Nim dies, whichever comes first.
 
 ## Naming
 Chrysaora is named after the genus of jellyfish, which in turn is named after Chrysaor, a being from Greek mythology. Chrysaor roughly translates as "he who has a golden armament."
@@ -18,10 +18,10 @@ Chrysaora is named after the genus of jellyfish, which in turn is named after Ch
 Deep learning is done using [arraymancer](https://github.com/mratsim/Arraymancer), which is the only dependency outside the Nim standard library.
 
 ### Building
-Chrysaora requires the most recent development version of Nim, as it requires features not present in the most recent stable version (0.19.6). With Nim (and arraymancer) installed, building Chrysaora is as simple as:
+Chrysaora requires a minimum Nim version of 0.20.0. With Nim (and arraymancer) installed, building Chrysaora is as simple as:
 
 ```
-nim c -d:release src/main.nim
+nim c -d:danger src/main.nim
 ```
 
 ## Features
@@ -33,6 +33,8 @@ nim c -d:release src/main.nim
   - Piece-square tables
 - Search
   - Fail-hard alpha-beta pruning minimax
+  - Zobrist hashing indexed transposition tables
+  - Iterative Deepening
 
 ### Acknowledgements
 I'd like to say a very special thank you to the following engines, which I consulted during the coding of Chrysaora:

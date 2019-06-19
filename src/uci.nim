@@ -245,7 +245,7 @@ proc decrypt_uci*(parser: UCI, cmd: string) =
     parser.previous_cmd = @[]
 
     # Need to clear the transposition table
-    engine.tt = newSeq[Transposition](200)
+    engine.tt = newSeq[Transposition](engine.tt.len)
   elif to_exec == "setoption":
     set_option(fields)
 

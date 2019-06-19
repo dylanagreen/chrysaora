@@ -618,19 +618,15 @@ proc update_ep_square(board: Board, move: Move) =
   elif abs(move.start.y - move.fin.y) != 2 or move.start.x != move.fin.x:
     return
 
-  let
-    loc = move.uci[2..3]
+  var square: Position = if board.to_move == WHITE: (move.fin.y + 1, move.fin.x)
+                         else: (move.fin.y - 1, move.fin.x)
 
-  var square = if board.to_move == WHITE: flat_alg_table.find(loc) + 8
-               else: flat_alg_table.find(loc) - 8
-
-  if square > -1 and square < 64 and
-     board.current_state[square div 8, square mod 8] == 0:
-    board.ep_square[board.to_move] = flat_alg_table[square]
+  if square.y > 0 and square.y < 7 and
+     board.current_state[square.y, square.x] == 0:
+    board.ep_square[board.to_move] = flat_alg_table[square.y * 8 + square.x]
 
     # Flip the y for updating the ep_bit.
-    square = (7 - square div 8) * 8 + square mod 8
-    board.ep_bit[board.to_move].setBit(square)
+    board.ep_bit[board.to_move].setBit((7 - square.y) * 8 + square.x)
 
 
 proc update_piece_list*(board: Board, move: Move) =

@@ -268,23 +268,9 @@ proc generate_pawn_moves*(board: Board, color: Color): seq[Move] =
 proc generate_pawn_captures*(board: Board, color: Color): seq[Move] =
   let pawns = board.find_piece(color, 'P')
   var pawn_bits = 0'u64
-  var ep_bit = 0'u64
-
-  if color  == WHITE:
-    var index = flat_alg_table.find(board.ep_square[BLACK])
-    if index > -1:
-      # Need to flip the y coordinate.
-      index = (7 - index div 8) * 8 + index mod 8
-      ep_bit.setBit(index)
-  else:
-    var index = flat_alg_table.find(board.ep_square[WHITE])
-    if index > -1:
-      # Need to flip the y coordinate.
-      index = (7 - index div 8) * 8 + index mod 8
-      ep_bit.setBit(index)
 
   # Ensures that the ep-bit is in the right rank.
-  ep_bit = if color == WHITE: ep_bit and RANK_6 else: ep_bit and RANK_3
+  var ep_bit = if color == WHITE: board.ep_bit[BLACK] else: board.ep_bit[WHITE]
 
   for pos in pawns:
     pawn_bits.setBit(((7 - pos.y)*8 + pos.x))

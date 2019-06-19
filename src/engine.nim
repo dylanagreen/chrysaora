@@ -172,7 +172,6 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
                     seq[EvalMove] =
 
   if (epochTime() - engine.start_time) * 1000 > engine.time_per_move:
-    logging.debug("TIME CUTOFF ACHIEVED")
     engine.compute = false
 
   # Initializes the result sequence.
@@ -266,8 +265,6 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
       # the engine will receieve on a node (alpha) exceeds the
       # maximum score that the engine predicts for the opponent (beta)
       if cur_alpha >= cur_beta or not engine.compute:
-        if not engine.compute:
-          logging.debug("COMPUTE IS FALSE")
         let cutoff_type = if color == engine.color: "alpha"
                           else: "beta"
         tt[index] = Transposition(refutation: m, zobrist: search_board.zobrist,

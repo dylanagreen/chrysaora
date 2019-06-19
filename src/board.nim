@@ -48,6 +48,7 @@ type
     # A square behind a pawn that moves two, i.e. the square a pawn taking
     # en passant would end on.
     ep_square*: Table[Color, string]
+    ep_bit*: Table[Color, uint64]
 
     # Whether every move should return the long algebraic regardles of whether
     # it needs to or not. This helps when checking en passant and rook
@@ -610,8 +611,15 @@ proc is_checkmate*(board: Board, color: Color): bool =
     result = true
 
 proc update_ep_square(board: Board, move: Move) =
+  # Some checks, first check the pawn even moves in this move (for calls from
+  # unmake) and then check the pawn moves two straight.
+  if not move.algebraic[0].isLowerASCII():
+    return
+  elif abs(move.start.y - move.fin.y) != 2 or move.start.x != move.fin.x:
+    return
+
   let
-    loc = move.algebraic[^2..^1]
+    loc = move.uci[2..3]
 
   var square = if board.to_move == WHITE: flat_alg_table.find(loc) + 8
                else: flat_alg_table.find(loc) - 8
@@ -619,6 +627,10 @@ proc update_ep_square(board: Board, move: Move) =
   if square > -1 and square < 64 and
      board.current_state[square div 8, square mod 8] == 0:
     board.ep_square[board.to_move] = flat_alg_table[square]
+
+    # Flip the y for updating the ep_bit.
+    square = (7 - square div 8) * 8 + square mod 8
+    board.ep_bit[board.to_move].setBit(square)
 
 
 proc update_piece_list*(board: Board, move: Move) =
@@ -814,10 +826,15 @@ proc update_zobrist(board: Board, move: Move) =
   square = move.fin.y * 8 + move.fin.x
   board.zobrist = board.zobrist xor ZOBRIST_TABLE[square + piece_num * 64]
 
+  # Castling rights also encoded in the zobrist hash
   board.zobrist = board.zobrist xor uint64(board.castle_rights)
 
+  # Side to move encoded in the zobrist hash
   board.zobrist = if board.to_move == WHITE: board.zobrist xor ZOBRIST_TABLE[^1]
                   else: board.zobrist xor ZOBRIST_TABLE[^2]
+
+  # Encoding the ep_bit into the zobrist has as well.
+  #board.zobrist = board.zobrist xor board.ep_bit[board.to_move]
 
 
 template check_for_moves(moves: seq[Move]): void=
@@ -845,7 +862,6 @@ template move_to_tensor*(move: Move) =
   # Deletes the pawn we take in en passant.
   elif "e.p." in move.algebraic:
     board.current_state[move.start.y, move.fin.x] = 0
-
 
 
 proc make_move*(board: Board, move: Move, skip: bool = false) =
@@ -928,6 +944,7 @@ proc make_move*(board: Board, move: Move, skip: bool = false) =
   board.to_move = to_move
   # Clear the ep square from the opposite color as its no longer in play
   board.ep_square[to_move] = ""
+  board.ep_bit[to_move] = 0'u64
   board.move_list.add(move)
 
   # For now update both attack bitmaps.
@@ -1008,6 +1025,8 @@ proc make_move*(board: Board, move: string) =
 
     big_move.fin = (rank, file)
 
+    big_move.uci = locs[0] & locs[1]
+
   make_move(board, big_move)
 
 
@@ -1021,6 +1040,7 @@ proc unmake_move*(board: Board) =
     board.update_ep_square(board.move_list[^1])
   board.to_move = if board.to_move == WHITE: BLACK else: WHITE # Invert color
   board.ep_square[board.to_move] = ""
+  board.ep_bit[board.to_move] = 0'u64
   board.revert_piece_list(move) # Move that piece list back.
   board.update_piece_bitmaps(move) # Reverts the piece bitmaps to the old state.
   board.update_zobrist(move) # Rever the zobrist since it's xor operated.
@@ -1208,13 +1228,15 @@ proc load_fen*(fen: string): Board =
       for i in 1..num_plies:
         temp_move_list.add(Move(start: (0, 0), fin: (0, 0), algebraic: $i & "Q"))
 
-  var castle_history: array[8, int] = [0, 0, 0, 0, 0, 0, 0, 0]
+  var
+    castle_history: array[8, int] = [0, 0, 0, 0, 0, 0, 0, 0]
+    ep_bit = {WHITE: 0'u64, BLACK: 0'u64}.toTable
   result = Board(half_move_clock: half_move, game_states: @[],
                 current_state: board_state.toTensor,
                 castle_rights: castle_dict, to_move: side_to_move,
                 status: IN_PROGRESS, move_list: temp_move_list,
                 headers: initTable[string, string](), ep_square: ep_square,
-                long: false, piece_list: piece_list,
+                long: false, piece_list: piece_list, ep_bit: ep_bit,
                 castle_history: castle_history, BLACK_PIECES: black_pieces,
                 WHITE_PIECES: white_pieces, BLACK_ATTACKS: 0'u64,
                 WHITE_ATTACKS: 0'u64, zobrist: 111017'u64)

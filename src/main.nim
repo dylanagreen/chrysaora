@@ -24,7 +24,7 @@ let
   cur_board = new_board()
   time_params = {"wtime" : -1, "btime" : -1, "winc" : -1, "binc" : -1}.toTable
   cur_engine = Engine(board: cur_board, time_params: time_params, compute: true,
-                      max_depth: 3, color: cur_board.to_move)
+                      max_depth: 15, color: cur_board.to_move)
   interpreter = UCI(board: cur_board, previous_cmd: @[], engine: cur_engine)
 
 addHandler(fileLog)

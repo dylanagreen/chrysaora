@@ -3,6 +3,7 @@ import re
 import strutils
 import tables
 import terminal
+import times
 
 import arraymancer
 
@@ -186,8 +187,8 @@ proc algebraic_to_uci*(parser: UCI, move: string): string =
 
 
 proc compute(parser: UCI, cmd: openArray[string]) =
-  var parameters = {"wtime" : -1, "btime" : -1,
-                    "winc" : -1, "binc" : -1}.toTable
+  var parameters = {"wtime" : 0, "btime" : 0,
+                    "winc" : 0, "binc" : 0}.toTable
 
   # Extracts the computation commands from the go command.
   # Things like wtime, btime, winc, binc.
@@ -207,6 +208,10 @@ proc compute(parser: UCI, cmd: openArray[string]) =
   # Sets the engines board to be the same as the parser.
   parser.engine.board = parser.board
   parser.engine.time_params = parameters
+
+  let to_go = cmd.find("movestogo")
+  parser.engine.moves_to_go = if to_go > -1: parseInt(cmd[to_go + 1]) else: 0
+
   parser.engine.compute = true
 
   logging.debug("Finding move.")
@@ -238,6 +243,9 @@ proc decrypt_uci*(parser: UCI, cmd: string) =
   elif to_exec == "ucinewgame":
     parser.board = new_board()
     parser.previous_cmd = @[]
+
+    # Need to clear the transposition table
+    engine.tt = newSeq[Transposition](200)
   elif to_exec == "setoption":
     set_option(fields)
 

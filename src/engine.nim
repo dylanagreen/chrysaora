@@ -42,7 +42,7 @@ type
     # An internal representation of the board.
     board*: Board
 
-    # Time parameters. I'll need this at some point.
+    # Time parameters.
     time_params*: Table[string, int]
 
     # Boolean for whether or not the engine should be computing right now
@@ -63,6 +63,13 @@ type
     # The moves at the root node and their corresponding evals for move ordering
     root_moves: seq[Move]
     root_evals: seq[tuple[move: Move, eval: int]]
+
+    # Number of moves to get into the remaining time, for time control.
+    moves_to_go*: int
+
+    # Starting time of the search, we use this for time management.
+    start_time: float
+    time_per_move: float
 
 
 var tt* = newSeq[Transposition](200)
@@ -163,8 +170,9 @@ proc evaluate_move(engine: Engine, board: Board): int =
 proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
                     alpha: int = -50000, beta: int = 50000, color: Color):
                     seq[EvalMove] =
-  # If we recieve the stop command don't go any deeper just return best move.
-  if check_for_stop():
+
+  if (epochTime() - engine.start_time) * 1000 > engine.time_per_move:
+    logging.debug("TIME CUTOFF ACHIEVED")
     engine.compute = false
 
   # Initializes the result sequence.
@@ -209,7 +217,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
     # We only want to access the table if the full state is the same. With
     # small tables collisions are more likely so this resolves them.
     # Is nil checks that the index has even been filled before.
-    if not hit.isNil and hit.zobrist == search_board.zobrist:
+    if not hit.isNil and hit.zobrist == search_board.zobrist and engine.cur_depth > 1:
       # If the current depth is less than the tt one then we can use it, as
       # the tt one will be more "accurate." If we are searching a deeper
       # depth than the table, then we don't use the table, since we will
@@ -258,6 +266,8 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
       # the engine will receieve on a node (alpha) exceeds the
       # maximum score that the engine predicts for the opponent (beta)
       if cur_alpha >= cur_beta or not engine.compute:
+        if not engine.compute:
+          logging.debug("COMPUTE IS FALSE")
         let cutoff_type = if color == engine.color: "alpha"
                           else: "beta"
         tt[index] = Transposition(refutation: m, zobrist: search_board.zobrist,
@@ -298,17 +308,51 @@ proc send_command(cmd: string) =
 
 
 proc search(engine: Engine, max_depth: int): EvalMove =
+  # Start the clock!
+  engine.start_time = epochTime()
+
   var
     # Times for calculating nodes per second
     t1, t2: float
     time: int
     nps: int
 
+  if engine.color == WHITE:
+    if engine.moves_to_go > 0:
+      engine.time_per_move = float(engine.time_params["wtime"] div engine.moves_to_go +
+                                   engine.time_params["winc"])
+    # In cases where a moves to go wasn't passed the engine defaults to trying
+    # to fit 30 moves into that span of time. In the future this can be more
+    # advanced and the number can vary over the course of the game.
+    else:
+      engine.time_per_move = float(engine.time_params["wtime"] div 30 +
+                                   engine.time_params["winc"])
+  else:
+    if engine.moves_to_go > 0:
+      engine.time_per_move = float(engine.time_params["btime"] div engine.moves_to_go +
+                                   engine.time_params["binc"])
+    else:
+      engine.time_per_move = float(engine.time_params["btime"] div 30 +
+                                   engine.time_params["binc"])
+
+  # We only want to calculate for 4/5 of the calculated time, to give some
+  # buffer for reporting and to give us a little extra time later.
+  engine.time_per_move = engine.time_per_move * (4/5)
+
+  # If the time is less than 1 ms default to 10 seconds.
+  if engine.time_per_move < 1:
+    engine.time_per_move = 10000
+
   # Generates our route node moves.
   engine.root_moves = engine.board.generate_all_moves(engine.board.to_move)
 
   # Iterative deepening framework.
   for d in 1..max_depth:
+    if not engine.compute:
+      break
+    # If we recieve the stop command don't go any deeper just return best move.
+    elif check_for_stop():
+     break
     engine.root_evals = @[]
     # Clear the number of nodes before starting.
     engine.nodes = 0
@@ -329,8 +373,8 @@ proc search(engine: Engine, max_depth: int): EvalMove =
 
     # Use the magic of iterative deepning to sort moves for more cutoffs.
     # Not much of a reason to sort this after depth 1.
-    #if d == 1:
-    engine.sort_root_moves()
+    if d == 1:
+      engine.sort_root_moves()
 
 
 proc find_move*(engine: Engine): string =

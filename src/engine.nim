@@ -71,6 +71,9 @@ type
     start_time: float
     time_per_move: float
 
+    # Cumulative time spent searching
+    time: int
+
 
 var tt* = newSeq[Transposition](200)
 
@@ -311,8 +314,9 @@ proc search(engine: Engine, max_depth: int): EvalMove =
   var
     # Times for calculating nodes per second
     t1, t2: float
-    time: int
     nps: int
+
+  engine.time = 0
 
   if engine.color == WHITE:
     if engine.moves_to_go > 0:
@@ -361,12 +365,12 @@ proc search(engine: Engine, max_depth: int): EvalMove =
     let moves = engine.minimax_search(engine.board, d, color = engine.color)
     t2 = cpuTime()
     # cpuTime is in seconds and we need milliseconds.
-    time = int(floor((t2 - t1) * 1000))
+    engine.time += int(floor((t2 - t1) * 1000))
     nps = int(float(engine.nodes) / (t2 - t1))
     result = moves[0]
 
     let pv = moves.map(proc(x: EvalMove): string = x.best_move).join(" ")
-    send_command(&"info depth {d} seldepth {d} score cp {result.eval} nodes {engine.nodes} nps {nps} time {time} pv {pv}")
+    send_command(&"info depth {d} seldepth {d} score cp {result.eval} nodes {engine.nodes} nps {nps} time {engine.time} pv {pv}")
 
     # Use the magic of iterative deepning to sort moves for more cutoffs.
     # Not much of a reason to sort this after depth 1.

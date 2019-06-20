@@ -820,7 +820,16 @@ proc update_zobrist(board: Board, move: Move) =
 
   # Step 3: XOR in the piece at the end.
   square = move.fin.y * 8 + move.fin.x
-  board.zobrist = board.zobrist xor ZOBRIST_TABLE[square + piece_num * 64]
+  var end_num = piece_num
+
+  # Need to account for the pawn changing on promotion.
+  if piece == 'P' and (move.fin.y == 7 or move.fin.y == 0):
+    end_num = nums.find(move.algebraic[^1])
+    if end_num > 0:
+      if board.to_move == BLACK: end_num = end_num + 6
+    else:
+      end_num = piece_num
+  board.zobrist = board.zobrist xor ZOBRIST_TABLE[square + end_num * 64]
 
   # Castling rights also encoded in the zobrist hash
   board.zobrist = board.zobrist xor uint64(board.castle_rights)

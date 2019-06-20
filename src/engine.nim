@@ -226,6 +226,8 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
       # get a better measure of how good the move is. In this case we
       # search the previously best found refutation first.
       if depth < hit.depth:
+        # If we pull the eval out of the TT we still evaluated that node.
+        engine.nodes += 1
         return @[(hit.refutation.uci, hit.eval)]
       else:
         moves.insert(hit.refutation)

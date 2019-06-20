@@ -39,8 +39,8 @@ type
     half_move_clock*: int
     game_states*: seq[Tensor[int]]
     current_state*: Tensor[int]
-    castle_rights*: uint32
-    castle_history*: array[8, int]
+    castle_rights*: uint8
+    castle_history*: seq[uint8]
     move_list*: seq[Move]
     status*: Status
     headers*: Table[string, string]
@@ -864,10 +864,8 @@ proc make_move*(board: Board, move: Move, skip: bool = false) =
   let
     to_move = if board.to_move == WHITE: BLACK else: WHITE
     castle_move = "O-O" in move.algebraic or "0-0" in move.algebraic
-    # The index to update in the castling history.
-    index = 7 - board.castle_rights.countLeadingZeroBits() div 4
 
-  board.castle_history[index] += 1
+  board.castle_history.add(board.castle_rights)
 
   var piece = 'P'
 
@@ -883,15 +881,11 @@ proc make_move*(board: Board, move: Move, skip: bool = false) =
   # Updates the castle table for castling rights.
   # This block removes castling from both sides if the king moves.
   if piece == 'K' or castle_move:
-    # This line moves the current castling rights to the left and duplicates
-    # it into the first four bits. 15 is the value of all four first bits set.
-    board.castle_rights = (board.castle_rights and 15'u32) or (board.castle_rights shl 4)
     if board.to_move == WHITE:
-      board.castle_rights = board.castle_rights and (BLACK_CASTLING or not 15'u32)
+      board.castle_rights = board.castle_rights and BLACK_CASTLING
     else:
-      board.castle_rights = board.castle_rights and (WHITE_CASTLING or not 15'u32)
+      board.castle_rights = board.castle_rights and WHITE_CASTLING
   elif piece == 'R':
-    board.castle_rights = (board.castle_rights and 15'u32) or (board.castle_rights shl 4)
     # Can use the magic of tuple equality for this now.
     if move.start == (0, 0):
       board.castle_rights = board.castle_rights and (not BLACK_QUEENSIDE)
@@ -906,17 +900,13 @@ proc make_move*(board: Board, move: Move, skip: bool = false) =
   # ever moving. We can't castle with a rook that doesn't exist.
   if board.to_move == WHITE:
     if "xa8" in move.algebraic:
-      board.castle_rights = (board.castle_rights and 15'u32) or (board.castle_rights shl 4)
       board.castle_rights = board.castle_rights and (not BLACK_QUEENSIDE)
     elif "xh8" in move.algebraic:
-      board.castle_rights = (board.castle_rights and 15'u32) or (board.castle_rights shl 4)
       board.castle_rights = board.castle_rights and (not BLACK_KINGSIDE)
   else:
     if "xa1" in move.algebraic:
-      board.castle_rights = (board.castle_rights and 15'u32) or (board.castle_rights shl 4)
       board.castle_rights = board.castle_rights and (not WHITE_QUEENSIDE)
     elif "xh1" in move.algebraic:
-      board.castle_rights = (board.castle_rights and 15'u32) or (board.castle_rights shl 4)
       board.castle_rights = board.castle_rights and (not WHITE_KINGSIDE)
 
 
@@ -1044,15 +1034,7 @@ proc unmake_move*(board: Board) =
 
   # Reverts the castling state or reduces the castle history depending.
   # Need this if block here because if it's 0 the compiler likes to do its own thing.
-  let index = if board.castle_rights == 0'u32: 0
-              else: 7 - (board.castle_rights.countLeadingZeroBits() div 4)
-
-  if board.castle_history[index] == 0:
-    board.castle_rights = board.castle_rights shr 4
-    if index > 0:
-      board.castle_history[index - 1] -= 1
-  else:
-    board.castle_history[index] -= 1
+  board.castle_rights = board.castle_history.pop()
 
   # For now update both attack bitmaps.
   board.update_attack_bitmaps(WHITE)
@@ -1183,7 +1165,7 @@ proc load_fen*(fen: string): Board =
   var
     side_to_move = if fields[1] == "w": WHITE else: BLACK
     # Castling rights
-    castle_dict: uint32 = 0
+    castle_dict: uint8 = 0
 
   let
     castle_names = {'K': WHITE_KINGSIDE, 'Q': WHITE_QUEENSIDE,
@@ -1225,7 +1207,7 @@ proc load_fen*(fen: string): Board =
         temp_move_list.add(Move(start: (0, 0), fin: (0, 0), algebraic: $i & "Q"))
 
   var
-    castle_history: array[8, int] = [0, 0, 0, 0, 0, 0, 0, 0]
+    castle_history: seq[uint8] =  @[]
     ep_bit = {WHITE: 0'u64, BLACK: 0'u64}.toTable
   result = Board(half_move_clock: half_move, game_states: @[],
                 current_state: board_state.toTensor,

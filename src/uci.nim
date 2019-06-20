@@ -123,7 +123,7 @@ proc set_up_position(parser: UCI, cmd: seq[string]) =
       raise newException(ValueError,
                          "Told to make moves, but no moves were passed")
 
-    var moves_to_make = cmd[start+1..^1]
+    var moves_to_make = cmd[start + 1..^1]
 
     # This requires that there be at least two moves to make after the same
     # So that we can just make the last two moves.

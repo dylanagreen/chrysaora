@@ -5,11 +5,10 @@ import system
 import tables
 import times
 
-import uci
-import engine
 import board
-
-var cmd = stdin.readLine()
+import engine
+import parselog
+import uci
 
 # Makes the folder for the logs if it doesn't exist yet. For now just makes it
 # in the folder the program is in.
@@ -27,11 +26,27 @@ let
                       max_depth: 15, color: cur_board.to_move)
   interpreter = UCI(board: cur_board, previous_cmd: @[], engine: cur_engine)
 
+var
+  cmd: string
+
 addHandler(fileLog)
-logging.debug("Input: ", cmd)
+# If any command line parameters are passed we enter this first code block.
+if paramCount() > 0:
+  let params = commandLineParams()
 
-identify()
+  if params[0] == "--parselog":
+    parse_log(params[1], interpreter)
 
+else:
+  # Gets the first command (usually "uci" but really could be anything)
+  cmd = stdin.readLine()
+  logging.debug("Input: ", cmd)
+
+  # Sends the identifying strings
+  identify()
+
+# Core running loop. Receives commands, decrypts them, and then flushes the
+# log to the file at the end of each iteration.
 while true:
   cmd = receive_command()
 

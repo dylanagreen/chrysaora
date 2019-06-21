@@ -318,25 +318,20 @@ proc search(engine: Engine, max_depth: int): EvalMove =
     t1, t2: float
     nps: int
 
+    remaining_time = if engine.color == WHITE: engine.time_params["wtime"]
+                     else: engine.time_params["btime"]
+    increment = if engine.color == WHITE: engine.time_params["winc"]
+                else: engine.time_params["binc"]
+
   engine.time = 0
 
-  if engine.color == WHITE:
-    if engine.moves_to_go > 0:
-      engine.time_per_move = float(engine.time_params["wtime"] div engine.moves_to_go +
-                                   engine.time_params["winc"])
-    # In cases where a moves to go wasn't passed the engine defaults to trying
-    # to fit 30 moves into that span of time. In the future this can be more
-    # advanced and the number can vary over the course of the game.
-    else:
-      engine.time_per_move = float(engine.time_params["wtime"] div 30 +
-                                   engine.time_params["winc"])
+  if engine.moves_to_go > 0:
+    engine.time_per_move = float(remaining_time div engine.moves_to_go + increment)
+  # In cases where a moves to go wasn't passed the engine defaults to trying
+  # to fit 30 moves into that span of time. In the future this can be more
+  # advanced and the number can vary over the course of the game.
   else:
-    if engine.moves_to_go > 0:
-      engine.time_per_move = float(engine.time_params["btime"] div engine.moves_to_go +
-                                   engine.time_params["binc"])
-    else:
-      engine.time_per_move = float(engine.time_params["btime"] div 30 +
-                                   engine.time_params["binc"])
+    engine.time_per_move = float(remaining_time div 30 + increment)
 
   # We only want to calculate for 4/5 of the calculated time, to give some
   # buffer for reporting and to give us a little extra time later.
@@ -345,6 +340,16 @@ proc search(engine: Engine, max_depth: int): EvalMove =
   # If the time is less than 1 ms default to 10 seconds.
   if engine.time_per_move < 1:
     engine.time_per_move = 10000
+  # This is a contingency for if we're searching for more time than is left.
+  # The increment only gets added if we actually complete the move so we need
+  # To finish in the time that's actually left.
+  elif engine.time_per_move > float(remaining_time):
+    # Search for remaining time left minus 1 second if we are searching too
+    # long. If there's less than a 1.5 seconds left search for 0.5 seconds.
+    if remaining_time > 1500:
+      engine.time_per_move = float(remaining_time - 1000)
+    else:
+      engine.time_per_move = 500
 
   # Generates our route node moves.
   engine.root_moves = engine.board.generate_all_moves(engine.board.to_move)

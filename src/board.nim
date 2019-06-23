@@ -167,37 +167,30 @@ proc `$`*(move: Move): string=
 # Convert the row and column Positions to an algebraic chess move.
 proc row_column_to_algebraic*(board: Board, start: Position, finish: Position,
                              piece: int, promotion: int = 0):
-                             tuple[short: string, long: string, uci: string] =
+                             tuple[long: string, uci: string] =
 
   # Adds the piece for non pawn moves.
   if abs(piece) > piece_numbers['P']:
     result.long.add(piece_names[abs(piece)])
 
+  var square = alg_table[start.y, start.x]
   # Add the starting Position to the fully disambiguated move.
-  result.long.add(alg_table[start.y, start.x])
-  result.uci.add(alg_table[start.y, start.x])
+  result.long.add(square)
+  result.uci.add(square)
 
   # The x for captures
   if board.current_state[finish.y, finish.x] != 0:
     result.long.add("x")
 
+  square = alg_table[finish.y, finish.x]
   # Append the ending Position to the move.
-  result.long.add(alg_table[finish.y, finish.x])
-  result.uci.add(alg_table[finish.y, finish.x])
+  result.long.add(square)
+  result.uci.add(square)
 
   if promotion != 0:
     result.long.add("=")
     result.long.add(piece_names[abs(promotion)])
     result.uci.add(piece_names[abs(promotion)].toLowerAscii())
-
-  if piece == piece_numbers['P']:
-    if 'x' in result.long:
-      result.short = result.long[0] & result.long[2..^1]
-    else:
-      result.short = result.long[2..^1]
-  else:
-    result.short = result.long[0] & result.long[3..^1]
-
 
 # This import needs to be after the type and constant declaration since those
 # are both used in move gen.
@@ -550,9 +543,9 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
     if can_make:
       if promotion:
         result = board.row_column_to_algebraic(pos, fin, piece_num,
-                                                promotion_piece)[1]
+                                                promotion_piece).long
       else:
-        result = board.row_column_to_algebraic(pos, fin, piece_num)[1]
+        result = board.row_column_to_algebraic(pos, fin, piece_num).long
       if ep:
         result = result & "e.p."
 

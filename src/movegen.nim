@@ -71,33 +71,14 @@ proc remove_moves_in_check(board: Board, moves: seq[Move], color: Color): seq[Mo
   board.to_move = orig_color
 
 
-proc disambiguate_moves(moves: seq[tuple[short, long: Move]]): seq[Move] =
-  # Shortcut for if there's no possible moves being disambiguated.
-  if len(moves) == 0:
-    return
-
-  # Strips out the short algebraic moves from the sequence.
-  let all_short = moves.map(proc (x: tuple[short, long: Move]): string = x.short.algebraic)
-
-  # Loop through the move/board state sequence.
-  for i, m in moves:
-    # If the number of times that the short moves appears is more than 1 we
-    # want to append the long move instead.
-    if all_short.count(m.short.algebraic) > 1:
-      result.add(m.long)
-    else:
-      result.add(m.short)
-
-
 proc generate_attack_mask*(board: Board, piece: char, pos: Position, color: Color = WHITE): uint64 =
   let square = (7 - pos.y) * 8 + pos.x
   case piece
   of 'P':
+    result.setBit(square)
     if color == WHITE:
-      result.setBit(square)
       return (result shl 7 and not H_FILE) or (result shl 9 and not A_FILE)
     else:
-      result.setBit(square)
       return (result shr 7 and not A_FILE) or (result shr 9 and not H_FILE)
   of 'N':
     return KNIGHT_TABLE[square]
@@ -129,7 +110,7 @@ proc generate_attack_mask*(board: Board, piece: char, pos: Position, color: Colo
 
 proc bits_to_algebraic(possible_moves: uint64, start_pos: Position,
                        piece: char, board: Board):
-                       seq[tuple[short, long: Move]] =
+                       seq[Move] =
   var possible_moves = possible_moves
   # Loops through, gets the LSB, and then pops it off.
   var fin = possible_moves.firstSetBit()
@@ -140,8 +121,7 @@ proc bits_to_algebraic(possible_moves: uint64, start_pos: Position,
     let
       end_pos: Position = (7 - ((fin - 1) div 8), (fin - 1) mod 8)
       move_tuple = board.row_column_to_algebraic(start_pos, end_pos, piece_numbers[piece])
-    result.add((Move(start: start_pos, fin: end_pos, algebraic: move_tuple.short, uci: move_tuple.uci),
-                Move(start: start_pos, fin: end_pos, algebraic: move_tuple.long, uci: move_tuple.uci)))
+    result.add(Move(start: start_pos, fin: end_pos, algebraic: move_tuple.long, uci: move_tuple.uci))
 
     # Sets fin to the next LSB, which will be 0 if there are no bits set.
     fin = possible_moves.firstSetBit()
@@ -149,7 +129,7 @@ proc bits_to_algebraic(possible_moves: uint64, start_pos: Position,
 
 proc generate_piece_moves(board: Board, color: Color, piece: char): seq[Move] =
   let starts = board.find_piece(color, piece)
-  var long: seq[tuple[short, long: Move]]
+  var long: seq[Move]
 
   for pos in starts:
     var possible_moves = board.generate_attack_mask(piece, pos)
@@ -166,7 +146,7 @@ proc generate_piece_moves(board: Board, color: Color, piece: char): seq[Move] =
 
     long = long.concat(bits_to_algebraic(possible_moves, pos, piece, board))
 
-  result = board.remove_moves_in_check(long.disambiguate_moves(), color)
+  result = board.remove_moves_in_check(long, color)
 
 
 proc generate_knight_moves*(board: Board, color: Color): seq[Move] =
@@ -187,7 +167,7 @@ proc generate_queen_moves*(board: Board, color: Color): seq[Move] =
 
 proc pawn_bits_to_algebraic(possible_moves: uint64, color: Color, board: Board,
                             dir: string = "straight", two: bool = false):
-                            seq[tuple[short, long: Move]] =
+                            seq[Move] =
   var possible_moves = possible_moves
   # Loops through, gets the LSB, and then pops it off.
   # TODO: Abstract this
@@ -224,13 +204,11 @@ proc pawn_bits_to_algebraic(possible_moves: uint64, color: Color, board: Board,
         if not (key == 'P') and not (key == 'K'):
           let move_tuple = board.row_column_to_algebraic(pos, end_pos,
                                                          piece_numbers['P'], val)
-          result.add((Move(start: pos, fin: end_pos, algebraic: move_tuple.short, uci: move_tuple.uci),
-                      Move(start: pos, fin: end_pos, algebraic: move_tuple.long, uci: move_tuple.uci)))
+          result.add(Move(start: pos, fin: end_pos, algebraic: move_tuple.long, uci: move_tuple.uci))
     else:
       var move_tuple = board.row_column_to_algebraic(pos, end_pos, piece_numbers['P'])
-      if ep: move_tuple = (move_tuple.short & "e.p.", move_tuple.long & "e.p.", move_tuple.uci)
-      result.add((Move(start: pos, fin: end_pos, algebraic: move_tuple.short, uci: move_tuple.uci),
-                  Move(start: pos, fin: end_pos, algebraic: move_tuple.long, uci: move_tuple.uci)))
+      if ep: move_tuple.long = move_tuple.long & "e.p."
+      result.add(Move(start: pos, fin: end_pos, algebraic: move_tuple.long, uci: move_tuple.uci))
 
     # Sets fin to the next LSB, which will be 0 if there are no bits set.
     fin = possible_moves.firstSetBit()
@@ -248,7 +226,7 @@ proc generate_pawn_moves*(board: Board, color: Color): seq[Move] =
 
   # Can only move straight forwards onto empty squares.
   possible_moves = possible_moves and not (board.BLACK_PIECES or board.WHITE_PIECES)
-  result = result.concat(pawn_bits_to_algebraic(possible_moves, color, board).disambiguate_moves())
+  result = result.concat(pawn_bits_to_algebraic(possible_moves, color, board))
 
   # Generates all the one forward moves. By shifting the previous possible moves
   # We thus also doubly check that we move through an empty square.
@@ -261,7 +239,7 @@ proc generate_pawn_moves*(board: Board, color: Color): seq[Move] =
   possible_moves = if color == WHITE: possible_moves and RANK_4
                    else: possible_moves and RANK_5
 
-  result = result.concat(pawn_bits_to_algebraic(possible_moves, color, board, two=true).disambiguate_moves())
+  result = result.concat(pawn_bits_to_algebraic(possible_moves, color, board, two=true))
   result = board.remove_moves_in_check(result, color)
 
 
@@ -286,7 +264,7 @@ proc generate_pawn_captures*(board: Board, color: Color): seq[Move] =
     possible_moves = possible_moves shr 7 and not A_FILE
     possible_moves = (possible_moves and board.WHITE_PIECES) or (possible_moves and ep_bit)
 
-  result = result.concat(pawn_bits_to_algebraic(possible_moves, color, board, dir = "left").disambiguate_moves())
+  result = result.concat(pawn_bits_to_algebraic(possible_moves, color, board, dir = "left"))
 
   # Generates all the takes to the right first.
   # Makes sure we don't wrap to the other side, and that we actually take an
@@ -298,7 +276,7 @@ proc generate_pawn_captures*(board: Board, color: Color): seq[Move] =
   else:
     possible_moves = possible_moves shr 9 and not H_FILE
     possible_moves = (possible_moves and board.WHITE_PIECES) or (possible_moves and ep_bit)
-  result = result.concat(pawn_bits_to_algebraic(possible_moves, color, board, dir = "right").disambiguate_moves())
+  result = result.concat(pawn_bits_to_algebraic(possible_moves, color, board, dir = "right"))
   result = board.remove_moves_in_check(result, color)
 
 

@@ -20,7 +20,7 @@ suite "start of game move generation":
     var alg: HashSet[string] = initHashSet[string]()
     for i, m in moves:
       alg.incl(m.algebraic)
-    var expected = ["Na3", "Nc3", "Nf3", "Nh3"].toHashSet
+    var expected = ["Nb1a3", "Nb1c3", "Ng1f3", "Ng1h3"].toHashSet
 
     check(alg == expected)
 
@@ -89,8 +89,9 @@ suite "start of game move generation":
     var alg: HashSet[string] = initHashSet[string]()
     for i, m in moves:
       alg.incl(m.algebraic)
-    var expected = ["a3", "a4", "b3", "b4", "c3", "c4", "d3", "d4", "e3",
-                    "e4", "f3", "f4", "g3", "g4", "h3", "h4"].toHashSet
+    var expected = ["a2a3", "a2a4", "b2b3", "b2b4", "c2c3", "c2c4", "d2d3",
+                    "d2d4", "e2e3", "e2e4", "f2f3", "f2f4", "g2g3", "g2g4",
+                    "h2h3", "h2h4"].toHashSet
 
     check(alg == expected)
 
@@ -102,9 +103,9 @@ suite "start of game move generation":
     for i, m in moves:
       alg.incl(m.algebraic)
 
-    var expected = ["a3", "a4", "b3", "b4", "c3", "c4", "d3", "d4", "e3",
-                    "e4", "f3", "f4", "g3", "g4", "h3", "h4", "Na3", "Nc3",
-                    "Nf3", "Nh3"].toHashSet
+    var expected = ["a2a3", "a2a4", "b2b3", "b2b4", "c2c3", "c2c4", "d2d3",
+                    "d2d4", "e2e3", "e2e4", "f2f3", "f2f4", "g2g3", "g2g4",
+                    "h2h3", "h2h4", "Nb1a3", "Nb1c3", "Ng1f3", "Ng1h3"].toHashSet
 
     check(alg == expected)
 
@@ -124,7 +125,7 @@ suite "complicated move generation":
       alg.incl(m.algebraic)
 
     #var expected = ["Na2", "Nb5", "Nxd5", "Ne4"].toHashSet
-    var expected = ["Nb8d7", "Nf6d7", "Ng4", "Ne4", "Nh5", "Ng8"].toHashSet
+    var expected = ["Nb8d7", "Nf6d7", "Nf6g4", "Nf6e4", "Nf6h5", "Nf6g8"].toHashSet
 
     check(alg == expected)
 
@@ -135,7 +136,7 @@ suite "complicated move generation":
     var alg: HashSet[string] = initHashSet[string]()
     for i, m in moves:
       alg.incl(m.algebraic)
-    var expected = ["Ra3", "Ra2", "Ra1", "Rf1", "Rg1"].toHashSet
+    var expected = ["Ra4a3", "Ra4a2", "Ra4a1", "Rh1f1", "Rh1g1"].toHashSet
 
     check(alg == expected)
 
@@ -146,8 +147,9 @@ suite "complicated move generation":
     var alg: HashSet[string] = initHashSet[string]()
     for i, m in moves:
       alg.incl(m.algebraic)
-    var expected = ["Bb7", "Bd7", "Be6", "Bf5", "Bg4", "Bh3", "Be7", "Bd6",
-                    "Bc5", "Bxb4", "Bg7", "Bh6"].toHashSet
+    var expected = ["Bc8b7", "Bc8d7", "Bc8e6", "Bc8f5", "Bc8g4", "Bc8h3",
+                    "Bf8e7", "Bf8d6", "Bf8c5", "Bf8xb4", "Bf8g7",
+                    "Bf8h6"].toHashSet
 
     check(alg == expected)
 
@@ -158,7 +160,7 @@ suite "complicated move generation":
     var alg: HashSet[string] = initHashSet[string]()
     for i, m in moves:
       alg.incl(m.algebraic)
-    var expected = ["Qa1", "Qb1", "Qc1", "Qc2", "Qb3"].toHashSet
+    var expected = ["Qd1a1", "Qd1b1", "Qd1c1", "Qd1c2", "Qd1b3"].toHashSet
 
     check(alg == expected)
 
@@ -169,7 +171,7 @@ suite "complicated move generation":
     var alg: HashSet[string] = initHashSet[string]()
     for i, m in moves:
       alg.incl(m.algebraic)
-    var expected = ["Kf1", "Kf2"].toHashSet
+    var expected = ["Ke1f1", "Ke1f2"].toHashSet
 
     check(alg == expected)
 
@@ -184,7 +186,7 @@ suite "complicated move generation":
     var alg: HashSet[string] = initHashSet[string]()
     for i, m in moves:
       alg.incl(m.algebraic)
-    var expected = ["b5", "d4", "d3", "e4", "e3", "h3", "gxh4"].toHashSet
+    var expected = ["b4b5", "d2d3", "d2d4", "e2e3", "e2e4", "h2h3", "g3xh4"].toHashSet
 
     check(alg == expected)
 
@@ -205,10 +207,11 @@ suite "complicated move generation":
     var alg: HashSet[string] = initHashSet[string]()
     for i, m in moves:
       alg.incl(m.algebraic)
-    var expected = ["O-O", "b5", "d4", "d3", "e4", "e3", "h3", "gxh4", "Kf1",
-                    "Kf2", "Qa1", "Qb1", "Qc1", "Qc2", "Qb3", "Ra3", "Ra2",
-                    "Ra1", "Rf1", "Rg1", "Na2", "Nb5", "Nxd5", "Ne4", "Ba1",
-                    "Ba3", "Bc1", "Nb1"].toHashSet
+    var expected = ["Nc3xd5", "Nc3b5", "Nc3a2", "Nc3b1", "Nc3e4", "Ra4a3",
+                    "Ra4a2", "Ra4a1", "Rh1f1", "Rh1g1", "Bb2a1", "Bb2c1",
+                    "Bb2a3", "Qd1a1", "Qd1b1", "Qd1c1", "Qd1c2", "Qd1b3",
+                    "Ke1f1", "Ke1f2", "b4b5", "d2d3", "d2d4", "e2e3", "e2e4",
+                    "h2h3", "g3xh4", "O-O"].toHashSet
 
     check(alg == expected)
 

@@ -50,7 +50,7 @@ proc remove_moves_in_check(board: Board, moves: seq[Move], color: Color): seq[Mo
     # check. The easiest way right now to verify this doesn't happen is to
     # just check every ep move. Perft 3 has an example of such a position with
     # first move e2e4.
-    elif len(m.algebraic) > 5 and m.algebraic[^4..^1] == "e.p.":
+    elif m.algebraic.endsWith("e.p."):
       test = true
 
     # This checks if the piece is attacked right now. It can only be pinned if it is.
@@ -219,7 +219,7 @@ proc generate_pawn_moves*(board: Board, color: Color): seq[Move] =
   var pawn_bits = 0'u64
 
   for pos in pawns:
-    pawn_bits.setBit(((7 - pos.y)*8 + pos.x))
+    pawn_bits.setBit(((7 - pos.y) * 8 + pos.x))
 
   # Generates all the one forward moves.
   var possible_moves = if color == WHITE: pawn_bits shl 8 else: pawn_bits shr 8

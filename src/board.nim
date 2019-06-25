@@ -237,7 +237,7 @@ proc long_algebraic_to_board_state*(board: Board, move: string): Tensor[int] =
 
   # Turns the pawn that gets taken en passant to 0. This pawn is on the
   # same rank as the pawn moving, and the same file as where the pawn ends.
-  if "e.p." in move:
+  if move.endsWith("e.p."):
     result[start.y, finish.x] = 0
 
 
@@ -333,7 +333,7 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
     return
 
   # You're not allowed to castle out of check.
-  if ("O-O" in move or "0-0" in move) and board.is_in_check(board.to_move):
+  if (move.startsWith("O-O") or move.startsWith("0-0")) and board.is_in_check(board.to_move):
     return
 
   # Slices off the checkmate character for parsing. This is largely so that
@@ -571,7 +571,7 @@ proc check_move_legality*(board: Board, move: string):
   # already checks to see if the move ends in check and if it does it returns
   # "".  Doesn't check castling ending in check, however, hence why this
   # is here. Castling shortcuts in short_algebraic.
-  if "O-O" in long_move or "0-0" in long_move:
+  if long_move.startsWith("O-O") or long_move.startsWith("0-0"):
     #var end_state = board.castle_algebraic_to_boardstate(long_move,
      #                                                    board.to_move)
     let rank = if board.to_move == WHITE: 7 else: 0
@@ -629,7 +629,7 @@ proc update_piece_list*(board: Board, move: Move) =
 
   # Castling is totally different so avoid doing everything else first.
   # This is a bit of a disaster.
-  if "O-O" in move.algebraic:
+  if move.algebraic.startsWith("O-O"):
     var
       rook_start: Position
       rook_end: Position
@@ -660,7 +660,7 @@ proc update_piece_list*(board: Board, move: Move) =
     let index = squares.find(end_alg)
     board.piece_list[opp_color].delete(index)
   # Need to handle en passant on its own since it's weird.
-  elif "e.p." in move.algebraic:
+  elif move.algebraic.endsWith("e.p."):
     var ep_square = if opp_color == BLACK: end_square + 8 else: end_square - 8
     let index = squares.find(flat_alg_table[ep_square])
     board.piece_list[opp_color].delete(index)
@@ -671,7 +671,7 @@ proc update_piece_list*(board: Board, move: Move) =
       p.square = alg_table[move.fin.y, move.fin.x]
 
       # Update name on promotion
-      if '=' in move.algebraic:
+      if move.algebraic[^2] == '=':
         p.name = move.algebraic[^1]
 
       # No need to continue searching.
@@ -683,7 +683,7 @@ proc revert_piece_list*(board: Board, move: Move) =
     opp_color = if board.to_move == WHITE: BLACK else: WHITE
 
   # Castling is totally different so avoid doing everything else first.
-  if "O-O" in move.algebraic:
+  if move.algebraic.startsWith("O-O"):
     var
       rook_start: Position
       rook_end: Position
@@ -714,7 +714,7 @@ proc revert_piece_list*(board: Board, move: Move) =
                                           square: alg_table[move.fin.y, move.fin.x],
                                           pos: (move.fin.y, move.fin.x)))
   # Need to handle en passant on its own since it's weird.
-  elif "e.p." in move.algebraic:
+  elif move.algebraic.endsWith("e.p."):
     board.piece_list[opp_color].add(Piece(name: 'P',
                                           square: alg_table[move.start.y, move.fin.x],
                                           pos: (move.start.y, move.fin.x)))
@@ -725,7 +725,7 @@ proc revert_piece_list*(board: Board, move: Move) =
       p.square = alg_table[move.start.y, move.start.x]
 
       # Revert promotion
-      if '=' in move.algebraic:
+      if move.algebraic[^2] == '=':
         p.name = 'P'
 
       # No need to continue searching.
@@ -741,7 +741,8 @@ proc update_piece_bitmaps*(board: Board, move: Move) =
   # Set the bits in the update, which with xor will clear the start and set
   # the end or vice versa if we're going in reverse.
   update.setBit(bit_end)
-  if "e.p." in move.algebraic:
+  if move.algebraic.endsWith("e.p."):
+    # Removes the pawn that gets taken in the move (or adds it back)
     var ep_clear: uint64
     if board.to_move == WHITE:
       ep_clear = update shr 8
@@ -749,14 +750,13 @@ proc update_piece_bitmaps*(board: Board, move: Move) =
     else:
       ep_clear = update shl 8
       board.WHITE_PIECES = board.WHITE_PIECES xor ep_clear
-  elif "x" in move.algebraic:
+  elif 'x' in move.algebraic:
     if board.to_move == WHITE:
       board.BLACK_PIECES = board.BLACK_PIECES xor update
     else:
       board.WHITE_PIECES = board.WHITE_PIECES xor update
-
-  update.setBit(bit_start)
-  if "O-O" in move.algebraic:
+  elif move.algebraic.startsWith("O-O"):
+    # Adds the moving of the rook to the update number
     if move.algebraic == "O-O":
       update.setBit((7 - move.start.y) * 8 + 7)
       update.setBit((7 - move.fin.y) * 8 + 5)
@@ -764,9 +764,9 @@ proc update_piece_bitmaps*(board: Board, move: Move) =
       update.setBit((7 - move.start.y) * 8)
       update.setBit((7 - move.fin.y) * 8 + 3)
 
+  update.setBit(bit_start)
   if board.to_move == WHITE:
     board.WHITE_PIECES = board.WHITE_PIECES xor update
-
   else:
     board.BLACK_PIECES = board.BLACK_PIECES xor update
 
@@ -796,9 +796,9 @@ proc update_zobrist(board: Board, move: Move) =
   board.zobrist = board.zobrist xor ZOBRIST_TABLE[square + piece_num * 64]
 
   # Step 2: XOR out the piece that gets taken
-  if board.current_state[move.fin.y, move.fin.x] != 0 or "e.p." in move.algebraic:
+  if board.current_state[move.fin.y, move.fin.x] != 0 or move.algebraic.endsWith("e.p."):
     var enemy_num = 0
-    if "e.p." in move.algebraic:
+    if move.algebraic.endsWith("e.p."):
       # These need to be opposite since it's the opposite color we take.
       # So white takes a black pawn (6)
       enemy_num = if board.to_move == WHITE: 6 else: 0
@@ -845,12 +845,12 @@ template move_to_tensor*(move: Move) =
   #result = clone(board.current_state)
   let sign = sgn(board.current_state[move.start.y, move.start.x])
   # This allows us to handle promotions with "grace".
-  piece = if piece == 'O': 'K' elif '=' in move.algebraic: move.algebraic[^1] else: piece
+  piece = if piece == 'O': 'K' elif move.algebraic[^2] == '=': move.algebraic[^1] else: piece
   board.current_state[move.fin.y, move.fin.x] = sign * piece_numbers[piece]
   board.current_state[move.start.y, move.start.x] = 0
 
   # Moves the rook for castling moves.
-  if "O-O" in move.algebraic:
+  if move.algebraic.startsWith("O-O"):
     if move.algebraic == "O-O":
       board.current_state[move.fin.y, 5] = board.current_state[move.start.y, 7]
       board.current_state[move.start.y, 7] = 0
@@ -858,14 +858,14 @@ template move_to_tensor*(move: Move) =
       board.current_state[move.fin.y, 3] = board.current_state[move.start.y, 0]
       board.current_state[move.start.y, 0] = 0
   # Deletes the pawn we take in en passant.
-  elif "e.p." in move.algebraic:
+  elif move.algebraic.endsWith("e.p."):
     board.current_state[move.start.y, move.fin.x] = 0
 
 
 proc make_move*(board: Board, move: Move, skip: bool = false) =
   let
     to_move = if board.to_move == WHITE: BLACK else: WHITE
-    castle_move = "O-O" in move.algebraic or "0-0" in move.algebraic
+    castle_move = move.algebraic.startsWith("O-O") or move.algebraic.startsWith("0-0")
 
   board.castle_history.add(board.castle_rights)
 
@@ -874,7 +874,7 @@ proc make_move*(board: Board, move: Move, skip: bool = false) =
   for i, c in move.algebraic:
     # If we have an = then this is the piece the pawn promotes to.
     # Pawns can promote to rooks which would fubar the dict.
-    if c.isUpperAscii() and not ('=' in move.algebraic):
+    if c.isUpperAscii() and not (move.algebraic[^2] == '='):
       piece = c
 
   if piece == 'P':
@@ -979,7 +979,7 @@ proc make_move*(board: Board, move: string) =
   # Since queenside is the same as kingside with an extra -O on the end
   # we can just check that the kingside move is in the move.
   var
-    castle_move = "O-O" in legality.alg or "0-0" in legality.alg
+    castle_move = legality.alg.startsWith("O-O") or legality.alg.startsWith("0-0")
     big_move = Move(start: (0, 0), fin: (0,0), algebraic: "")
 
   big_move.algebraic = legality.alg

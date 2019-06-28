@@ -220,17 +220,24 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
     # small tables collisions are more likely so this resolves them.
     # Is nil checks that the index has even been filled before.
     if not hit.isNil and hit.zobrist == search_board.zobrist and engine.cur_depth > 1:
+      # This is required to check that the refutation is legal. We check to see
+      # if the UCI is in the list of UCI, and if it is we delete the move
+      # And move it up to the front.
+      let index = moves.find(hit.refutation)
       # If the current depth is less than the tt one then we can use it, as
       # the tt one will be more "accurate." If we are searching a deeper
       # depth than the table, then we don't use the table, since we will
       # get a better measure of how good the move is. In this case we
       # search the previously best found refutation first.
-      if depth < hit.depth:
-        # If we pull the eval out of the TT we still evaluated that node.
-        engine.nodes += 1
-        return @[(hit.refutation.uci, hit.eval)]
-      else:
-        moves.insert(hit.refutation)
+      # We only want to do anything if the refutation move is actually legal
+      if index > -1:
+        if depth < hit.depth:
+          # If we pull the eval out of the TT we still evaluated that node.
+          engine.nodes += 1
+          return @[(hit.refutation.uci, hit.eval)]
+        else:
+          moves.delete(index)
+          moves.insert(hit.refutation)
 
     for m in moves:
       # Generate a new board state for move generation.

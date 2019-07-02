@@ -48,7 +48,8 @@ type
     # A square behind a pawn that moves two, i.e. the square a pawn taking
     # en passant would end on.
     ep_square*: Table[Color, string]
-    ep_bit*: Table[Color, uint64]
+    WHITE_EP*: uint64
+    BLACK_EP*: uint64
 
     # Whether every move should return the long algebraic regardles of whether
     # it needs to or not. This helps when checking en passant and rook
@@ -123,6 +124,8 @@ proc is_in_check*(board: Board, color: Color): bool
 proc update_piece_list*(board: Board, move: Move)
 proc revert_piece_list*(board: Board, move: Move)
 proc update_piece_bitmaps*(board: Board, move: Move)
+
+proc to_fen*(board: Board): string
 
 # Finds the piece in the board using the piece list.
 proc find_piece*(board: Board, color: Color, name: char): seq[Position] =
@@ -619,7 +622,10 @@ proc update_ep_square(board: Board, move: Move) =
     board.ep_square[board.to_move] = flat_alg_table[square.y * 8 + square.x]
 
     # Flip the y for updating the ep_bit.
-    board.ep_bit[board.to_move].setBit((7 - square.y) * 8 + square.x)
+    if board.to_move == WHITE:
+      board.WHITE_EP.setBit((7 - square.y) * 8 + square.x)
+    else:
+      board.BLACK_EP.setBit((7 - square.y) * 8 + square.x)
 
 
 proc update_piece_list*(board: Board, move: Move) =
@@ -932,7 +938,7 @@ proc make_move*(board: Board, move: Move, skip: bool = false) =
   board.to_move = to_move
   # Clear the ep square from the opposite color as its no longer in play
   board.ep_square[to_move] = ""
-  board.ep_bit[to_move] = 0'u64
+  if to_move == WHITE: board.WHITE_EP = 0'u64 else: board.BLACK_EP = 0'u64
   board.move_list.add(move)
 
   # For now update both attack bitmaps.
@@ -1028,7 +1034,7 @@ proc unmake_move*(board: Board) =
     board.update_ep_square(board.move_list[^1])
   board.to_move = if board.to_move == WHITE: BLACK else: WHITE # Invert color
   board.ep_square[board.to_move] = ""
-  board.ep_bit[board.to_move] = 0'u64
+  if board.to_move == WHITE: board.WHITE_EP = 0'u64 else: board.BLACK_EP = 0'u64
   board.revert_piece_list(move) # Move that piece list back.
   board.update_piece_bitmaps(move) # Reverts the piece bitmaps to the old state.
   board.update_zobrist(move) # Rever the zobrist since it's xor operated.
@@ -1210,13 +1216,12 @@ proc load_fen*(fen: string): Board =
 
   var
     castle_history: seq[uint8] =  @[]
-    ep_bit = {WHITE: 0'u64, BLACK: 0'u64}.toTable
   result = Board(half_move_clock: half_move, game_states: @[],
                 current_state: board_state.toTensor,
                 castle_rights: castle_dict, to_move: side_to_move,
                 status: IN_PROGRESS, move_list: temp_move_list,
                 headers: initTable[string, string](), ep_square: ep_square,
-                long: false, piece_list: piece_list, ep_bit: ep_bit,
+                long: false, piece_list: piece_list, WHITE_EP: 0'u64, BLACK_EP: 0'u64,
                 castle_history: castle_history, BLACK_PIECES: black_pieces,
                 WHITE_PIECES: white_pieces, BLACK_ATTACKS: 0'u64,
                 WHITE_ATTACKS: 0'u64, zobrist: 111017'u64)

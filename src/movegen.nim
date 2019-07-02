@@ -248,7 +248,7 @@ proc generate_pawn_captures*(board: Board, color: Color): seq[Move] =
   var pawn_bits = 0'u64
 
   # Ensures that the ep-bit is in the right rank.
-  var ep_bit = if color == WHITE: board.ep_bit[BLACK] else: board.ep_bit[WHITE]
+  var ep_bit = if color == WHITE: board.BLACK_EP else: board.WHITE_EP
 
   for pos in pawns:
     pawn_bits.setBit(((7 - pos.y)*8 + pos.x))

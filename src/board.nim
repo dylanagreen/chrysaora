@@ -70,6 +70,9 @@ type
     # The zobrist hash representing this board state.
     zobrist*: uint64
 
+    # Evaluations for training, otherwise typically remains empty.
+    evals*: seq[float]
+
   # Custom move list types
   DisambigMove* = tuple[algebraic: string, state: Tensor[int]]
   ShortAndLongMove* = tuple[short: string, long: string, state: Tensor[int]]
@@ -1230,7 +1233,7 @@ proc load_fen*(fen: string): Board =
   result.update_attack_bitmaps(BLACK)
 
 
-proc load_pgn*(name: string, folder: string = "games"): Board =
+proc load_pgn*(name: string, folder: string = "games", train = false): Board =
   # File location of the pgn.
   var loc = os.joinPath(folder, name)
 
@@ -1262,9 +1265,13 @@ proc load_pgn*(name: string, folder: string = "games"): Board =
   var moves_line: string
 
   # Loops as long as there's an opening comment character.
-  var in_comment = false
+  var
+    in_comment = false
+    evals: seq[float] = @[]
+    joined_line = game_line.join("")
 
-  for i, c in game_line.join(""):
+
+  for i, c in joined_line:
     if c == '{':
       in_comment = true
       continue
@@ -1274,6 +1281,14 @@ proc load_pgn*(name: string, folder: string = "games"): Board =
 
     if not in_comment:
       moves_line.add(c)
+    elif train:
+      if c == 'b' and joined_line[i..i+3] == "book":
+        evals.add(0)
+      elif c == 'w' and joined_line[i..i+2] == "wv=":
+        if joined_line[i+3] == '-':
+          evals.add(joined_line[i+3..i+7].parseFloat())
+        else:
+          evals.add(joined_line[i+3..i+6].parseFloat())
 
   # \d+ looks for 1 or more digits
   # \. escapes the period
@@ -1292,11 +1307,15 @@ proc load_pgn*(name: string, folder: string = "games"): Board =
       plies.add(s.strip())
 
   # Cuts out the game result
+  # Rarely this will pop off an actual move, but if your pgn client ended
+  # on a move and not a * then it sucks
   discard plies.pop()
 
   # Makes all the moves and then returns the board state at the end.
   result = new_board()
   result.headers = tags
+  # Put the evaluations into the board object.
+  result.evals = evals
 
   for ply in plies:
     result.make_move(ply)

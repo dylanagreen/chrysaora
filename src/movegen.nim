@@ -27,7 +27,6 @@ proc remove_moves_in_check(board: Board, moves: seq[Move], color: Color): seq[Mo
   let orig_color = board.to_move
   var
     test = false
-    check = board.is_in_check(color)
     # The pieces squares are technically attacked too.
     attacks = if color == WHITE: board.BLACK_ATTACKS or board.BLACK_PIECES
               else: board.WHITE_ATTACKS or board.WHITE_PIECES
@@ -37,7 +36,7 @@ proc remove_moves_in_check(board: Board, moves: seq[Move], color: Color): seq[Mo
     # Except in certain cases where the king could move along the attack vector
     # In a direction that hasn't been generated before.
     if m.algebraic[0] == 'K':
-      if check:
+      if board.check[color]:
         test = true
       else:
         result.add(m)
@@ -58,7 +57,7 @@ proc remove_moves_in_check(board: Board, moves: seq[Move], color: Color): seq[Mo
 
     # If we're in check and the ending isn't on the attack vectors then it's
     # not even a good move since it can't possibly get us out.
-    if check and not test:
+    if board.check[color] and not test:
       if attacks.testBit((7 - m.fin.y) * 8 + m.fin.x):
         test = true
       else:
@@ -300,7 +299,7 @@ proc generate_castle_moves*(board: Board, color: Color): seq[Move] =
 
   # You're not allowed to castle out of check so if you're in check
   # don't generate it as a legal move.
-  if board.is_in_check(color):
+  if board.check[color]:
     return
 
   # Change the board to_move for testing that the generating color doesn't

@@ -46,7 +46,7 @@ type
     headers*: Table[string, string]
 
     # A square behind a pawn that moves two, i.e. the square a pawn taking
-    # en passant would end on.
+    # en passant would end on. Also encoded as bits for move generation.
     ep_square*: Table[Color, string]
     WHITE_EP*: uint64
     BLACK_EP*: uint64
@@ -58,6 +58,10 @@ type
     long*: bool
 
     piece_list*: Table[Color, seq[Piece]]
+
+    # Stores whether or not each side is in check or not. Speeds up move
+    # generation as we don't need to determine this for every move pruned.
+    check*: Table[Color, bool]
 
     # Bitmaps of all the pieces for a color
     WHITE_PIECES*: uint64
@@ -339,7 +343,7 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
     return
 
   # You're not allowed to castle out of check.
-  if (move.startsWith("O-O") or move.startsWith("0-0")) and board.is_in_check(board.to_move):
+  if (move.startsWith("O-O") or move.startsWith("0-0")) and board.check[board.to_move]:
     return
 
   # Slices off the checkmate character for parsing. This is largely so that
@@ -596,10 +600,8 @@ proc check_move_legality*(board: Board, move: string):
 
 
 proc is_checkmate*(board: Board, color: Color): bool =
-  let check = board.is_in_check(color)
-
   # Result is auto instantiated to false.
-  if not check:
+  if not board.check[color]:
     return
 
   # Check if there are any possible moves that could get color out of check.
@@ -938,7 +940,6 @@ proc make_move*(board: Board, move: Move, skip: bool = false) =
 
   move_to_tensor(move)
 
-  board.to_move = to_move
   # Clear the ep square from the opposite color as its no longer in play
   board.ep_square[to_move] = ""
   if to_move == WHITE: board.WHITE_EP = 0'u64 else: board.BLACK_EP = 0'u64
@@ -947,6 +948,9 @@ proc make_move*(board: Board, move: Move, skip: bool = false) =
   # For now update both attack bitmaps.
   board.update_attack_bitmaps(WHITE)
   board.update_attack_bitmaps(BLACK)
+
+  board.check[to_move] = board.is_in_check(to_move)
+  board.to_move = to_move
 
   # The earliest possible checkmate is after 4 plies. No reason to check earlier
   if len(board.move_list) > 3 and not skip:
@@ -969,8 +973,7 @@ proc make_move*(board: Board, move: Move, skip: bool = false) =
       check_for_moves(board.generate_castle_moves(to_move))
 
     if noresponses:
-      var check = board.is_in_check(to_move)
-      if check:
+      if board.check[to_move]:
         if board.to_move == WHITE:
           board.status = WHITE_VICTORY
         else:
@@ -1028,6 +1031,7 @@ proc make_move*(board: Board, move: string) =
 
 
 proc unmake_move*(board: Board) =
+  let orig_to_move = board.to_move
   board.current_state = board.game_states.pop() # Reverts the mailbox board.
   var move = board.move_list.pop() # Take the last move off the move list.
   # We can extract the ep square from the previous move. We have to do this
@@ -1050,6 +1054,8 @@ proc unmake_move*(board: Board) =
   # For now update both attack bitmaps.
   board.update_attack_bitmaps(WHITE)
   board.update_attack_bitmaps(BLACK)
+
+  board.check[orig_to_move] = board.is_in_check(orig_to_move)
 
 
 proc to_fen*(board: Board): string =
@@ -1219,8 +1225,9 @@ proc load_fen*(fen: string): Board =
 
   var
     castle_history: seq[uint8] =  @[]
+    check: Table[Color, bool] = {WHITE: false, BLACK: false}.toTable()
   result = Board(half_move_clock: half_move, game_states: @[],
-                current_state: board_state.toTensor,
+                current_state: board_state.toTensor, check: check,
                 castle_rights: castle_dict, to_move: side_to_move,
                 status: IN_PROGRESS, move_list: temp_move_list,
                 headers: initTable[string, string](), ep_square: ep_square,
@@ -1231,6 +1238,10 @@ proc load_fen*(fen: string): Board =
 
   result.update_attack_bitmaps(WHITE)
   result.update_attack_bitmaps(BLACK)
+
+  # In case you pass a position that is in check
+  result.check[WHITE] = result.is_in_check(WHITE)
+  result.check[BLACK] = result.is_in_check(BLACK)
 
 
 proc load_pgn*(name: string, folder: string = "games", train = false): Board =
@@ -1282,13 +1293,13 @@ proc load_pgn*(name: string, folder: string = "games", train = false): Board =
     if not in_comment:
       moves_line.add(c)
     elif train:
-      if c == 'b' and joined_line[i..i+3] == "book":
+      if c == 'b' and joined_line[i..(i + 3)] == "book":
         evals.add(0)
-      elif c == 'w' and joined_line[i..i+2] == "wv=":
+      elif c == 'w' and joined_line[i..(i + 2)] == "wv=":
         if joined_line[i+3] == '-':
-          evals.add(joined_line[i+3..i+7].parseFloat())
+          evals.add(joined_line[(i + 3)..(i + 7)].parseFloat())
         else:
-          evals.add(joined_line[i+3..i+6].parseFloat())
+          evals.add(joined_line[(i + 3)..(i + 6)].parseFloat())
 
   # \d+ looks for 1 or more digits
   # \. escapes the period

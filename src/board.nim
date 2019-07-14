@@ -563,6 +563,10 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
 
       if not no_check:
         result = ""
+        # A continue here avoids the return, and allows us to check if another
+        # piece can legally make this move while also leaving you out of
+        # check.
+        continue
 
       return
 
@@ -1296,10 +1300,20 @@ proc load_pgn*(name: string, folder: string = "games", train = false): Board =
       if c == 'b' and joined_line[i..(i + 3)] == "book":
         evals.add(0)
       elif c == 'w' and joined_line[i..(i + 2)] == "wv=":
-        if joined_line[i+3] == '-':
-          evals.add(joined_line[(i + 3)..(i + 7)].parseFloat())
-        else:
-          evals.add(joined_line[(i + 3)..(i + 6)].parseFloat())
+        try:
+          if joined_line[i+3] == '-':
+            evals.add(joined_line[(i + 3)..(i + 7)].parseFloat())
+          else:
+            evals.add(joined_line[(i + 3)..(i + 6)].parseFloat())
+        # This except block handles if one of the engines reported a mating
+        # move which shouldn't really happen 2/3 of the way through a game
+        # but one overzealous engine reported an M83 once.
+        except ValueError:
+          if "M" in joined_line[(i + 3)..(i + 6)]:
+            if joined_line[i+3] == '-':
+              evals.add(-100)
+            else:
+              evals.add(100)
 
   # \d+ looks for 1 or more digits
   # \. escapes the period

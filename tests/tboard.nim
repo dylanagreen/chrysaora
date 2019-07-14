@@ -245,6 +245,16 @@ suite "move legality":
     var legal = test_board.check_move_legality("O-O")
     check(legal[0] == false)
 
+  test "disambiguating pieces: 1 illegal, 1 legal":
+    # In this test two rooks can make the same move and are not disambiguated.
+    # One however leaves the king in check and should be ignored leading to the
+    # other being correctly found and thus ideentifying the move as legal.
+    test_fen = "4r1k1/5r1p/P1p3b1/2P5/1p1Bp2P/1B2Q3/6P1/1qN3K1 b - - 4 41"
+    test_board = load_fen(test_fen)
+
+    var legal = test_board.check_move_legality("Re7")
+    check(legal[0] == true)
+
 suite "loading/saving":
 
   test "loading fen":

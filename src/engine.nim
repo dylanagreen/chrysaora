@@ -1,25 +1,28 @@
 import algorithm
 import logging
+import marshal
 import os
 import random
 import selectors
 import sequtils
+import streams
 import strformat
 import strutils
 import system
 import tables
 import terminal
-import times
+import times # Why not just import everything at this point
 
 import arraymancer
 
 import board
 import bitboard
 import movegen
+include net
 
 type
 
-  EvalMove = tuple[best_move: string, eval: int]
+  EvalMove = tuple[best_move: string, eval: float]
 
   # Object for transposition table entries.
   Transposition* = ref object
@@ -29,7 +32,7 @@ type
     # The score and score type. Score type is used for if the score returned
     # on an alpha-beta cutoff in which case it's an approximation and not
     # the true score and we need to know that.
-    eval*: int
+    eval*: float
     score_type*: string
 
     # The previously found best refutation move, to search first from this pos
@@ -62,7 +65,7 @@ type
 
     # The moves at the root node and their corresponding evals for move ordering
     root_moves: seq[Move]
-    root_evals: seq[tuple[move: Move, eval: int]]
+    root_evals: seq[tuple[move: Move, eval: float]]
 
     # Number of moves to get into the remaining time, for time control.
     moves_to_go*: int
@@ -74,6 +77,12 @@ type
     # Cumulative time spent searching
     time: int
 
+    # The actual network we use to evaluate
+    network*: ChessNet
+
+    # Whether or not this engine is being used for training (reduces search time)
+    train*: bool
+
 
 var tt* = newSeq[Transposition](200)
 
@@ -82,7 +91,7 @@ var tt* = newSeq[Transposition](200)
 # the chess programming wiki and partially self designed based on my own
 # knowledge and understanding of the game.
 let
-  knight_table = @[[-4, -3, -2, -2, -2, -2, -3, -4],
+  knight_table = [[-4, -3, -2, -2, -2, -2, -3, -4],
                    [-3, -2, 0, 1, 1, 0, -2, -3],
                    [-2, 0, 1, 2, 2, 1, 0, -2],
                    [-2, 1, 2, 3, 3, 2, 1, -2],
@@ -91,7 +100,7 @@ let
                    [-3, -2, 0, 1, 1, 0, -2, -3],
                    [-4, -3, -2, -2, -2, -2, -3, -4]].toTensor
 
-  rook_table = @[[0, 0, 0, 0, 0, 0, 0, 0],
+  rook_table = [[0, 0, 0, 0, 0, 0, 0, 0],
                 [1, 2, 2, 2, 2, 2, 2, 1],
                 [-1, 0, 0, 0, 0, 0, 0, -1],
                 [-1, 0, 0, 0, 0, 0, 0, -1],
@@ -100,7 +109,7 @@ let
                 [-1, 0, 0, 0, 0, 0, 0, -1],
                 [0, 0, 0, 1, 1, 0, 0, 0]].toTensor
 
-  king_table = @[[0, 0, 0, 0, 0, 0, 0, 0],
+  king_table = [[0, 0, 0, 0, 0, 0, 0, 0],
                  [0, 0, 0, 0, 0, 0, 0, 0],
                  [0, 0, 0, 0, 0, 0, 0, 0],
                  [0, 0, 0, 0, 0, 0, 0, 0],
@@ -109,7 +118,7 @@ let
                  [0, 0, 0, 0, 0, 0, 0, 0],
                  [0, 0, 0, 0, 0, 0, 0, 0]].toTensor # TODO: Write this
 
-  pawn_table = @[[0, 0, 0, 0, 0, 0, 0, 0],
+  pawn_table = [[0, 0, 0, 0, 0, 0, 0, 0],
                  [5, 5, 5, 5, 5, 5, 5, 5],
                  [2, 2, 3, 4, 4, 3, 2, 2],
                  [1, 1, 1, 4, 4, 1, 1, 1],
@@ -118,7 +127,7 @@ let
                  [1, 1, 1, -2, -2, 1, 1, 1],
                  [0, 0, 0, 0, 0, 0, 0, 0]].toTensor
 
-  queen_table = @[[-2, -1, -1, -1, -1, -1, -1, -2],
+  queen_table = [[-2, -1, -1, -1, -1, -1, -1, -2],
                  [-1, 0, 0, 0, 0, 0, 0, -1],
                  [-1, 1, 1, 1, 1, 1, 1, -1],
                  [-1, 0, 0, 2, 2, 0, 0, -1],
@@ -127,7 +136,7 @@ let
                  [-1, 0, 1, 0, 0, 1, 0, -1],
                  [-2, -1, -1, -1, -1, -1, -1, -2]].toTensor
 
-  bishop_table = @[[-2, -1, -1, -1, -1, -1, -1, -2],
+  bishop_table = [[-2, -1, -1, -1, -1, -1, -1, -2],
                  [-1, 0, 0, 0, 0, 0, 0, -1],
                  [-1, 0, 1, 2, 2, 1, 0, -1],
                  [-1, 1, 1, 2, 2, 1, 1, -1],
@@ -138,6 +147,20 @@ let
 
   value_table = {'N': knight_table, 'R': rook_table, 'K': king_table,
                  'P': pawn_table, 'Q': queen_table, 'B': bishop_table}.toTable
+
+
+proc initialize_network*(engine: Engine, name: string = "box-t1-bootstrap.txt") =
+  let weights_loc = os.joinPath(getAppDir(), name)
+  # Idiot proofing.
+  if not fileExists(weights_loc):
+    logging.error("Weights File not found!")
+    raise newException(IOError, "Weights File not found!")
+  var strm = newFileStream(weights_loc, fmRead)
+  strm.load(engine.network)
+  strm.close()
+  ctx = engine.network.fc3.weight.context
+
+  logging.debug("Loaded weights file: " & name)
 
 
 # Set up the selector
@@ -156,29 +179,35 @@ proc check_for_stop(): bool =
       result = true
 
 
-proc evaluate_move(engine: Engine, board: Board): int =
+proc handcrafted_eval*(board: Board): float =
   # Starts by summing to get the straight piece value difference
-  result = sum(board.current_state)
+  result = float(sum(board.current_state))
 
   # This loops over the pieces and gets their evaluations from the piece-square
   # tables up above and adds them to the table if they're white, or subtracts
   # if they're black.
   for piece in board.piece_list[WHITE]:
-    result = result + value_table[piece.name][piece.pos.y, piece.pos.x] * 10
+    result += float(value_table[piece.name][piece.pos.y, piece.pos.x] * 10)
 
   for piece in board.piece_list[BLACK]:
-    result = result + value_table[piece.name][7 - piece.pos.y, piece.pos.x] * -10
+    result -= float(value_table[piece.name][7 - piece.pos.y, piece.pos.x] * 10)
+
+
+proc network_eval(engine: Engine, board: Board): float =
+  let x = ctx.variable(board.prep_board_for_network().reshape(1, D_in))
+  # Evals are in pawns and not centipawns so multiply by 100.
+  result = engine.network.forward(x).value[0, 0]
 
 
 proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
-                    alpha: int = -50000, beta: int = 50000, color: Color):
+                    alpha: float = -50000.0, beta: float = 50000.0, color: Color):
                     seq[EvalMove] =
 
   if (epochTime() - engine.start_time) * 1000 > engine.time_per_move:
     engine.compute = false
 
   # Initializes the result sequence.
-  result = if color == engine.color: @[("", -50000)] else: @[("", 50000)]
+  result = if color == engine.color: @[("", -50000.0)] else: @[("", 50000.0)]
 
   var
     cur_alpha = alpha
@@ -186,7 +215,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
 
   if depth == 0:
     engine.nodes += 1
-    result[0].eval = engine.evaluate_move(search_board)
+    result[0].eval = engine.network_eval(search_board)
     # Flip the sign for Black moves.
     if engine.color == BLACK: result[0].eval = result[0].eval * -1
     return
@@ -204,10 +233,10 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
       # Regardless of whether we're black or white the val will be negative if
       # we don't want it and positive if we do.
       if search_board.to_move == engine.color or not check:
-        result[0].eval = -depth * 5000
+        result[0].eval = -float(depth * 5000)
       # Otherwise we found a checkmate and we really want this
       else:
-        result[0].eval = depth * 5000
+        result[0].eval = float(depth * 5000)
       return
 
     # Before we start the search let's see if we can cut it off early with
@@ -296,13 +325,13 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
 # more cutoffs.
 proc sort_root_moves(engine: Engine) =
   # Comparison where lower eval is ranked lower
-  proc comparison(x, y: tuple[move: Move, eval: int]): int =
+  proc comparison(x, y: tuple[move: Move, eval: float]): int =
     if x.eval < y.eval: -1 else: 1
 
   engine.root_evals.sort(comparison, order=SortOrder.Descending)
 
   # Extracts the new sorted root moves from the sorted evals.
-  engine.root_moves = engine.root_evals.map(proc(x: tuple[move: Move, eval: int]): Move = x.move)
+  engine.root_moves = engine.root_evals.map(proc(x: tuple[move: Move, eval: float]): Move = x.move)
 
 
 # I know this is duplicated from UCI but I didn't want to have to try and
@@ -346,7 +375,7 @@ proc search(engine: Engine, max_depth: int): EvalMove =
 
   # If the time is less than 1 ms default to 10 seconds.
   if engine.time_per_move < 1:
-    engine.time_per_move = 10000
+    engine.time_per_move = if not engine.train: 10000 else: 3000
   # This is a contingency for if we're searching for more time than is left.
   # The increment only gets added if we actually complete the move so we need
   # To finish in the time that's actually left.
@@ -367,7 +396,7 @@ proc search(engine: Engine, max_depth: int): EvalMove =
       break
     # If we recieve the stop command don't go any deeper just return best move.
     elif check_for_stop():
-     break
+      break
     engine.root_evals = @[]
     # Clear the number of nodes before starting.
     engine.nodes = 0
@@ -383,8 +412,9 @@ proc search(engine: Engine, max_depth: int): EvalMove =
     nps = int(float(engine.nodes) / (t2 - t1))
     result = moves[0]
 
-    let pv = moves.map(proc(x: EvalMove): string = x.best_move).join(" ")
-    send_command(&"info depth {d} seldepth {d} score cp {result.eval} nodes {engine.nodes} nps {nps} time {engine.time} pv {pv}")
+    if not engine.train:
+      let pv = moves.map(proc(x: EvalMove): string = x.best_move).join(" ")
+      send_command(&"info depth {d} seldepth {d} score cp {int(result.eval)} nodes {engine.nodes} nps {nps} time {engine.time} pv {pv}")
 
     # Use the magic of iterative deepning to sort moves for more cutoffs.
     # Not much of a reason to sort this after depth 1.

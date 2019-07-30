@@ -23,10 +23,13 @@ let
   cur_board = new_board()
   time_params = {"wtime" : 0, "btime" : 0, "winc" : 0, "binc" : 0}.toTable
   cur_engine = Engine(board: cur_board, time_params: time_params, compute: true,
-                      max_depth: 15, color: cur_board.to_move)
+                      max_depth: 15, color: cur_board.to_move, train: false)
   interpreter = UCI(board: cur_board, previous_cmd: @[], engine: cur_engine)
 
 var
+  # Whether the network was initiated and whether or not a log was parsed,
+  # respectively.
+  init, parse: bool
   cmd: string
 
 addHandler(fileLog)
@@ -34,10 +37,18 @@ addHandler(fileLog)
 if paramCount() > 0:
   let params = commandLineParams()
 
-  if params[0] == "--parselog":
-    parse_log(params[1], interpreter)
+  for i in 0 ..< params.len:
+    let p = params[i]
+    if p == "--parselog":
+      parse = true
+      parse_log(params[i + 1], interpreter)
+    elif p == "--weightsfile":
+      init = true
+      cur_engine.initialize_network(params[i + 1])
 
-else:
+if not parse:
+  if not init:
+    cur_engine.initialize_network()
   # Gets the first command (usually "uci" but really could be anything)
   cmd = stdin.readLine()
   logging.debug("Input: ", cmd)

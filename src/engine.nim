@@ -196,7 +196,8 @@ proc handcrafted_eval*(board: Board): float =
 proc network_eval(engine: Engine, board: Board): float =
   let x = ctx.variable(board.prep_board_for_network().reshape(1, D_in))
   # Evals are in pawns and not centipawns so multiply by 100.
-  result = engine.network.forward(x).value[0, 0]
+  no_grad_mode ctx:
+    result = engine.network.forward(x).value[0, 0]
 
 
 proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,

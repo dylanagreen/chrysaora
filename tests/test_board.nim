@@ -283,7 +283,7 @@ suite "loading/saving":
 
   test "loading pgn - immortal game":
     let t1 = cpuTime()
-    var test_board = load_pgn("anderssen_kieseritzky_1851", "games")
+    var test_board = load_pgn("anderssen_kieseritzky_1851", "tests")
     echo "Time taken: ", cpuTime() - t1
     var expected = @[[-500, 0, -300, -1000, 0, 0, 0, -500],
                      [-100, 0, 0, -100, 300, -100, 310, -100],
@@ -299,7 +299,7 @@ suite "loading/saving":
   test "loading pgn - Komodo MCTS vs Lc0":
     let t1 = cpuTime()
     let test_pgn = "KomodoMCTS 2221.00vsLCZero v19.1-11248 2018-12-15"
-    var test_board = load_pgn(test_pgn, "games")
+    var test_board = load_pgn(test_pgn, "tests")
     echo "Time taken: ", cpuTime() - t1
 
     var expected = @[[0, 0, 0, 0, 0, 0, 0, 0],
@@ -321,7 +321,7 @@ suite "loading/saving":
       test_pgn = "KomodoMCTS 2221.00vsLCZero v19.1-11248 2018-12-15"
       test_fen = "8/8/8/8/8/2k1K3/p2p1p2/3R4 b - - 0 78"
     var
-      test_board = load_pgn(test_pgn, "games")
+      test_board = load_pgn(test_pgn, "tests")
       generated = test_board.to_fen()
     check(generated == test_fen)
 
@@ -341,6 +341,18 @@ suite "zobrist tests":
     board.make_move("Bc4xf7")
     board.unmake_move()
     check(board.zobrist == zobrist)
+
+  test "unmake recording check status":
+    var
+      test_pgn = "LCZero v0.21.1-nT40.T8.610vsStockfish 19050918 2019.05.11 4.1"
+      board = load_pgn(test_pgn, "tests")
+      num = board.movelist.len div 3 * 2
+
+    for j in 1..num:
+      board.unmake_move()
+
+    check(board.check[WHITE] == false)
+    check(board.check[BLACK] == true)
 
 suite "perft tests":
   test "position 1 depth 4":

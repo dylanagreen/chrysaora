@@ -1059,7 +1059,10 @@ proc unmake_move*(board: Board) =
   board.update_attack_bitmaps(WHITE)
   board.update_attack_bitmaps(BLACK)
 
-  board.check[orig_to_move] = board.is_in_check(orig_to_move)
+  # If a side was in check, when we unmake they're not, otherwise it would
+  # have had the king taken. Then check to see if the other side is in check.
+  board.check[orig_to_move] = false
+  board.check[board.to_move] = board.is_in_check(board.to_move)
 
 
 proc to_fen*(board: Board): string =

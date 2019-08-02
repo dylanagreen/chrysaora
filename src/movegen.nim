@@ -337,11 +337,11 @@ proc generate_castle_moves*(board: Board, color: Color): seq[Move] =
 
 
 proc generate_all_moves*(board: Board, color: Color): seq[Move] =
+  result = result.concat(board.generate_queen_moves(color))
+  result = result.concat(board.generate_rook_moves(color))
+  result = result.concat(board.generate_bishop_moves(color))
+  result = result.concat(board.generate_knight_moves(color))
   result = result.concat(board.generate_pawn_moves(color))
   result = result.concat(board.generate_pawn_captures(color))
-  result = result.concat(board.generate_knight_moves(color))
-  result = result.concat(board.generate_bishop_moves(color))
-  result = result.concat(board.generate_rook_moves(color))
-  result = result.concat(board.generate_queen_moves(color))
   result = result.concat(board.generate_king_moves(color))
   result = result.concat(board.generate_castle_moves(color))

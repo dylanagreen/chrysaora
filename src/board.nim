@@ -16,7 +16,7 @@ type
   Color* = enum
     WHITE, BLACK
 
-  Status = enum
+  Status* = enum
     IN_PROGRESS, DRAW, WHITE_VICTORY, BLACK_VICTORY
 
   Piece* = ref object
@@ -967,21 +967,21 @@ proc make_move*(board: Board, move: Move, skip: bool = false) =
     # move instead of generating all of them at once just to see if there
     # are no possible moves.
     block movechecking:
-      check_for_moves(board.generate_pawn_moves(to_move))
-      check_for_moves(board.generate_pawn_captures(to_move))
-      check_for_moves(board.generate_knight_moves(to_move))
+      check_for_moves(board.generate_queen_moves(to_move))
       check_for_moves(board.generate_rook_moves(to_move))
       check_for_moves(board.generate_bishop_moves(to_move))
-      check_for_moves(board.generate_queen_moves(to_move))
+      check_for_moves(board.generate_knight_moves(to_move))
+      check_for_moves(board.generate_pawn_moves(to_move))
+      check_for_moves(board.generate_pawn_captures(to_move))
       check_for_moves(board.generate_king_moves(to_move))
       check_for_moves(board.generate_castle_moves(to_move))
 
     if noresponses:
       if board.check[to_move]:
         if board.to_move == WHITE:
-          board.status = WHITE_VICTORY
-        else:
           board.status = BLACK_VICTORY
+        else:
+          board.status = WHITE_VICTORY
       else:
         board.status = DRAW
 

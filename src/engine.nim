@@ -228,18 +228,18 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
 
     # If there are no moves then someone either got checkmated or stalemated.
     if len(moves) == 0:
-      if color == BLACK:
-        echo "does this even proc"
       let check = search_board.is_in_check(search_board.to_move)
       # In this situation we were the ones to get checkmated (or stalemated).
       # By multiplying by depth we consider closer checkmates worse/better.
       # Regardless of whether we're black or white the val will be negative if
       # we don't want it and positive if we do.
       if search_board.to_move == engine.color or not check:
-        result[0].eval = -float(depth * 5000)
+        # We need closer checkmates to be worse, so we compare depth against
+        # the current depth.
+        result[0].eval = -float((engine.cur_depth - depth) * 1500)
       # Otherwise we found a checkmate and we really want this
       else:
-        result[0].eval = float(depth * 5000)
+        result[0].eval = float(depth * 1500)
       return
 
     # Before we start the search let's see if we can cut it off early with
@@ -275,7 +275,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
       # Generate a new board state for move generation.
       search_board.make_move(m, skip=true)
 
-        # Best move from the next lower ply.
+      # Best move from the next lower ply
       let best_lower = engine.minimax_search(search_board, depth - 1, cur_alpha,
                                              cur_beta, search_board.to_move)
 
@@ -303,7 +303,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
         cur_beta = min([cur_beta, result[0].eval])
 
       if depth == engine.cur_depth:
-        engine.root_evals.add((m, result[0].eval))
+        engine.root_evals.add((m, best_lower[0].eval))
 
       # Once alpha exceeds beta, i.e. once the minimum score that
       # the engine will receieve on a node (alpha) exceeds the
@@ -424,7 +424,6 @@ proc search(engine: Engine, max_depth: int): EvalMove =
     # non checkmate lines first.
     if (d mod 2) == 1:
       engine.sort_root_moves()
-      #echo engine.root_evals
 
 
 proc find_move*(engine: Engine): string =

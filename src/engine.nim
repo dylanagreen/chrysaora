@@ -226,8 +226,10 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
               else: search_board.generate_all_moves(search_board.to_move)
       best_move: Move
 
-    #If there are no moves then someone either got checkmated or stalemated.
+    # If there are no moves then someone either got checkmated or stalemated.
     if len(moves) == 0:
+      if color == BLACK:
+        echo "does this even proc"
       let check = search_board.is_in_check(search_board.to_move)
       # In this situation we were the ones to get checkmated (or stalemated).
       # By multiplying by depth we consider closer checkmates worse/better.
@@ -315,7 +317,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
         return
 
     # Adds the score to the transposition table.
-    # I put the things in different orders to the tabbing would be nice.
+    # I put the things in different orders so the tabbing would be nice.
     tt[index] = Transposition(refutation: best_move, eval: result[0].eval,
                               zobrist: search_board.zobrist, score_type: "pure",
                               depth: depth)
@@ -388,7 +390,7 @@ proc search(engine: Engine, max_depth: int): EvalMove =
     else:
       engine.time_per_move = 500
 
-  # Generates our route node moves.
+  # Generates our root node moves.
   engine.root_moves = engine.board.generate_all_moves(engine.board.to_move)
 
   # Iterative deepening framework.
@@ -418,9 +420,11 @@ proc search(engine: Engine, max_depth: int): EvalMove =
       send_command(&"info depth {d} seldepth {d} score cp {int(result.eval)} nodes {engine.nodes} nps {nps} time {engine.time} pv {pv}")
 
     # Use the magic of iterative deepning to sort moves for more cutoffs.
-    # Not much of a reason to sort this after depth 1.
-    if d == 1:
+    # Resort every odd ply in case we found a checkmate and need to search
+    # non checkmate lines first.
+    if (d mod 2) == 1:
       engine.sort_root_moves()
+      #echo engine.root_evals
 
 
 proc find_move*(engine: Engine): string =

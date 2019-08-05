@@ -1,6 +1,7 @@
 import algorithm
 import logging
 import marshal
+import math
 import os
 import random
 import selectors
@@ -149,16 +150,16 @@ let
                  'P': pawn_table, 'Q': queen_table, 'B': bishop_table}.toTable
 
 
-proc initialize_network*(engine: Engine, name: string = "box-t1-bootstrap.txt") =
+proc initialize_network*(name: string = "box-t1-bootstrap.txt") =
   let weights_loc = os.joinPath(getAppDir(), name)
   # Idiot proofing.
   if not fileExists(weights_loc):
     logging.error("Weights File not found!")
     raise newException(IOError, "Weights File not found!")
   var strm = newFileStream(weights_loc, fmRead)
-  strm.load(engine.network)
+  strm.load(model)
   strm.close()
-  ctx = engine.network.fc3.weight.context
+  ctx = engine.model.fc3.weight.context
 
   logging.debug("Loaded weights file: " & name)
 
@@ -193,11 +194,14 @@ proc handcrafted_eval*(board: Board): float =
     result -= float(value_table[piece.name][7 - piece.pos.y, piece.pos.x] * 10)
 
 
-proc network_eval(engine: Engine, board: Board): float =
+proc network_eval(board: Board): float =
   let x = ctx.variable(board.prep_board_for_network().reshape(1, D_in))
   # Evals are in pawns and not centipawns so multiply by 100.
   no_grad_mode ctx:
-    result = engine.network.forward(x).value[0, 0]
+    result = model.forward(x).value[0, 0]
+
+  # Converts network output to centipawns.
+  result = arctanh(result) * 100
 
 
 proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
@@ -216,7 +220,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
 
   if depth == 0:
     engine.nodes += 1
-    result[0].eval = engine.network_eval(search_board)
+    result[0].eval = network_eval(search_board)
     # Flip the sign for Black moves.
     if engine.color == BLACK: result[0].eval = result[0].eval * -1
     return
@@ -378,7 +382,7 @@ proc search(engine: Engine, max_depth: int): EvalMove =
 
   # If the time is less than 1 ms default to 10 seconds.
   if engine.time_per_move < 1:
-    engine.time_per_move = if not engine.train: 10000 else: 3000
+    engine.time_per_move = if not engine.train: 10000 else: 4000
   # This is a contingency for if we're searching for more time than is left.
   # The increment only gets added if we actually complete the move so we need
   # To finish in the time that's actually left.

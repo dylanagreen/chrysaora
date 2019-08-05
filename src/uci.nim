@@ -50,14 +50,13 @@ proc identify*() =
   send_command("uciok")
 
 
-proc uci_to_algebraic(parser: UCI, move: string): string =
+proc uci_to_algebraic*(parser: UCI, move: string): string =
   # Promotions are in the form say a7a8q so length 5
   if len(move) == 5:
     result = move[0..^2] & '=' & toUpperAscii(move[^1])
   else:
     # Uses regex to find the rank/file combinations.
     let locs = findAll(move, loc_finder)
-
     # Gets the starting Position and puts into a constant
     var
       dest = locs[0]

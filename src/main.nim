@@ -44,11 +44,11 @@ if paramCount() > 0:
       parse_log(params[i + 1], interpreter)
     elif p == "--weightsfile":
       init = true
-      cur_engine.initialize_network(params[i + 1])
+      initialize_network(params[i + 1])
 
 if not parse:
   if not init:
-    cur_engine.initialize_network()
+    initialize_network()
   # Gets the first command (usually "uci" but really could be anything)
   cmd = stdin.readLine()
   logging.debug("Input: ", cmd)

@@ -159,7 +159,7 @@ proc initialize_network*(name: string = "box-t1-bootstrap.txt") =
   var strm = newFileStream(weights_loc, fmRead)
   strm.load(model)
   strm.close()
-  ctx = engine.model.fc3.weight.context
+  ctx = engine.model.fc1.weight.context
 
   logging.debug("Loaded weights file: " & name)
 
@@ -382,7 +382,7 @@ proc search(engine: Engine, max_depth: int): EvalMove =
 
   # If the time is less than 1 ms default to 10 seconds.
   if engine.time_per_move < 1:
-    engine.time_per_move = if not engine.train: 10000 else: 4000
+    engine.time_per_move = if not engine.train: 10000 else: 3000
   # This is a contingency for if we're searching for more time than is left.
   # The increment only gets added if we actually complete the move so we need
   # To finish in the time that's actually left.

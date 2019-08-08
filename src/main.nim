@@ -18,7 +18,7 @@ if not existsDir(log_folder):
 
 # Initiliazes the log.
 let
-  log_name = os.joinPath(log_folder, $(now()) & ".log")
+  log_name = log_folder / $(now()) & ".log"
   fileLog* = newFileLogger(log_name, levelThreshold = lvlDebug)
   cur_board = new_board()
   time_params = {"wtime" : 0, "btime" : 0, "winc" : 0, "binc" : 0}.toTable

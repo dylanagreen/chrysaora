@@ -17,6 +17,80 @@ import uci
 include net
 
 
+proc split_game*(name: string, folder: string = "games") =
+  # File location of the pgn.
+  var
+    start_loc = parentDir(getAppDir()) / folder / name
+    temp_loc = parentDir(getAppDir()) / folder / "train" / "temp.pgn"
+
+  # In case you pass the name without .pgn at the end.
+  if not start_loc.endsWith(".pgn"):
+    start_loc = start_loc & ".pgn"
+
+  if not fileExists(start_loc):
+    raise newException(IOError, "PGN not found!")
+
+  # Creates the folder for the split games.
+  if not existsDir(folder / "train"):
+    createDir(folder / "train")
+
+  let data = open(start_loc)
+
+  # We only use the tags for naming the file.
+  var
+    f = open(temp_loc, fmWrite)
+    tags = initTable[string, string]()
+    in_game = false
+
+  for line in data.lines:
+    if not line.startsWith("["):
+      in_game = true
+    else:
+      if in_game:
+        # If we encounter a tag opening [ but still think we are in the game
+        # then we reached the end. We close temp, move it to the new name,
+        # and open a new temp to write to.
+        in_game = false
+        f.close()
+        var new_name = tags["White"] & "vs" & tags["Black"] & " " & tags["Date"]
+
+        # Adds the round for multiple games played by the same players on the
+        # same date
+        if tags.hasKey("Round"):
+          new_name = new_name & " " & tags["Round"]
+
+        new_name = new_name & ".pgn"
+        temp_loc.moveFile(parentDir(getAppDir()) / folder / "train" / new_name)
+        f = open(temp_loc, fmWrite)
+        tags = initTable[string, string]()
+
+      var
+        trimmed = line.strip(chars = {'[', ']'})
+        pair = trimmed.split("\"")
+
+      tags[pair[0].strip()] = pair[1]
+
+    f.write(line & "\n")
+
+  # Moves the final game as well once we jump out of the loop.
+  f.close()
+  var new_name = tags["White"] & "vs" & tags["Black"] & " " & tags["Date"]
+  if tags.hasKey("Round"):
+    new_name = new_name & " " & tags["Round"] & ".pgn"
+  else:
+    new_name = new_name & ".pgn"
+
+  temp_loc.moveFile(parentDir(getAppDir()) / folder / "train" / new_name)
+
+
+proc split_all_games() =
+  let start_loc = parentDir(getAppDir()) / "games"
+
+  for file in walkFiles(start_loc / "*.pgn"):
+    split_game(file.extractFilename())
+    echo &"Split {file.extractFilename()}"
+
+
 proc generate_bootstrap_data(): tuple[batches, evals: seq[Tensor[float32]]] =
   # Location of the training games
   let train_loc = parentDir(getAppDir()) / "games" / "train"
@@ -236,16 +310,10 @@ proc reinforcement_learning(weights: string = "", fileLog: FileLogger) =
     ctx = model.fc1.weight.context
 
   var
+    # The engine we use to make the moves.
     time_params = {"wtime" : 0, "btime" : 0, "winc" : 0, "binc" : 0}.toTable
     cur_engine = Engine(time_params: time_params, compute: true,
                 max_depth: 30, train: true)
-
-  #[if weights !=  "":
-    initialize_network(weights)
-  else: # Just load whatever the heck is the default lol.
-    initialize_network()]#
-
-  var
     # The number of training steps we've done.
     num_steps = 0
 
@@ -260,6 +328,7 @@ proc reinforcement_learning(weights: string = "", fileLog: FileLogger) =
     # The number of plies long the trace should be.
     num_plies = 6
 
+    # Storage of the network gradients
     grads: seq[Tensor[float32]]
 
     # Storing the previous value for difference calculations.

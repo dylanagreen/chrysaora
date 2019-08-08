@@ -1065,6 +1065,37 @@ proc unmake_move*(board: Board) =
   board.check[board.to_move] = board.is_in_check(board.to_move)
 
 
+# To be used for training, color swaps everything on the board.
+proc color_swap*(board: Board): Board =
+  result.ep_square = {WHITE: "", BLACK: ""}.toTable()
+
+  for color in [WHITE, BLACK]:
+    let opp_color = if color == WHITE: BLACK else: WHITE
+    # Swaps the ep square. Also vertically flips its location.
+    if board.ep_square[color] != "":
+      result.ep_square[opp_color] = flat_alg_table[flat_alg_table.find(board.ep_square[color]) xor 56]
+    # Swaps the check status
+    result.check[color] = board.check[opp_color]
+
+    # Swaps the piece lists
+    result.piece_list[color] = board.piece_list[opp_color]
+
+    for piece in result.piece_list[color]:
+      piece.pos = (7 - piece.pos.y, piece.pos.x)
+      # Xoring with 56 magically vertically flips square numbers
+      piece.square = flat_alg_table[flat_alg_table.find(piece.square) xor 56]
+
+  # I'm copying things over manually because frankly it'll be faster. I don't
+  # need the full move history (it's incorrect anyway) nor a history
+  # of tensor board states (also incorrect and it's insane to try and flip
+  # every single one of them)
+  result.zobrist = board.zobrist
+  result.status = board.status
+  result.to_move = if board.to_move == WHITE: BLACK else: WHITE
+  result.half_move_clock = board.half_move_clock
+  result.long = board.long
+
+
 proc to_fen*(board: Board): string =
   var fen: seq[string] = @[]
 

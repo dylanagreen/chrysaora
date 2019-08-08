@@ -150,18 +150,34 @@ let
                  'P': pawn_table, 'Q': queen_table, 'B': bishop_table}.toTable
 
 
-proc initialize_network*(name: string = "box-t1-bootstrap.txt") =
-  let weights_loc = os.joinPath(getAppDir(), name)
+proc initialize_network*(name: string = "default.txt") =
+  var weights_name: string
+  # Searches for the most developed weights file with the current version name.
+  # Since this will be sorted this will be in general in order the weights file
+  # with the longest stack trace, and then among those with the same stack trace
+  # the one with the most training games.
+  if name == "default.txt":
+    for f in walkFiles(getAppDir() / "*.txt"):
+      let file_name = f.splitPath().tail
+      if file_name.startsWith(base_version) and not f.endsWith("bootstrap.txt"):
+        weights_name = file_name
+  else:
+    weights_name = name
+
+  let weights_loc = getAppDir() / weights_name
   # Idiot proofing.
   if not fileExists(weights_loc):
     logging.error("Weights File not found!")
+    logging.error(&"Attempted to load {weights_name}")
     raise newException(IOError, "Weights File not found!")
+
   var strm = newFileStream(weights_loc, fmRead)
   strm.load(model)
   strm.close()
   ctx = engine.model.fc1.weight.context
 
-  logging.debug("Loaded weights file: " & name)
+  # For future reference so we know what weights file was loaded.
+  logging.debug(&"Loaded weights file: {weights_name}")
 
 
 # Set up the selector

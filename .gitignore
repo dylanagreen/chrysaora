@@ -9,8 +9,9 @@ src/box-t*
 # Binaries
 src/main
 src/perft
-tests/tboard
-tests/tmovegen
+tests/test_board
+tests/test_movegen
+tests/test_net
 
 # Logs
 src/logs

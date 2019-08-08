@@ -3,6 +3,8 @@ chrysaora/results/
 chrysaora//logs/
 
 # Training data for the network
+# And weights files
+src/box-t*
 
 # Binaries
 src/main

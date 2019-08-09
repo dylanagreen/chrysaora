@@ -1390,7 +1390,7 @@ proc save_pgn*(board: Board) =
   else:
     name = "???vs???" & $(now()) & ".pgn"
 
-  let loc = os.joinPath("results", name)
+  let loc = "results" / name
 
   let f = open(loc, fmWrite)
 

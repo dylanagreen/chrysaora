@@ -33,7 +33,7 @@ Chrysaora will self play for 4 plies from these two positions, and then apply TD
 To train, compile and run `src/train.nim`:
 
 ```
-nim c -d:danger -o:chysaora-train --run src/train.nim
+nim c -d:danger -o:chrysaora-train --run src/train.nim
 ```
 
 Chrysaora has the ability to bootstrap its training process using its internal handcrafted evaluation function.
@@ -48,7 +48,7 @@ In the future I plan to allow bootstrapping to be selectively enable with a comm
 line switch:
 
 ```
-nim c -d:danger -o:chysaora-train --run src/train.nim --bootstrap
+nim c -d:danger -o:chrysaora-train --run src/train.nim --bootstrap
 ```
 
 In the future I further plan to allow a command line switch to pass in a weights
@@ -56,7 +56,7 @@ file to start training from, allowing continual start/stop training. This update
 will likely be coupled with the one that will save periodic snapshots of the network.
 
 ```
-nim c -d:danger -o:chysaora-train --run src/train.nim --input:weights.txt
+nim c -d:danger -o:chrysaora-train --run src/train.nim --input:weights.txt
 ```
 
 ## Features

@@ -111,11 +111,15 @@ proc generate_bootstrap_data(): tuple[batches, evals: seq[Tensor[float32]]] =
 
     var
       # The board state numbers that we take
-      num1 = test_board.evals.len div 3 + 3
-      num2 = num1 * 2 + 3
+      num1 = test_board.move_list.len div 3
+      num2 = num1 * 2
 
       # The boards we'll prep for the network
       board1, board2: Board
+
+    if num2 < test_board.move_list.len - 3:
+      num2 = num2 + 3
+    num1 = num1 + 3
 
     # Unmakes the moves to get the board state at num 1 and 2.
     for j in 1..num2:
@@ -192,7 +196,7 @@ proc bootstrap(fileLog: FileLogger): string=
 
   # For the time being I'm restricting the training to avoid overfitting.
   #  At some point I can make the number of bootstrap epochs variable.
-  for t in 1 .. 20:
+  for t in 1 .. 10:
     var running_loss = 0.0
     for i, minibatch in batches:
       # Generates the prediction finds the loss
@@ -230,30 +234,30 @@ proc generate_training_data(engine: var Engine, file: string, num_plies: int = 4
   # Location of the training games
   let
     train_loc = parentDir(getAppDir()) / "games" / "train"
-    test_board = load_pgn(file.extractFilename(), train_loc, train=true)
 
   var
-    # The board state numbers that we take
-    num1 = test_board.evals.len div 3 * 2
+    test_board = load_pgn(file.extractFilename(), train_loc, train=true)
 
-    # Copying the board so we can unmake moves
-    board1 = deepCopy(test_board)
+    # The board state number that we take. Subtract 5 to further differentiate
+    # from the bootstrap states.
+    num1 = test_board.move_list.len div 3 * 2 - 5
+
 
   # Unmakes the moves to get the board state at num 1 and 2.
   for j in 1..num1:
-    board1.unmake_move()
+    test_board.unmake_move()
 
-  engine.board = board1
-  engine.color = board1.to_move
+  engine.board = test_board
+  engine.color = test_board.to_move
+
+  # We need this really only for castling moves.
   let
-    parser = UCI(board: board1, previous_cmd: @[], engine: engine)
+    parser = UCI(board: test_board, previous_cmd: @[], engine: engine)
 
   var
-    # V1 and v2 stand for vector 1 and 2 representing the boards as network
-    # ready tensors
-    v1 = board1.prep_board_for_network().reshape(1, D_in)
+    board_tensor = test_board.prep_board_for_network().reshape(1, D_in)
 
-  result = v1
+  result = board_tensor
 
   # Loops over the number of plies.
   for i in 1..num_plies:
@@ -261,24 +265,32 @@ proc generate_training_data(engine: var Engine, file: string, num_plies: int = 4
     try:
       let
         m = engine.find_move()
-
-      let
         converted = parser.uci_to_algebraic(m)
-      board1.make_move(converted)
+      test_board.make_move(converted)
+
+    # Just in case an illegal move is made.
     except Exception as e:
       echo file.extractFilename()
-      echo board1.tofen()
-      echo board1.move_list
+      echo test_board.tofen()
+      echo test_board.move_list
+      echo test_board.status
+      echo i
+      echo test_board.to_move
+
+      logging.error("Error encountered during make_move.")
+      logging.error(&"Board fen: {test_board.tofen()}")
       raise(e)
 
-    let v2 = board1.prep_board_for_network().reshape(1, D_in)
-    result = result.concat(v2, axis=0)
+    let new_tensor = test_board.prep_board_for_network().reshape(1, D_in)
+    result = result.concat(new_tensor, axis=0)
 
     # Lets the fledgling engine play into a checkmate. In much the same way
-    # that a mother bird will sometimes watch as her fledgling jumps out
+    # that a mother bird will sometimes watch as her fledgling jump out
     # of the nest unprepared, I too watch as my engine plays itself into
-    # a loss.
-    if board1.status == WHITE_VICTORY or board1.status == BLACK_VICTORY: break
+    # a loss. Good old blundersaora.
+    if test_board.status == WHITE_VICTORY or test_board.status == BLACK_VICTORY:
+      break
+
 
 # A template to clear the gradients of a network. Mainly just for readibility.
 template zero_grad(store: bool = false)=
@@ -288,6 +300,7 @@ template zero_grad(store: bool = false)=
         field.grad = zeros_like(field.grad)
         if store:
           grads.add(zeros_like(field.grad))
+
 
 proc reinforcement_learning(weights: string = "", fileLog: FileLogger) =
   # I'll be honest, this is super super janky and I'm not even sure that this is
@@ -299,7 +312,7 @@ proc reinforcement_learning(weights: string = "", fileLog: FileLogger) =
 
   # Idiot proofing.
   if not fileExists(weights_loc):
-    echo  "Weights file not found, using default weights file."
+    echo  "Weights file not found, using default weights."
   else:
     if weights.endsWith("bootstrap.txt"):
       echo "Using bootstrapped weights"
@@ -323,7 +336,7 @@ proc reinforcement_learning(weights: string = "", fileLog: FileLogger) =
     # The factor to reduce each temporal difference by. 0.7 is pretty standard
     scale = 0.7
 
-    learning_rate = 1e-3'f32
+    learning_rate = 1.3e-3'f32
 
     # The number of plies long the trace should be.
     num_plies = 6

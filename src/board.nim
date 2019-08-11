@@ -1371,7 +1371,10 @@ proc load_pgn*(name: string, folder: string = "games", train = false): Board =
   discard plies.pop()
 
   # Makes all the moves and then returns the board state at the end.
-  result = new_board()
+  if "FEN" in tags:
+    result = load_fen(tags["FEN"])
+  else:
+    result = new_board()
   result.headers = tags
   # Put the evaluations into the board object.
   result.evals = evals

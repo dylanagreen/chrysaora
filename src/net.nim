@@ -9,14 +9,14 @@ import board
 # Two layer network, H1, H2 are hidden dimensions.
 # D_out is output dimension.
 let
-  (D_in*, H1, H2, D_out) = (79, 256, 64, 1)
+  (D_in*, H1, H2, D_out) = (79, 256, 128, 1)
 
   # Code name and test status for whever I need it.
   # Test status changes with each change to the internal variations on the
   # network (hidden layer sizes for example)
   # Input vector changes and large scale changes to internal network structure
   # like number of hidden layers whill get their own code name.
-  base_version* = "box-t6"
+  base_version* = "box-t7"
 
   # Create the autograd context that will hold the computational graph
 var ctx* = newContext Tensor[float32]
@@ -31,7 +31,7 @@ network ctx, ChessNet:
   # Giraffe used RELUs, I currently achieve better results with sigmoids.
   # I'll have to investigate that more.
   forward x:
-    x.fc1.sigmoid.fc2.sigmoid.fc3.tanh
+    x.fc1.relu.fc2.relu.fc3#.tanh
 
 # Initialize the model, in general we'll load a weights file for this.
 # I really hope you're not running it with random weights....
@@ -161,7 +161,8 @@ proc color_swap_board*(board: Tensor[float32]): Tensor[float32] =
 
   # Vertically swaps the positions of the pieces.
   for i in countup(white_start + 1, board.shape[0], 2):
-    result[i] = float(int(result[i]) xor 56)
+    if result[i] > -1:
+      result[i] = float(int(result[i]) xor 56)
 
   # Swaps side to move
   result[10] = -board[10]

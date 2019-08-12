@@ -107,7 +107,7 @@ proc generate_bootstrap_data(): tuple[batches, evals: seq[Tensor[float32]]] =
   for file in walkFiles(train_loc / "*.pgn"):
 
     # The test board we'll be unmaking moves on.
-    let test_board = load_pgn(file.extractFilename(), train_loc, train=true)
+    let test_board = load_pgn(file.extractFilename(), train_loc)
 
     var
       # The board state numbers that we take
@@ -138,8 +138,8 @@ proc generate_bootstrap_data(): tuple[batches, evals: seq[Tensor[float32]]] =
       v4 = v2.color_swap_board().reshape(1, D_in)
 
       # e1 and e2 are the evaluations of board 1 and 2 respectively.
-      e1 = [tanh(board1.handcrafted_eval() / 1000)].toTensor().astype(float32)
-      e2 = [tanh(board2.handcrafted_eval() / 1000)].toTensor().astype(float32)
+      e1 = [board1.handcrafted_eval() / 100].toTensor().astype(float32)
+      e2 = [board2.handcrafted_eval() / 100].toTensor().astype(float32)
 
     v1 = v1.reshape(1, D_in)
     v2 = v2.reshape(1, D_in)
@@ -196,7 +196,7 @@ proc bootstrap(fileLog: FileLogger): string=
 
   # For the time being I'm restricting the training to avoid overfitting.
   #  At some point I can make the number of bootstrap epochs variable.
-  for t in 1 .. 10:
+  for t in 1 .. 40:
     var running_loss = 0.0
     for i, minibatch in batches:
       # Generates the prediction finds the loss
@@ -236,7 +236,7 @@ proc generate_training_data(engine: var Engine, file: string, num_plies: int = 4
     train_loc = parentDir(getAppDir()) / "games" / "train"
 
   var
-    test_board = load_pgn(file.extractFilename(), train_loc, train=true)
+    test_board = load_pgn(file.extractFilename(), train_loc)
 
     # The board state number that we take. Subtract 5 to further differentiate
     # from the bootstrap states.

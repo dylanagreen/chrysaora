@@ -1282,7 +1282,7 @@ proc load_fen*(fen: string): Board =
   result.check[BLACK] = result.is_in_check(BLACK)
 
 
-proc load_pgn*(name: string, folder: string = "games", train = false): Board =
+proc load_pgn*(name: string, folder: string = "games"): Board =
   # File location of the pgn.
   var loc = os.joinPath(folder, name)
 
@@ -1330,24 +1330,6 @@ proc load_pgn*(name: string, folder: string = "games", train = false): Board =
 
     if not in_comment:
       moves_line.add(c)
-    elif train:
-      if c == 'b' and joined_line[i..(i + 3)] == "book":
-        evals.add(0)
-      elif c == 'w' and joined_line[i..(i + 2)] == "wv=":
-        try:
-          if joined_line[i+3] == '-':
-            evals.add(joined_line[(i + 3)..(i + 7)].parseFloat())
-          else:
-            evals.add(joined_line[(i + 3)..(i + 6)].parseFloat())
-        # This except block handles if one of the engines reported a mating
-        # move which shouldn't really happen 2/3 of the way through a game
-        # but one overzealous engine reported an M83 once.
-        except ValueError:
-          if "M" in joined_line[(i + 3)..(i + 6)]:
-            if joined_line[i+3] == '-':
-              evals.add(-100)
-            else:
-              evals.add(100)
 
   # \d+ looks for 1 or more digits
   # \. escapes the period

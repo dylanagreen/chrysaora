@@ -228,7 +228,10 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
     engine.compute = false
 
   # Initializes the result sequence.
-  result = if color == engine.color: @[("", -50000.0)] else: @[("", 50000.0)]
+  let
+    min_eval = -50000.0
+    max_eval = -min_eval
+  result = if color == engine.color: @[("", min_eval)] else: @[("", max_eval)]
 
   var
     cur_alpha = alpha
@@ -237,6 +240,12 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
   if depth == 0:
     engine.nodes += 1
     result[0].eval = network_eval(search_board)
+
+    # Just in case my network exploded.
+    if result[0].eval == NegInf:
+      result[0].eval = min_eval
+    elif result[0].eval == Inf:
+        result[0].eval = max_eval
     # Flip the sign for Black moves.
     if engine.color == BLACK: result[0].eval = result[0].eval * -1
     return
@@ -398,7 +407,7 @@ proc search(engine: Engine, max_depth: int): EvalMove =
 
   # If the time is less than 1 ms default to 10 seconds.
   if engine.time_per_move < 1:
-    engine.time_per_move = if not engine.train: 10000 else: 4000
+    engine.time_per_move = if not engine.train: 10 * 1000 else: 4000
   # This is a contingency for if we're searching for more time than is left.
   # The increment only gets added if we actually complete the move so we need
   # To finish in the time that's actually left.

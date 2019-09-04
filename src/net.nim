@@ -31,7 +31,7 @@ network ctx, ChessNet:
   # Giraffe used RELUs, I currently achieve better results with sigmoids.
   # I'll have to investigate that more.
   forward x:
-    x.fc1.relu.fc2.relu.fc3#.tanh
+    x.fc1.relu.fc2.relu.fc3.tanh
 
 # Initialize the model, in general we'll load a weights file for this.
 # I really hope you're not running it with random weights....

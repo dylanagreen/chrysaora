@@ -138,8 +138,8 @@ proc generate_bootstrap_data(): tuple[batches, evals: seq[Tensor[float32]]] =
       v4 = v2.color_swap_board().reshape(1, D_in)
 
       # e1 and e2 are the evaluations of board 1 and 2 respectively.
-      e1 = [board1.handcrafted_eval() / 100].toTensor().astype(float32)
-      e2 = [board2.handcrafted_eval() / 100].toTensor().astype(float32)
+      e1 = [tanh(board1.handcrafted_eval() / 1000)].toTensor().astype(float32)
+      e2 = [tanh(board2.handcrafted_eval() / 1000)].toTensor().astype(float32)
 
     v1 = v1.reshape(1, D_in)
     v2 = v2.reshape(1, D_in)
@@ -189,14 +189,14 @@ proc bootstrap(fileLog: FileLogger): string=
   let (batches, evals) = generate_bootstrap_data()
   # Adam optimizer needs to be variable as it learns during training
   # Adam works better for the bootstrapping process.
-  var optim = optimizerAdam[model, float32](model, learning_rate = 2e-3'f32)
+  var optim = optimizerAdam[model, float32](model, learning_rate = 1.3e-4'f32)
 
   # Timer to see how long the training takes.
   let t1 = epochtime()
 
   # For the time being I'm restricting the training to avoid overfitting.
   #  At some point I can make the number of bootstrap epochs variable.
-  for t in 1 .. 40:
+  for t in 1 .. 135:
     var running_loss = 0.0
     for i, minibatch in batches:
       # Generates the prediction finds the loss
@@ -229,7 +229,8 @@ proc bootstrap(fileLog: FileLogger): string=
   echo &"Bootstrapping completed in {t2-t1} seconds"
   logging.debug(&"Bootstrapping completed in {t2-t1} seconds")
 
-proc generate_training_data(engine: var Engine, file: string, num_plies: int = 4): Tensor[float32] =
+proc generate_training_data(engine: var Engine, file: string,
+                            num_plies: int=4, reverse: bool=false): Tensor[float32] =
 
   # Location of the training games
   let
@@ -255,7 +256,11 @@ proc generate_training_data(engine: var Engine, file: string, num_plies: int = 4
     parser = UCI(board: test_board, previous_cmd: @[], engine: engine)
 
   var
-    board_tensor = test_board.prep_board_for_network().reshape(1, D_in)
+    board_tensor = test_board.prep_board_for_network()
+
+  if reverse:
+    board_tensor = board_tensor.color_swap_board()
+  board_tensor = board_tensor.reshape(1, D_in)
 
   result = board_tensor
 
@@ -281,7 +286,11 @@ proc generate_training_data(engine: var Engine, file: string, num_plies: int = 4
       logging.error(&"Board fen: {test_board.tofen()}")
       raise(e)
 
-    let new_tensor = test_board.prep_board_for_network().reshape(1, D_in)
+    var new_tensor = test_board.prep_board_for_network()
+    if reverse:
+      new_tensor = new_tensor.color_swap_board()
+    new_tensor = new_tensor.reshape(1, D_in)
+
     result = result.concat(new_tensor, axis=0)
 
     # Lets the fledgling engine play into a checkmate. In much the same way
@@ -336,7 +345,7 @@ proc reinforcement_learning(weights: string = "", fileLog: FileLogger) =
     # The factor to reduce each temporal difference by. 0.7 is pretty standard
     scale = 0.7
 
-    learning_rate = 1.3e-3'f32
+    learning_rate = 0.1e-6'f32
 
     # The number of plies long the trace should be.
     num_plies = 6
@@ -347,6 +356,9 @@ proc reinforcement_learning(weights: string = "", fileLog: FileLogger) =
     # Storing the previous value for difference calculations.
     prev = 0'f32
     started = false
+
+    # To color flip the resulting tensors.
+    flip = false
 
   # Zeroes the grad while also creating a grad storage.
   #zero_grad(true)
@@ -362,12 +374,17 @@ proc reinforcement_learning(weights: string = "", fileLog: FileLogger) =
     engine.tt = newSeq[Transposition](engine.tt.len)
     #echo file.extractFilename()
     let
-      data = generate_training_data(cur_engine, file, num_plies)
+      data = generate_training_data(cur_engine, file, num_plies, flip)
       x = ctx.variable(data)
       y_pred = model.forward(x)
 
-    logging.debug(&"Pre-forward pass:")
+    if flip:
+      logging.debug("Pre-forward pass (Flipped):")
+    else:
+      logging.debug("Pre-forward pass:")
     logging.debug(y_pred.value)
+    flip = not flip
+
     for i in countdown(data.shape[0] - 1, 0):
       # This should be equal to y_pred[i, 0] but running it through alone
       # allows us to calculate the grdient.
@@ -380,12 +397,6 @@ proc reinforcement_learning(weights: string = "", fileLog: FileLogger) =
         continue
 
       let diff = prev - single_run.value[0, 0]
-
-      # echo ""
-      # echo single_run.value
-      # echo prev
-      # echo diff
-
       prev = single_run.value[0, 0]
 
       # Reduce the old trace by scale then add the new diff (which is scaled by 1

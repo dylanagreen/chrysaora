@@ -271,6 +271,8 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
         result[0].eval = float(depth * 1500)
       return
 
+    # Prevents bugs when we return "" if the first move is the best.
+    result[0].best_move = moves[0].uci
     # Before we start the search let's see if we can cut it off early with
     # Transposition hit
     let

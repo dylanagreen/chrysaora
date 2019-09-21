@@ -5,16 +5,32 @@ import arraymancer
 import ../src/board
 include ../src/net
 
+# Everything about this file was tedious as hell to write. But:
+# Bugs caught with these tests: 3
+# Tests are important kids!
 suite "board state to tensor":
 
   test "start pos":
     let board = new_board()
     let observed = board.prep_board_for_network()
-    let expected = [8, 2, 2, 2, 1, 8, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 48, 1, 49, 1, 50, 1, 51,
-                    1, 52, 1, 53, 1, 54, 1, 55, 2, 57, 2, 62, 3, 58, 3, 61, 4,
-                    56, 4, 63, 5, 59, 6, 60, 1, 8, 1, 9, 1, 10, 1, 11, 1, 12, 1,
-                    13, 1, 14, 1, 15, 2, 1, 2, 6, 3, 2, 3, 5, 4, 0, 4, 7, 5, 3,
-                    6, 4].toTensor().astype(float32)
+    let expected = [8, 2, 2, 2, 1, # White piece count
+                    8, 2, 2, 2, 1, # Black piece count
+                    1, # Side to move (WHITE)
+                    1, 1, 1, 1, # Castling rights
+                    1, 3, -4, 1, 3, -3, 1, 3, -2, 1, 3, -1,
+                    1, 3, 1, 1, 3, 2, 1, 3, 3, 1, 3, 4, # White pawns
+                    2, 4, -3, 2, 4, 3, # White knights (hahahahahaha)
+                    3, 4, -2, 3, 4, 2, # White bishops
+                    4, 4, -4, 4, 4, 4, # White rooks
+                    5, 4, -1, # White queen
+                    6, 4, 1, # White king
+                    1, -3, -4, 1, -3, -3, 1, -3, -2, 1, -3, -1,
+                    1, -3, 1, 1, -3, 2, 1, -3, 3, 1, -3, 4, # Black pawns
+                    2, -4, -3, 2, -4, 3, # Black knights
+                    3, -4, -2, 3, -4, 2, # Black bishops
+                    4, -4, -4, 4, -4, 4, # Black rooks
+                    5, -4, -1, # Black queen
+                    6, -4, 1].toTensor().astype(float32) # Black King
 
     check(observed == expected)
 
@@ -23,51 +39,103 @@ suite "board state to tensor":
     let board = load_fen("4R3/4k1p1/4p1Bp/3bN3/8/5PK1/3r2PP/4n3 b - - 7 46")
     let observed = board.prep_board_for_network()
 
-    let expected = [3, 1, 1, 1, 0, 3, 1, 1, 1, 0, -1, 0, 0, 0, 0, 1, 45, 1, 54, 1, 55, -1,
-                    -1, -1, -1, -1, -1, -1, -1, -1, -1, 2, 28, -1, -1, 3, 22,
-                    -1, -1, 4, 4, -1, -1, -1, -1, 6, 46, 1, 14, 1, 20, 1, 23,
-                    -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 2, 60, -1, -1, 3,
-                    27, -1, -1, 4, 51, -1, -1, -1, -1, 6, 12].toTensor().astype(float32)
+    let expected = [3, 1, 1, 1, 0, # White piece count
+                    3, 1, 1, 1, 0, # Black piece count
+                    -1, # Side to move (BLACK)
+                    0, 0, 0, 0, # Castling rights
+                    1, 2, 2, 1, 3, 3, 1, 3, 4, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, # White pawns
+                    2, -1, 1, 0, 0, 0, # White knights
+                    3, -2, 3, 0, 0, 0, # White bishops
+                    4, -4, 1, 0, 0, 0, # White rooks
+                    0, 0, 0, # White queen
+                    6, 2, 3, # White king
+                    1, -3, 3, 1, -2, 1, 1, -2, 4, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, # Black pawns
+                    2, 4, 1, 0, 0, 0, # Black knights
+                    3, -1, -1, 0, 0, 0, # Black bishops
+                    4, 3, -1, 0, 0, 0, # Black rooks
+                    0, 0, 0, # Black queen
+                    6, -3, 1].toTensor().astype(float32) # Black king
 
     check(observed == expected)
 
   test "color swap start pos":
     let board = new_board()
     let observed = board.prep_board_for_network().color_swap_board()
-    let expected = [8, 2, 2, 2, 1, 8, 2, 2, 2, 1, -1, 1, 1, 1, 1, 1, 48, 1, 49, 1, 50, 1, 51,
-                    1, 52, 1, 53, 1, 54, 1, 55, 2, 57, 2, 62, 3, 58, 3, 61, 4,
-                    56, 4, 63, 5, 59, 6, 60, 1, 8, 1, 9, 1, 10, 1, 11, 1, 12, 1,
-                    13, 1, 14, 1, 15, 2, 1, 2, 6, 3, 2, 3, 5, 4, 0, 4, 7, 5, 3,
-                    6, 4].toTensor().astype(float32)
+    let expected = [8, 2, 2, 2, 1, # White piece count
+                    8, 2, 2, 2, 1, # Black piece count
+                    -1, # Side to move (BLACK)
+                    1, 1, 1, 1, # Castling rights
+                    1, 3, -4, 1, 3, -3, 1, 3, -2, 1, 3, -1,
+                    1, 3, 1, 1, 3, 2, 1, 3, 3, 1, 3, 4, # White pawns
+                    2, 4, -3, 2, 4, 3, # White knights
+                    3, 4, -2, 3, 4, 2, # White bishops
+                    4, 4, -4, 4, 4, 4, # White rooks
+                    5, 4, -1, # White queen
+                    6, 4, 1, # White king
+                    1, -3, -4, 1, -3, -3, 1, -3, -2, 1, -3, -1,
+                    1, -3, 1, 1, -3, 2, 1, -3, 3, 1, -3, 4, # Black pawns
+                    2, -4, -3, 2, -4, 3, # Black knights
+                    3, -4, -2, 3, -4, 2, # Black bishops
+                    4, -4, -4, 4, -4, 4, # Black rooks
+                    5, -4, -1, # Black queen
+                    6, -4, 1].toTensor().astype(float32) # Black King
 
     check(observed == expected)
 
 
   test "white to move, black 3 rooks":
-    # Atest to make sure we not only generate promotions correctly, but that
+    # A test to make sure we not only generate promotions correctly, but that
     # we put them in the correct place, i.e. the black section.
     # A position from AllieStein v0.2 vs Xiphos 0.5.2, March 24, 2019
     let board = load_fen("2qbrr2/p4pk1/1p5p/2p1N3/P2pPP2/1P1P2P1/5R2/Q4KRr w - - 0 34")
     let observed = board.prep_board_for_network()
-    let expected = [6, 1, 0, 2, 1, 6, 0, 1, 3, 1, 1, 0, 0, 0, 0, 1, 32, 1, 36, 1, 37,
-                    1, 41, 1, 43, 1, 46, -1, -1, -1, -1, 2, 28, -1, -1, -1, -1,
-                    -1, -1, 4, 53, 4, 62, 5, 56, 6, 61, 1, 8, 1, 13, 1, 17, 1, 23,
-                    1, 26, 1, 35, -1, -1, 4, 63, -1, -1, -1, -1, 3, 3, -1, -1,
-                    4, 4, 4, 5, 5, 2, 6, 14].toTensor().astype(float32)
+    let expected = [6, 1, 0, 2, 1, # White piece count
+                    6, 0, 1, 3, 1, # Black piece count
+                    1, # Side to move (WHITE)
+                    0, 0, 0, 0, # Castling rights
+                    1, 1, -4, 1, 1, 1, 1, 1, 2, 1, 2, -3,
+                    1, 2, -1, 1, 2, 3, 0, 0, 0, 0, 0, 0, # White pawns
+                    2, -1, 1, 0, 0, 0, # White knights
+                    0, 0, 0, 0, 0, 0, # White bishops
+                    4, 3, 2, 4, 4, 3, # White rooks
+                    5, 4, -4, # White queen
+                    6, 4, 2, # White king
+                    1, -3, -4, 1, -3, 2, 1, -2, -3, 1, -2, 4,
+                    1, -1, -2, 1, 1, -1, 0, 0, 0, 4, 4, 4, # Black pawns and promoted rook
+                    0, 0, 0, 0, 0, 0, # Black knights
+                    3, -4, -1, 0, 0, 0, # Black bishops
+                    4, -4, 1, 4, -4, 2, # Black rooks
+                    5, -4, -2, # Black queen
+                    6, -3, 3].toTensor().astype(float32) # Black king
 
     check(observed == expected)
 
   test "black to move, white 3 rooks (reversed previous)":
     # Atest to make sure we not only generate promotions correctly, but that
-    # we put them in the correct place, i.e. the black section.
+    # we put them in the correct place, i.e. the white section.
     # A position from AllieStein v0.2 vs Xiphos 0.5.2, March 24, 2019
     let board = load_fen("2qbrr2/p4pk1/1p5p/2p1N3/P2pPP2/1P1P2P1/5R2/Q4KRr w - - 0 34")
     let observed = board.prep_board_for_network().color_swap_board()
-    let expected = [6, 0, 1, 3, 1, 6, 1, 0, 2, 1, -1, 0, 0, 0, 0, 1, 48, 1, 53, 1, 41, 1, 47,
-                    1, 34, 1, 27, -1, -1, 4, 7, -1, -1, -1, -1, 3, 59, -1, -1,
-                    4, 60, 4, 61, 5, 58, 6, 54, 1, 24, 1, 28, 1, 29,
-                    1, 17, 1, 19, 1, 22, -1, -1, -1, -1, 2, 36, -1, -1, -1, -1,
-                    -1, -1, 4, 13, 4, 6, 5, 0, 6, 5].toTensor().astype(float32)
+    let expected = [6, 0, 1, 3, 1, # White piece count
+                    6, 1, 0, 2, 1, # Black piece count
+                    -1, # Side to move (BLACK)
+                    0, 0, 0, 0, # Castling rights
+                    1, 3, -4, 1, 3, 2, 1, 2, -3, 1, 2, 4,
+                    1, 1, -2, 1, -1, -1, 0, 0, 0, 4, -4, 4, # White pawns and promoted rook
+                    0, 0, 0, 0, 0, 0, # White knights
+                    3, 4, -1, 0, 0, 0, # White bishops
+                    4, 4, 1, 4, 4, 2, # White rooks
+                    5, 4, -2, # White queen
+                    6, 3, 3, # White king
+                    1, -1, -4, 1, -1, 1, 1, -1, 2, 1, -2, -3,
+                    1, -2, -1, 1, -2, 3, 0, 0, 0, 0, 0, 0, # Black pawns
+                    2, 1, 1, 0, 0, 0, # Black knights
+                    0, 0, 0, 0, 0, 0, # Black bishops
+                    4, -3, 2, 4, -4, 3, # Black rooks
+                    5, -4, -4, # Black queen
+                    6, -4, 2].toTensor().astype(float32) # Black king
 
     check(observed == expected)
 

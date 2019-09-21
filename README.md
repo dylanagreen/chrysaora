@@ -66,10 +66,12 @@ nim c -d:danger -o:chrysaora-train --run src/train.nim --input:weights.txt
 - Hand Crafted Evaluation
   - Centipawn piece imbalance
   - Piece-square tables
-- Network Evaluation: 75 input features
+- Network Evaluation: 11 input features
   - Number of each piece (10 features)
   - Side to move (1 feature)
-  - Square position and piece existence (64 features)
+  - Castling rights (4 features)
+  - Square position (64 features)
+  - Piece existence (32 features)
   - More in depth network details can be found in the Chrysora Wiki
 - Search
   - Fail-hard alpha-beta pruning minimax

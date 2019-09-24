@@ -196,7 +196,7 @@ proc bootstrap(fileLog: FileLogger): string=
 
   # For the time being I'm restricting the training to avoid overfitting.
   #  At some point I can make the number of bootstrap epochs variable.
-  for t in 1 .. 135:
+  for t in 1 .. 60:
     var running_loss = 0.0
     for i, minibatch in batches:
       # Generates the prediction finds the loss
@@ -345,7 +345,7 @@ proc reinforcement_learning(weights: string = "", fileLog: FileLogger) =
     # The factor to reduce each temporal difference by. 0.7 is pretty standard
     scale = 0.7
 
-    learning_rate = 0.1e-6'f32
+    learning_rate = 1e-6'f32
 
     # The number of plies long the trace should be.
     num_plies = 6
@@ -375,7 +375,7 @@ proc reinforcement_learning(weights: string = "", fileLog: FileLogger) =
     #echo file.extractFilename()
     let
       data = generate_training_data(cur_engine, file, num_plies, flip)
-      x = ctx.variable(data)
+      x = ctx.variable(data / 8) # Divide by 8 so all values are -1 to 1
       y_pred = model.forward(x)
 
     if flip:

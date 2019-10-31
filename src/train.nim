@@ -226,8 +226,8 @@ proc bootstrap(fileLog: FileLogger): string=
 
   let t2 = epochtime()
 
-  echo &"Bootstrapping completed in {t2-t1} seconds"
-  logging.debug(&"Bootstrapping completed in {t2-t1} seconds")
+  echo &"Bootstrapping completed in {t2-t1:3.3f} seconds"
+  logging.debug(&"Bootstrapping completed in {t2-t1:3.3f} seconds")
 
 proc generate_training_data(engine: var Engine, file: string,
                             num_plies: int=4, reverse: bool=false): Tensor[float32] =
@@ -311,6 +311,23 @@ template zero_grad(store: bool = false)=
           grads.add(zeros_like(field.grad))
 
 
+# Copies from first to second.
+template copy_weights(first, second: ChessNet) =
+  # Storage of the network gradients
+  var temp_grads: seq[Tensor[float32]]
+  for layer in fields(first):
+    for field in fields(layer):
+      when field is Variable:
+        temp_grads.add(deepCopy(field.grad))
+
+  var i = 0
+  for layer in fields(second):
+    for field in fields(layer):
+      when field is Variable:
+        field.grad = deepCopy(temp_grads[i])
+        i += 1
+
+
 proc reinforcement_learning(weights: string = "", fileLog: FileLogger) =
   # I'll be honest, this is super super janky and I'm not even sure that this is
   # actually the correct implementation of TDLeaf(lambda) but it should be close
@@ -345,7 +362,7 @@ proc reinforcement_learning(weights: string = "", fileLog: FileLogger) =
     # The factor to reduce each temporal difference by. 0.7 is pretty standard
     scale = 0.7
 
-    learning_rate = 1e-6'f32
+    learning_rate = 0.9e-4'f32
 
     # The number of plies long the trace should be.
     num_plies = 6
@@ -360,11 +377,29 @@ proc reinforcement_learning(weights: string = "", fileLog: FileLogger) =
     # To color flip the resulting tensors.
     flip = false
 
+    # To count how many games have been run through
+    game_counter = 0
+
+    # The model whose weights will be updated during training.
+    working_model = ctx.init(ChessNet)
+
   # Zeroes the grad while also creating a grad storage.
   #zero_grad(true)
   # Timing variable
   let t1 = epochTime()
+  # Copy the weights from model into working_model
+  copy_weights(model, working_model)
   for file in walkFiles(train_loc / "*.pgn"):
+    # This code increments each game, and then after ten games trained will
+    # push the accumulated weight upgrades to the engine's model.
+    # Don't need to do this the first time but I can't imagine game_counter > 1
+    # will really speed it up that much.
+    game_counter += 1
+    if game_counter mod 100 == 1:
+      logging.debug(&"Reached game {game_counter}, updating engine model.")
+      # Copy the updated weights from working_model into model.
+      copy_weights(working_model, model)
+
     var
       # Storage for all the grads and traces.
       all_traces: seq[float32]
@@ -424,9 +459,9 @@ proc reinforcement_learning(weights: string = "", fileLog: FileLogger) =
 
     # Uses the optimzer to backpropagate the weight updates.
     #optim.update()
-    for i in 0..<data.shape[0]:
+    for i in 0 ..< data.shape[0]:
       var j = 0
-      for layer in fields(model):
+      for layer in fields(working_model):
         for field in fields(layer):
           when field is Variable:
             field.value += learning_rate * trace * grads[j]
@@ -437,7 +472,7 @@ proc reinforcement_learning(weights: string = "", fileLog: FileLogger) =
 
     # Log the results of the gradient descent.
     logging.debug(&"Post-forward pass:")
-    logging.debug(model.forward(x).value)
+    logging.debug(working_model.forward(x).value)
     logging.debug(&"Completed {num_steps} games.")
 
 

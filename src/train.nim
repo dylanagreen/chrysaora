@@ -362,7 +362,7 @@ proc reinforcement_learning(weights: string = "", fileLog: FileLogger) =
     # The factor to reduce each temporal difference by. 0.7 is pretty standard
     scale = 0.7
 
-    learning_rate = 0.9e-4'f32
+    learning_rate = 1e-5'f32
 
     # The number of plies long the trace should be.
     num_plies = 6
@@ -464,7 +464,8 @@ proc reinforcement_learning(weights: string = "", fileLog: FileLogger) =
       for layer in fields(working_model):
         for field in fields(layer):
           when field is Variable:
-            field.value += learning_rate * trace * grads[j]
+            for k in 0 ..< len(all_grads):
+              field.value += learning_rate * all_traces[k] * all_grads[k][j]
             j += 1
 
     num_steps += 1

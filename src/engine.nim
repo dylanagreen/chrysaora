@@ -99,7 +99,7 @@ let
                    [-2, 1, 2, 3, 3, 2, 1, -2],
                    [-2, 0, 1, 2, 2, 1, 0, -2],
                    [-3, -2, 0, 1, 1, 0, -2, -3],
-                   [-4, -3, -2, -2, -2, -2, -3, -4]].toTensor
+                   [-4, -3, -2, -2, -2, -2, -3, -4]].toTensor * 10
 
   rook_table = [[0, 0, 0, 0, 0, 0, 0, 0],
                 [1, 2, 2, 2, 2, 2, 2, 1],
@@ -108,7 +108,7 @@ let
                 [-1, 0, 0, 0, 0, 0, 0, -1],
                 [-1, 0, 0, 0, 0, 0, 0, -1],
                 [-1, 0, 0, 0, 0, 0, 0, -1],
-                [0, 0, 0, 1, 1, 0, 0, 0]].toTensor
+                [0, 0, 0, 1, 1, 0, 0, 0]].toTensor * 10
 
   king_table = [[0, 0, 0, 0, 0, 0, 0, 0],
                  [0, 0, 0, 0, 0, 0, 0, 0],
@@ -117,7 +117,7 @@ let
                  [0, 0, 0, 0, 0, 0, 0, 0],
                  [0, 0, 0, 0, 0, 0, 0, 0],
                  [0, 0, 0, 0, 0, 0, 0, 0],
-                 [0, 0, 0, 0, 0, 0, 0, 0]].toTensor # TODO: Write this
+                 [0, 0, 0, 0, 0, 0, 0, 0]].toTensor * 10 # TODO: Write this
 
   pawn_table = [[0, 0, 0, 0, 0, 0, 0, 0],
                  [5, 5, 5, 5, 5, 5, 5, 5],
@@ -126,7 +126,7 @@ let
                  [0, 0, 0, 3, 3, 0, 0, 0],
                  [0, -1, -1, 2, 2, -1, -1, 0],
                  [1, 1, 1, -2, -2, 1, 1, 1],
-                 [0, 0, 0, 0, 0, 0, 0, 0]].toTensor
+                 [0, 0, 0, 0, 0, 0, 0, 0]].toTensor * 10
 
   queen_table = [[-2, -1, -1, -1, -1, -1, -1, -2],
                  [-1, 0, 0, 0, 0, 0, 0, -1],
@@ -135,7 +135,7 @@ let
                  [-1, 0, 0, 2, 2, 0, 0, -1],
                  [-1, 1, 1, 1, 1, 1, 1, -1],
                  [-1, 0, 1, 0, 0, 1, 0, -1],
-                 [-2, -1, -1, -1, -1, -1, -1, -2]].toTensor
+                 [-2, -1, -1, -1, -1, -1, -1, -2]].toTensor * 10
 
   bishop_table = [[-2, -1, -1, -1, -1, -1, -1, -2],
                  [-1, 0, 0, 0, 0, 0, 0, -1],
@@ -144,7 +144,7 @@ let
                  [-1, 0, 2, 2, 2, 2, 0, -1],
                  [-1, 1, 1, 1, 1, 1, 1, -1],
                  [-1, 1, 0, 0, 0, 0, 1, -1],
-                 [-2, -1, -1, -1, -1, -1, -1, -2]].toTensor
+                 [-2, -1, -1, -1, -1, -1, -1, -2]].toTensor * 10
 
   value_table = {'N': knight_table, 'R': rook_table, 'K': king_table,
                  'P': pawn_table, 'Q': queen_table, 'B': bishop_table}.toTable
@@ -204,10 +204,10 @@ proc handcrafted_eval*(board: Board): float =
   # tables up above and adds them to the table if they're white, or subtracts
   # if they're black.
   for piece in board.piece_list[WHITE]:
-    result += float(value_table[piece.name][piece.pos.y, piece.pos.x] * 10)
+    result += float(value_table[piece.name][piece.pos.y, piece.pos.x])
 
   for piece in board.piece_list[BLACK]:
-    result -= float(value_table[piece.name][7 - piece.pos.y, piece.pos.x] * 10)
+    result -= float(value_table[piece.name][7 - piece.pos.y, piece.pos.x])
 
 
 proc network_eval(board: Board): float =

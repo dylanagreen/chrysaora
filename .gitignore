@@ -5,10 +5,12 @@ chrysaora//logs/
 # Training data for the network
 # And weights files
 src/box-t*
+results/
 
 # Binaries
 src/main
 src/perft
+src/train
 tests/test_board
 tests/test_movegen
 tests/test_net

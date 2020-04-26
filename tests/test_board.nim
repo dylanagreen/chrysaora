@@ -1,6 +1,5 @@
 import unittest
 import tables
-import sets
 import arraymancer
 import sequtils
 import tables

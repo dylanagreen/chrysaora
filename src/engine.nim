@@ -3,7 +3,6 @@ import logging
 import marshal
 import math
 import os
-import random
 import selectors
 import sequtils
 import streams
@@ -11,7 +10,6 @@ import strformat
 import strutils
 import system
 import tables
-import terminal
 import times # Why not just import everything at this point
 
 import arraymancer

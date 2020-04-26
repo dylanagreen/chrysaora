@@ -1,4 +1,3 @@
-import algorithm
 import bitops
 import tables
 import strutils

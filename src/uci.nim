@@ -2,8 +2,6 @@ import logging
 import re
 import strutils
 import tables
-import terminal
-import times
 
 import arraymancer
 

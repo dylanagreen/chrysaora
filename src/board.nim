@@ -1100,25 +1100,33 @@ proc to_fen*(board: Board): string =
   var fen: seq[string] = @[]
 
   # Loops over the board and gets the item at each location.
+  var space = 0
   for y in 0..7:
     for x in 0..7:
       # Adds pieces to the FEN. Lower case for black, and upper
       # for white. Since the dict is in uppercase we don't have
       # do to anything for that.
       var piece = board.current_state[y, x]
-      if piece < 0:
-        fen.add($piece_names[-piece].toLowerAscii())
-      elif piece > 0:
-        fen.add($piece_names[piece])
+
       # Empty spaces are represented by the number of blank spaces
-      # between pieces. If the previous item is a piece or the list
-      # is empty we add a 1, if the previous space is a number we
-      # increment it by one for this empty space.
+      # between pieces. If there is no piece here increment the space counter
+      # then reset it when we get to a piece and append it before adding
+      # the piece.
+      if piece == 0:
+        space += 1
       else:
-        if len(fen) == 0 or not fen[^1].isDigit():
-          fen.add("1")
-        else:
-          fen[^1] = $(parseInt(fen[^1]) + 1)
+        if space > 0:
+          fen.add($(space))
+          space = 0
+
+        if piece < 0:
+          fen.add($piece_names[-piece].toLowerAscii())
+        elif piece > 0:
+          fen.add($piece_names[piece])
+
+    if space != 0: fen.add($(space))
+    space = 0
+
     # At the end of each row we need to add a "/" to indicate that the row has
     # ended and we are moving to the next. Don't want an ending / though.
     if y < 7:

@@ -148,6 +148,8 @@ let
                  'P': pawn_table, 'Q': queen_table, 'B': bishop_table}.toTable
 
 
+var loaded_values = {'N': 1000}.toTable
+
 proc initialize_network*(name: string = "default.txt") =
   var weights_name: string
   # Searches for the most developed weights file with the current version name.
@@ -170,9 +172,9 @@ proc initialize_network*(name: string = "default.txt") =
     raise newException(IOError, "Weights File not found!")
 
   var strm = newFileStream(weights_loc, fmRead)
-  strm.load(model)
+  strm.load(loaded_values)
   strm.close()
-  ctx = engine.model.fc1.weight.context
+  echo loaded_values # For debug purposes.
 
   # For future reference so we know what weights file was loaded.
   logging.debug(&"Loaded weights file: {weights_name}")
@@ -201,21 +203,19 @@ proc handcrafted_eval*(board: Board): float =
   # This loops over the pieces and gets their evaluations from the piece-square
   # tables up above and adds them to the table if they're white, or subtracts
   # if they're black.
-  for piece in board.piece_list[WHITE]:
-    result += float(value_table[piece.name][piece.pos.y, piece.pos.x])
+  # for piece in board.piece_list[WHITE]:
+  #   result += float(value_table[piece.name][piece.pos.y, piece.pos.x])
 
-  for piece in board.piece_list[BLACK]:
-    result -= float(value_table[piece.name][7 - piece.pos.y, piece.pos.x])
+  # for piece in board.piece_list[BLACK]:
+  #   result -= float(value_table[piece.name][7 - piece.pos.y, piece.pos.x])
 
 
 proc network_eval(board: Board): float =
-  let x = ctx.variable(board.prep_board_for_network().reshape(1, D_in))
-  # Evals are in pawns and not centipawns so multiply by 100.
-  no_grad_mode ctx:
-    result = model.forward(x).value[0, 0]
+  for piece in board.piece_list[WHITE]:
+    result += float(loaded_values[piece.name])
 
-  # Converts network output to centipawns.
-  result = arctanh(result) * 100
+  for piece in board.piece_list[BLACK]:
+    result -= float(loaded_values[piece.name])
 
 
 proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,

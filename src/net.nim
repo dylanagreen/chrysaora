@@ -16,7 +16,7 @@ let
   # network (hidden layer sizes for example)
   # Input vector changes and large scale changes to internal network structure
   # like number of hidden layers whill get their own code name.
-  base_version* = "box-t8"
+  base_version* = "noctiluca" # A bioluminescent jellyfish
 
   # Create the autograd context that will hold the computational graph
 var ctx* = newContext Tensor[float32]

@@ -24,7 +24,7 @@ type
 
 
 # Authorship information
-const id = {"name": "Chrysaora 0.005", "author": "Dylan Green"}.toTable
+const id = {"name": "Chrysaora 0.005-knightcap", "author": "Dylan Green"}.toTable
 
 
 proc send_command*(cmd: string) =

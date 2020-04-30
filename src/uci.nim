@@ -1,13 +1,12 @@
 import logging
-import re
 import strutils
 import tables
 
 import arraymancer
 
 import board
-import bitboard
 import engine
+import train
 
 type
   UCI* = ref object
@@ -43,47 +42,10 @@ proc identify*() =
 
   # Id the options
   send_command("option name Hash type spin default 16 min 1 max 4096")
+  send_command("option name Train type check default false")
 
   # Writes the ok command at the end.
   send_command("uciok")
-
-
-proc uci_to_algebraic*(parser: UCI, move: string): string =
-  # Promotions are in the form say a7a8q so length 5
-  if len(move) == 5:
-    result = move[0..^2] & '=' & toUpperAscii(move[^1])
-  else:
-    # Uses regex to find the rank/file combinations.
-    let locs = findAll(move, loc_finder)
-    # Gets the starting Position and puts into a constant
-    var
-      dest = locs[0]
-      file = ascii_lowercase.find(dest[0]) # File = x
-      rank = 8 - parseInt($dest[1]) # Rank = y
-
-    let
-      start: Position = (rank, file)
-
-      # Finds the piece that's being moved so we can prepend it to the move.
-      piece = parser.board.current_state[start.y, start.x]
-      piece_name = piece_names[abs(piece)]
-
-    # If the piece is a king check if this is a castling move.
-    if piece_name == 'K' and dest[0] == 'e':
-      # Only need this for checking for castling.
-      dest = locs[1]
-
-      # Kingside castling
-      if dest[0] == 'g':
-        return "O-O"
-      # Queenside castling
-      elif dest[0] == 'c':
-        return "O-O-O"
-
-    if piece_name == 'P':
-      result = move
-    else:
-      result = $piece_name & move
 
 
 proc set_option(option: seq[string]) =
@@ -98,6 +60,11 @@ proc set_option(option: seq[string]) =
       engine.tt = newSeq[Transposition](int(floor(size)))
     except:
       echo "Invalid hash size input, defaulting to 16."
+
+  elif option[2] == "Train":
+    if option[^1].toLowerAscii() == "true":
+      training = true
+      logging.debug("Enabled training mode!")
 
 
 proc set_up_position(parser: UCI, cmd: seq[string]) =
@@ -134,7 +101,7 @@ proc set_up_position(parser: UCI, cmd: seq[string]) =
 
     # Converts the moves to long algebraic to make them.
     for move in moves_to_make:
-      var converted = parser.uci_to_algebraic(move)
+      var converted = parser.board.uci_to_algebraic(move)
       parser.board.make_move(converted)
 
   # When the command is just start pos reset the board to the start pos.
@@ -236,6 +203,10 @@ proc decrypt_uci*(parser: UCI, cmd: string) =
   elif to_exec == "position":
     parser.set_up_position(fields)
   elif to_exec == "quit":
+    if training:
+      # Update and save the weights before quitting.
+      update_weights()
+      save_weights()
     quit()
   elif to_exec == "ucinewgame":
     parser.board = new_board()
@@ -243,6 +214,10 @@ proc decrypt_uci*(parser: UCI, cmd: string) =
 
     # Need to clear the transposition table
     engine.tt = newSeq[Transposition](engine.tt.len)
+
+    if training:
+      # Update all the weights
+      update_weights()
   elif to_exec == "setoption":
     set_option(fields)
 

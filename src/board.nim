@@ -89,6 +89,8 @@ const
   piece_names* = {100: 'P', 500: 'R', 310: 'N',
                   300: 'B', 900: 'Q', 1000: 'K'}.toOrderedTable
 
+  base_version* = "noctiluca" # A bioluminescent jellyfish
+
 var temp: seq[tuple[key: char, val: int]] = @[]
 for key, value in piece_names:
   temp.add((value, key))
@@ -333,6 +335,44 @@ proc is_in_check*(board: Board, color: Color): bool =
 
       if attacks.testBit((7 - king.y) * 8 + king.x):
         return true
+
+
+proc uci_to_algebraic*(board: Board, move: string): string =
+  # Promotions are in the form say a7a8q so length 5
+  if len(move) == 5:
+    result = move[0..^2] & '=' & toUpperAscii(move[^1])
+  else:
+    # Uses regex to find the rank/file combinations.
+    let locs = findAll(move, loc_finder)
+    # Gets the starting Position and puts into a constant
+    var
+      dest = locs[0]
+      file = ascii_lowercase.find(dest[0]) # File = x
+      rank = 8 - parseInt($dest[1]) # Rank = y
+
+    let
+      start: Position = (rank, file)
+
+      # Finds the piece that's being moved so we can prepend it to the move.
+      piece = board.current_state[start.y, start.x]
+      piece_name = piece_names[abs(piece)]
+
+    # If the piece is a king check if this is a castling move.
+    if piece_name == 'K' and dest[0] == 'e':
+      # Only need this for checking for castling.
+      dest = locs[1]
+
+      # Kingside castling
+      if dest[0] == 'g':
+        return "O-O"
+      # Queenside castling
+      elif dest[0] == 'c':
+        return "O-O-O"
+
+    if piece_name == 'P':
+      result = move
+    else:
+      result = $piece_name & move
 
 
 proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =

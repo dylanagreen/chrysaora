@@ -15,9 +15,9 @@ import times # Why not just import everything at this point
 import arraymancer
 
 import board
-import bitboard
 import movegen
-include net
+# include net
+import train
 
 type
 
@@ -77,13 +77,15 @@ type
     time: int
 
     # The actual network we use to evaluate
-    network*: ChessNet
+    # network*: ChessNet
 
-    # Whether or not this engine is being used for training (reduces search time)
-    train*: bool
+    # Storing this for training purposes
+    pv: string
 
-
-var tt* = newSeq[Transposition](200)
+var
+  tt* = newSeq[Transposition](200)
+  # Whether or not we're in training mode
+  training* = false
 
 
 # Piece-square tables. These tables are partially designed based on those on
@@ -148,8 +150,6 @@ let
                  'P': pawn_table, 'Q': queen_table, 'B': bishop_table}.toTable
 
 
-var loaded_values = {'N': 1000}.toTable
-
 proc initialize_network*(name: string = "default.txt") =
   var weights_name: string
   # Searches for the most developed weights file with the current version name.
@@ -174,7 +174,6 @@ proc initialize_network*(name: string = "default.txt") =
   var strm = newFileStream(weights_loc, fmRead)
   strm.load(loaded_values)
   strm.close()
-  echo loaded_values # For debug purposes.
 
   # For future reference so we know what weights file was loaded.
   logging.debug(&"Loaded weights file: {weights_name}")
@@ -352,7 +351,6 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
                               depth: depth)
 
 
-
 # Sorts the root moves to put the highest evaluated one first to try and proc
 # more cutoffs.
 proc sort_root_moves(engine: Engine) =
@@ -407,7 +405,7 @@ proc search(engine: Engine, max_depth: int): EvalMove =
 
   # If the time is less than 1 ms default to 10 seconds.
   if engine.time_per_move < 1:
-    engine.time_per_move = if not engine.train: 10 * 1000 else: 4000
+    engine.time_per_move = 10 * 1000
   # This is a contingency for if we're searching for more time than is left.
   # The increment only gets added if we actually complete the move so we need
   # To finish in the time that's actually left.
@@ -444,9 +442,8 @@ proc search(engine: Engine, max_depth: int): EvalMove =
     nps = int(float(engine.nodes) / (t2 - t1))
     result = moves[0]
 
-    if not engine.train:
-      let pv = moves.map(proc(x: EvalMove): string = x.best_move).join(" ")
-      send_command(&"info depth {d} seldepth {d} score cp {int(result.eval)} nodes {engine.nodes} nps {nps} time {engine.time} pv {pv}")
+    engine.pv = moves.map(proc(x: EvalMove): string = x.best_move).join(" ")
+    send_command(&"info depth {d} seldepth {d} score cp {int(result.eval)} nodes {engine.nodes} nps {nps} time {engine.time} pv {engine.pv}")
 
     # Use the magic of iterative deepning to sort moves for more cutoffs.
     # Resort every odd ply in case we found a checkmate and need to search
@@ -458,5 +455,8 @@ proc search(engine: Engine, max_depth: int): EvalMove =
 proc find_move*(engine: Engine): string =
   engine.color = engine.board.to_move
   let search_result = engine.search(engine.max_depth)
+
+  if training:
+      update_training_parameters(engine.board, search_result.eval, engine.pv)
 
   return search_result.best_move

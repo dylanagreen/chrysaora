@@ -8,500 +8,93 @@ import strutils
 import tables
 import times
 
-import arraymancer
-
 import board
-import movegen
-import engine
-import uci
-include net
-
-
-proc split_game*(name: string, folder: string = "games") =
-  # File location of the pgn.
-  var
-    start_loc = parentDir(getAppDir()) / folder / name
-    temp_loc = parentDir(getAppDir()) / folder / "train" / "temp.pgn"
-
-  # In case you pass the name without .pgn at the end.
-  if not start_loc.endsWith(".pgn"):
-    start_loc = start_loc & ".pgn"
-
-  if not fileExists(start_loc):
-    raise newException(IOError, "PGN not found!")
-
-  # Creates the folder for the split games.
-  if not existsDir(folder / "train"):
-    createDir(folder / "train")
-
-  let data = open(start_loc)
-
-  # We only use the tags for naming the file.
-  var
-    f = open(temp_loc, fmWrite)
-    tags = initTable[string, string]()
-    in_game = false
-
-  for line in data.lines:
-    if not line.startsWith("["):
-      in_game = true
-    else:
-      if in_game:
-        # If we encounter a tag opening [ but still think we are in the game
-        # then we reached the end. We close temp, move it to the new name,
-        # and open a new temp to write to.
-        in_game = false
-        f.close()
-        var new_name = tags["White"] & "vs" & tags["Black"] & " " & tags["Date"]
-
-        # Adds the round for multiple games played by the same players on the
-        # same date
-        if tags.hasKey("Round"):
-          new_name = new_name & " " & tags["Round"]
-
-        new_name = new_name & ".pgn"
-        temp_loc.moveFile(parentDir(getAppDir()) / folder / "train" / new_name)
-        f = open(temp_loc, fmWrite)
-        tags = initTable[string, string]()
-
-      var
-        trimmed = line.strip(chars = {'[', ']'})
-        pair = trimmed.split("\"")
-
-      tags[pair[0].strip()] = pair[1]
-
-    f.write(line & "\n")
-
-  # Moves the final game as well once we jump out of the loop.
-  f.close()
-  var new_name = tags["White"] & "vs" & tags["Black"] & " " & tags["Date"]
-  if tags.hasKey("Round"):
-    new_name = new_name & " " & tags["Round"] & ".pgn"
-  else:
-    new_name = new_name & ".pgn"
-
-  temp_loc.moveFile(parentDir(getAppDir()) / folder / "train" / new_name)
-
-
-proc split_all_games() =
-  let start_loc = parentDir(getAppDir()) / "games"
-
-  for file in walkFiles(start_loc / "*.pgn"):
-    split_game(file.extractFilename())
-    echo &"Split {file.extractFilename()}"
-
-
-proc generate_bootstrap_data(): tuple[batches, evals: seq[Tensor[float32]]] =
-  # Location of the training games
-  let train_loc = parentDir(getAppDir()) / "games" / "train"
-
-  # We record the number of batches for reporting purposes.
-  var
-    num_batches = 0
-    minibatch = zeros[float32](1, 74)
-    evals = zeros[float32](1)
-    total_states = 0
-
-  # Walking through the pgn files only (so it doesn't matter if you accidentally
-  # put a png in there once like I did :))
-  for file in walkFiles(train_loc / "*.pgn"):
-
-    # The test board we'll be unmaking moves on.
-    let test_board = load_pgn(file.extractFilename(), train_loc)
-
-    var
-      # The board state numbers that we take
-      num1 = test_board.move_list.len div 3
-      num2 = num1 * 2
-
-      # The boards we'll prep for the network
-      board1, board2: Board
-
-    if num2 < test_board.move_list.len - 3:
-      num2 = num2 + 3
-    num1 = num1 + 3
-
-    # Unmakes the moves to get the board state at num 1 and 2.
-    for j in 1..num2:
-      if j == num1:
-        board1 = deepCopy(test_board)
-      test_board.unmake_move()
-    board2 = deepCopy(test_board)
-
-    var
-      # V1 and v2 stand for vector 1 and 2 representing the boards as network
-      # ready tensors
-      v1 = board1.prep_board_for_network()
-      v2 = board2.prep_board_for_network()
-
-      v3 = v1.color_swap_board().reshape(1, D_in)
-      v4 = v2.color_swap_board().reshape(1, D_in)
-
-      # e1 and e2 are the evaluations of board 1 and 2 respectively.
-      e1 = [tanh(board1.handcrafted_eval() / 1000)].toTensor().astype(float32)
-      e2 = [tanh(board2.handcrafted_eval() / 1000)].toTensor().astype(float32)
-
-    v1 = v1.reshape(1, D_in)
-    v2 = v2.reshape(1, D_in)
-    # If this is the first one loaded then we create the state/eval in the
-    # final tensor. Otherwise we can straight concat it.
-    if minibatch.shape[0] == 1:
-      num_batches += 1
-      minibatch = v1
-      evals = e1
-    else:
-      minibatch = minibatch.concat(v1, axis=0)
-      evals = evals.concat(e1, axis=0)
-
-    # Second board from every game is always able to be concated.
-    minibatch = minibatch.concat(v2, axis=0)
-    evals = evals.concat(e2, axis=0)
-
-    # Adds the color swapped boards, and the negative versions of their evals
-    minibatch = minibatch.concat(v3, axis=0)
-    evals = evals.concat(-e1, axis=0)
-
-    minibatch = minibatch.concat(v4, axis=0)
-    evals = evals.concat(-e2, axis=0)
-
-    if minibatch.shape[0] == 100:
-      result.batches.add(minibatch)
-      total_states += 100
-      # Reshaping for running through the network.
-      result.evals.add(evals.reshape(evals.shape[0], 1))
-
-      minibatch = zeros[float32](1, 74)
-      evals = zeros[float32](1)
-
-  # Adds the final minibatch that is length < 50 to the result.
-  result.batches.add(minibatch)
-  total_states += minibatch.shape[0]
-  # Reshaping for running through the network.
-  result.evals.add(evals.reshape(evals.shape[0], 1))
-
-  echo &"Training data loaded. Loaded {total_states / 4} games and {total_states} board states."
-  logging.debug(&"Training data loaded. Loaded {total_states / 4} games and {total_states} board states.")
-  echo &"Data is in {result.batches.len - 1} batches of 100 states and one batch of {result.batches[^1].shape[0]} states."
-  logging.debug(&"Data is in {result.batches.len - 1} batches of 100 states and one batch of {result.batches[^1].shape[0]} states.")
-
-
-proc bootstrap(fileLog: FileLogger): string=
-  let (batches, evals) = generate_bootstrap_data()
-  # Adam optimizer needs to be variable as it learns during training
-  # Adam works better for the bootstrapping process.
-  var optim = optimizerAdam[model, float32](model, learning_rate = 1.3e-4'f32)
-
-  # Timer to see how long the training takes.
-  let t1 = epochtime()
-
-  # For the time being I'm restricting the training to avoid overfitting.
-  #  At some point I can make the number of bootstrap epochs variable.
-  for t in 1 .. 60:
-    var running_loss = 0.0
-    for i, minibatch in batches:
-      # Generates the prediction finds the loss
-      let
-        x = ctx.variable(minibatch)
-        y_pred = model.forward(x)
-        loss = mse_loss(y_pred, evals[i])
-
-      # Keeping a running loss for averaging
-      running_loss += loss.value[0]
-
-      # Back propagation
-      loss.backprop()
-      optim.update()
-
-    echo &"Epoch {t}: avg loss {running_loss / float(batches.len)}"
-    logging.debug(&"Epoch {t}: avg loss {running_loss / float(batches.len)}")
-    flushFile(fileLog.file)
-
-  # Codenaming network version 1 as box. I don't really need to save the
-  # Bootstrap since the weights will be saved into the model already.
-  result = &"{base_version}-bootstrap.txt"
-  var strm = newFileStream(os.joinPath(getAppDir(), result), fmWrite)
-  strm.store(model)
-  strm.close()
-  logging.debug(&"Saved: {base_version}-bootstrap.txt")
-
-  let t2 = epochtime()
-
-  echo &"Bootstrapping completed in {t2-t1:3.3f} seconds"
-  logging.debug(&"Bootstrapping completed in {t2-t1:3.3f} seconds")
-
-proc generate_training_data(engine: var Engine, file: string,
-                            num_plies: int=4, reverse: bool=false): Tensor[float32] =
-
-  # Location of the training games
-  let
-    train_loc = parentDir(getAppDir()) / "games" / "train"
-
-  var
-    test_board = load_pgn(file.extractFilename(), train_loc)
-
-    # The board state number that we take. Subtract 5 to further differentiate
-    # from the bootstrap states.
-    num1 = test_board.move_list.len div 3 * 2 - 5
-
-
-  # Unmakes the moves to get the board state at num 1 and 2.
-  for j in 1..num1:
-    test_board.unmake_move()
-
-  engine.board = test_board
-  engine.color = test_board.to_move
-
-  # We need this really only for castling moves.
-  let
-    parser = UCI(board: test_board, previous_cmd: @[], engine: engine)
-
-  var
-    board_tensor = test_board.prep_board_for_network()
-
-  if reverse:
-    board_tensor = board_tensor.color_swap_board()
-  board_tensor = board_tensor.reshape(1, D_in)
-
-  result = board_tensor
-
-  # Loops over the number of plies.
-  for i in 1..num_plies:
-    engine.compute = true
-    try:
-      let
-        m = engine.find_move()
-        converted = parser.uci_to_algebraic(m)
-      test_board.make_move(converted)
-
-    # Just in case an illegal move is made.
-    except Exception as e:
-      echo file.extractFilename()
-      echo test_board.tofen()
-      echo test_board.move_list
-      echo test_board.status
-      echo i
-      echo test_board.to_move
-
-      logging.error("Error encountered during make_move.")
-      logging.error(&"Board fen: {test_board.tofen()}")
-      raise(e)
-
-    var new_tensor = test_board.prep_board_for_network()
-    if reverse:
-      new_tensor = new_tensor.color_swap_board()
-    new_tensor = new_tensor.reshape(1, D_in)
-
-    result = result.concat(new_tensor, axis=0)
-
-    # Lets the fledgling engine play into a checkmate. In much the same way
-    # that a mother bird will sometimes watch as her fledgling jump out
-    # of the nest unprepared, I too watch as my engine plays itself into
-    # a loss. Good old blundersaora.
-    if test_board.status == WHITE_VICTORY or test_board.status == BLACK_VICTORY:
-      break
-
-
-# A template to clear the gradients of a network. Mainly just for readibility.
-template zero_grad(store: bool = false)=
-  for layer in fields(model):
-    for field in fields(layer):
-      when field is Variable:
-        field.grad = zeros_like(field.grad)
-        if store:
-          grads.add(zeros_like(field.grad))
-
-
-# Copies from first to second.
-template copy_weights(first, second: ChessNet) =
-  # Storage of the network gradients
-  var temp_grads: seq[Tensor[float32]]
-  for layer in fields(first):
-    for field in fields(layer):
-      when field is Variable:
-        temp_grads.add(deepCopy(field.grad))
-
-  var i = 0
-  for layer in fields(second):
-    for field in fields(layer):
-      when field is Variable:
-        field.grad = deepCopy(temp_grads[i])
-        i += 1
-
-
-proc reinforcement_learning(weights: string = "", fileLog: FileLogger) =
-  # I'll be honest, this is super super janky and I'm not even sure that this is
-  # actually the correct implementation of TDLeaf(lambda) but it should be close
-  # enough. I hope. Weights is a weights file for where to start the training.
-  let
-    weights_loc = getAppDir() / weights
-    train_loc = parentDir(getAppDir()) / "games" / "train"
-
-  # Idiot proofing.
-  if not fileExists(weights_loc):
-    echo  "Weights file not found, using default weights."
-  else:
-    if weights.endsWith("bootstrap.txt"):
-      echo "Using bootstrapped weights"
-    var strm = newFileStream(weights_loc, fmRead)
-    strm.load(model)
-    strm.close()
-
-    ctx = model.fc1.weight.context
-
-  var
-    # The engine we use to make the moves.
-    time_params = {"wtime" : 0, "btime" : 0, "winc" : 0, "binc" : 0}.toTable
-    cur_engine = Engine(time_params: time_params, compute: true,
-                max_depth: 30, train: true)
-    # The number of training steps we've done.
-    num_steps = 0
-
-    # The running list of the trace.
-    trace: float32
-
-    # The factor to reduce each temporal difference by. 0.7 is pretty standard
-    scale = 0.7
-
-    learning_rate = 1e-5'f32
-
-    # The number of plies long the trace should be.
-    num_plies = 6
-
-    # Storage of the network gradients
-    grads: seq[Tensor[float32]]
-
-    # Storing the previous value for difference calculations.
-    prev = 0'f32
-    started = false
-
-    # To color flip the resulting tensors.
-    flip = false
-
-    # To count how many games have been run through
-    game_counter = 0
-
-    # The model whose weights will be updated during training.
-    working_model = ctx.init(ChessNet)
-
-  # Zeroes the grad while also creating a grad storage.
-  #zero_grad(true)
-  # Timing variable
-  let t1 = epochTime()
-  # Copy the weights from model into working_model
-  copy_weights(model, working_model)
-  for file in walkFiles(train_loc / "*.pgn"):
-    # This code increments each game, and then after ten games trained will
-    # push the accumulated weight upgrades to the engine's model.
-    # Don't need to do this the first time but I can't imagine game_counter > 1
-    # will really speed it up that much.
-    game_counter += 1
-    if game_counter mod 100 == 1:
-      logging.debug(&"Reached game {game_counter}, updating engine model.")
-      # Copy the updated weights from working_model into model.
-      copy_weights(working_model, model)
-
-    var
-      # Storage for all the grads and traces.
-      all_traces: seq[float32]
-      all_grads: seq[seq[Tensor[float32]]]
-
-    # Clears the transposition table.
-    engine.tt = newSeq[Transposition](engine.tt.len)
-    #echo file.extractFilename()
-    let
-      data = generate_training_data(cur_engine, file, num_plies, flip)
-      x = ctx.variable(data / 8) # Divide by 8 so all values are -1 to 1
-      y_pred = model.forward(x)
-
-    if flip:
-      logging.debug("Pre-forward pass (Flipped):")
-    else:
-      logging.debug("Pre-forward pass:")
-    logging.debug(y_pred.value)
-    flip = not flip
-
-    for i in countdown(data.shape[0] - 1, 0):
-      # This should be equal to y_pred[i, 0] but running it through alone
-      # allows us to calculate the grdient.
-      var
-        single_run = model.forward(ctx.variable(data[i, 0..<D_in], requires_grad = true))
-
-      if not started:
-        prev = single_run.value[0, 0]
-        started = true
-        continue
-
-      let diff = prev - single_run.value[0, 0]
-      prev = single_run.value[0, 0]
-
-      # Reduce the old trace by scale then add the new diff (which is scaled by 1
-      # here). This is equivalent to Sum(0.7 ^ lifetime of diff * diff)
-      trace *= scale
-      trace += diff
-
-      all_traces.add(trace)
-      grads = @[]
-      zero_grad(true)
-
-      # Backprop the output gradient
-      single_run.backprop()
-
-      var j = 0
-      for layer in fields(model):
-        for field in fields(layer):
-          when field is Variable:
-            grads[j] = field.grad
-            j += 1
-
-      all_grads.add(grads)
-      # Writes the log.
-      flushFile(fileLog.file)
-
-    # Uses the optimzer to backpropagate the weight updates.
-    #optim.update()
-    for i in 0 ..< data.shape[0]:
-      var j = 0
-      for layer in fields(working_model):
-        for field in fields(layer):
-          when field is Variable:
-            for k in 0 ..< len(all_grads):
-              field.value += learning_rate * all_traces[k] * all_grads[k][j]
-            j += 1
-
-    num_steps += 1
-    echo &"Completed {num_steps} games."
-
-    # Log the results of the gradient descent.
-    logging.debug(&"Post-forward pass:")
-    logging.debug(working_model.forward(x).value)
-    logging.debug(&"Completed {num_steps} games.")
-
-
-  # Codenaming network version 1 as box
-  var out_strm = newFileStream(os.joinPath(getAppDir(), &"{base_version}-{num_plies}-{num_steps}.txt"), fmWrite)
-  out_strm.store(model)
+
+var
+  # Easier to save the evals and the piece lists.
+  evals: seq[float] = @[]
+
+  # For this super shitty eval function the gradients are equal to the difference
+  # between white and black pieces
+  grads: seq[seq[int]] = @[]
+
+  # Loaded weight values
+  loaded_values* = {'K': 1000}.toTable
+
+let
+  # Learning rate and lambda hyperparameters
+  alpha = 0.01
+
+  lamb = 0.7
+
+  piece_index = {'P': 0, 'N': 1, 'R': 2, 'B': 3, 'Q': 4}.toTable
+
+
+proc update_training_parameters*(board: Board, eval: float, pv: string) =
+  evals.add(eval)
+
+  # Get the moves and make them so we can look at the leaf node
+  let moves = pv.split(" ")
+  for m in moves:
+    # I suspect we always end up adding an empty string at the end so in theory
+    # I could just ignore the last move but this is safer in case there's one
+    # in the middle or in case we don't add one at the end.
+    if m == "": continue
+    let alg_move = board.uci_to_algebraic(m)
+    board.make_move(alg_move)
+
+  # Here we get the piece nums which in our lame eval function end up being the
+  # gradients when you take the derivative with respect to the weights. In our
+  # case the weights are the piece values.
+  var piece_nums: seq[int] = @[0, 0, 0, 0, 0]
+
+  for piece in board.piece_list[WHITE]:
+    # We always have a king on both sides so we're not counting them
+    if piece.name == 'K' : continue
+    piece_nums[piece_index[piece.name]] += 1
+
+  for piece in board.piece_list[BLACK]:
+    if piece.name == 'K' : continue
+    piece_nums[piece_index[piece.name]] -= 1
+  grads.add(piece_nums)
+
+  # Return the board to its original state
+  for m in moves:
+    if m == "": continue
+    board.unmake_move()
+
+proc update_weights*() =
+  # Without two states you can't calculate a difference (cuz what would it be
+  # a difference between?
+  if evals.len < 2:
+    logging.debug("Not enough states to compute temporal difference")
+    logging.debug("At least two states required")
+    evals = @[]
+    grads = @[]
+    return
+
+  var running_diff = 0.0
+  # Works backwards from the end, stops at 2  because that gives the first two.
+  for i in countdown(evals.len, 2):
+    let diff = evals[i-1] - evals[i-2]
+
+    # Computes the eligability trace
+    running_diff = running_diff * lamb + diff
+    # Weight update caluclated from magical temporal difference formula
+    let cur_grads = grads[i-2]
+
+    for key, val in loaded_values:
+      # The update to this will always be 0 anyway.
+      # Since # of kings always equal.
+      # TODO change this in the future.
+      if key == 'K': continue
+      let weight_update = alpha * float(cur_grads[piece_index[key]]) * running_diff
+      loaded_values[key] += int(weight_update)
+
+  evals = @[]
+  grads = @[]
+
+proc save_weights*() =
+  var out_strm = newFileStream(os.joinPath(getAppDir(), &"{base_version}-t2.txt"), fmWrite)
+  out_strm.store(loaded_values)
   out_strm.close()
-
-  let t2 = epochtime()
-
-  echo &"Reinforcement learning completed in {t2-t1} seconds"
-  echo &"Average time per game: {(t2-t1)/float(num_steps)} seconds"
-
-
-if isMainModule:
-  # Set up a log to track anything that happens during the training.
-  let log_folder = os.joinPath(getAppDir(), "logs")
-  if not existsDir(log_folder):
-      createDir(log_folder)
-  let
-    log_name = log_folder / &"training-{base_version}-{$now()}.log"
-    fileLog = newFileLogger(log_name, levelThreshold = lvlDebug)
-  # Mustn't forget to add a handler for the logging file.
-  addHandler(fileLog)
-
-  # The actual training. Bootstraps then trains.
-  let name = bootstrap(fileLog)
-  reinforcement_learning(name, fileLog)
-
-  # Flush anything left in the log.
-  flushFile(fileLog.file)

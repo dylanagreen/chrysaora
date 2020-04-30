@@ -23,7 +23,7 @@ var
 
 let
   # Learning rate and lambda hyperparameters
-  alpha = 0.01
+  alpha = 0.002
 
   lamb = 0.7
 

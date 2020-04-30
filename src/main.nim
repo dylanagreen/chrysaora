@@ -22,7 +22,7 @@ let
   cur_board = new_board()
   time_params = {"wtime" : 0, "btime" : 0, "winc" : 0, "binc" : 0}.toTable
   cur_engine = Engine(board: cur_board, time_params: time_params, compute: true,
-                      max_depth: 15, color: cur_board.to_move, train: false)
+                      max_depth: 15, color: cur_board.to_move)
   interpreter = UCI(board: cur_board, previous_cmd: @[], engine: cur_engine)
 
 var

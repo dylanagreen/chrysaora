@@ -16,7 +16,7 @@ import arraymancer
 
 import board
 import movegen
-# include net
+include net
 import train
 
 type
@@ -77,7 +77,7 @@ type
     time: int
 
     # The actual network we use to evaluate
-    # network*: ChessNet
+    network*: ChessNet
 
     # Storing this for training purposes
     pv: string
@@ -172,8 +172,11 @@ proc initialize_network*(name: string = "default.txt") =
     raise newException(IOError, "Weights File not found!")
 
   var strm = newFileStream(weights_loc, fmRead)
-  strm.load(loaded_values)
+  # strm.load(loaded_values)
+  strm.load(model)
   strm.close()
+  # Need to make sure we're all good on contexts
+  ctx = engine.model.fc1.weight.context
 
   # For future reference so we know what weights file was loaded.
   logging.debug(&"Loaded weights file: {weights_name}")
@@ -210,11 +213,13 @@ proc handcrafted_eval*(board: Board): float =
 
 
 proc network_eval(board: Board): float =
-  for piece in board.piece_list[WHITE]:
-    result += float(loaded_values[piece.name])
+  let x = ctx.variable(board.prep_board_for_network().reshape(1, D_in))
+  # Don't want to track this forward operation for changing gradients
+  no_grad_mode ctx:
+    result = model.forward(x).value[0, 0]
 
-  for piece in board.piece_list[BLACK]:
-    result -= float(loaded_values[piece.name])
+  # Converts network output to centipawns.
+  result = arctanh(result) * 100
 
 
 proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,

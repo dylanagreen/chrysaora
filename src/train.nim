@@ -9,6 +9,7 @@ import tables
 import times
 
 import board
+include net
 
 var
   # Easier to save the evals and the piece lists.
@@ -16,21 +17,24 @@ var
 
   # For this super shitty eval function the gradients are equal to the difference
   # between white and black pieces
-  grads: seq[seq[int]] = @[]
+  all_grads: seq[seq[Tensor[float32]]]
+  grads: seq[Tensor[float32]]
 
   # Loaded weight values
   loaded_values* = {'K': 1000}.toTable
 
 let
   # Learning rate and lambda hyperparameters
-  alpha = 0.002
+  alpha = 0.01'f32
 
-  lamb = 0.7
-
-  piece_index = {'P': 0, 'N': 1, 'R': 2, 'B': 3, 'Q': 4}.toTable
+  lamb = 0.7'f32
 
 
 proc update_training_parameters*(board: Board, eval: float, pv: string) =
+  # It should be noted that these evals are calculated as
+  # arctanh(network output) * 100 to convert to centipawns
+  # This is why my learnning rate is ~0.01 since that way it's approx 1
+  # after multiplicatoin which is what giraffe used
   evals.add(eval)
 
   # Get the moves and make them so we can look at the leaf node
@@ -43,20 +47,20 @@ proc update_training_parameters*(board: Board, eval: float, pv: string) =
     let alg_move = board.uci_to_algebraic(m)
     board.make_move(alg_move)
 
-  # Here we get the piece nums which in our lame eval function end up being the
-  # gradients when you take the derivative with respect to the weights. In our
-  # case the weights are the piece values.
-  var piece_nums: seq[int] = @[0, 0, 0, 0, 0]
+  let
+    x = ctx.variable(board.prep_board_for_network().reshape(1, D_in), requires_grad = true)
+    # I don't actually need this, but I need to run x through in order to compute gradients
+    y = model.forward(x)
 
-  for piece in board.piece_list[WHITE]:
-    # We always have a king on both sides so we're not counting them
-    if piece.name == 'K' : continue
-    piece_nums[piece_index[piece.name]] += 1
+  grads = @[]
 
-  for piece in board.piece_list[BLACK]:
-    if piece.name == 'K' : continue
-    piece_nums[piece_index[piece.name]] -= 1
-  grads.add(piece_nums)
+  # Store the gradients for each of the layers in order, from beginning to
+  # end, so that we can update them later.
+  for layer in fields(model):
+    for field in fields(layer):
+      when field is Variable:
+        grads.add(field.grad)
+  all_grads.add(grads)
 
   # Return the board to its original state
   for m in moves:
@@ -67,7 +71,7 @@ proc update_weights*() =
   # Without two states you can't calculate a difference
   # I made min_states a variable in case we want to discount the opening
   # moves since that's typically an open book kind of thing.
-  var min_states = 2
+  var min_states = 6
   if evals.len < min_states:
     logging.debug("Not enough states to compute temporal difference")
     logging.debug(&"At least {min_states} states required")
@@ -83,20 +87,20 @@ proc update_weights*() =
     # Computes the eligability trace
     running_diff = running_diff * lamb + diff
     # Weight update caluclated from magical temporal difference formula
-    let cur_grads = grads[i-2]
+    let cur_grads = all_grads[i-2]
 
-    for key, val in loaded_values:
-      # The update to this will always be 0 anyway.
-      # Since # of kings always equal.
-      # TODO change this in the future.
-      if key == 'K': continue
-      let weight_update = alpha * float(cur_grads[piece_index[key]]) * running_diff
-      loaded_values[key] += int(weight_update)
+    var j = 0
+    for layer in fields(model):
+      for field in fields(layer):
+        when field is Variable:
+          field.value += alpha * cur_grads[j] * running_diff
+          j += 1
 
   evals = @[]
   grads = @[]
 
 proc save_weights*() =
+  # TODO Clear the Nodes somewhere in here????
   var out_strm = newFileStream(os.joinPath(getAppDir(), &"{base_version}-t2.txt"), fmWrite)
-  out_strm.store(loaded_values)
+  out_strm.store(model)
   out_strm.close()

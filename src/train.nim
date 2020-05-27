@@ -47,6 +47,12 @@ proc update_training_parameters*(board: Board, eval: float, pv: string) =
     let alg_move = board.uci_to_algebraic(m)
     board.make_move(alg_move)
 
+  # Gonna zero out those gradients just in case.
+  for layer in fields(model):
+    for field in fields(layer):
+      when field is Variable:
+        field.grad = field.grad.zeros_like
+
   let
     x = ctx.variable(board.prep_board_for_network().reshape(1, D_in), requires_grad = true)
     # I don't actually need this, but I need to run x through in order to compute gradients

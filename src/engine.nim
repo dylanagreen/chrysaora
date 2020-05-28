@@ -219,7 +219,7 @@ proc network_eval(board: Board): float =
     result = model.forward(x).value[0, 0]
 
   # Converts network output to centipawns.
-  result = arctanh(result) * 100
+  # result = arctanh(result) * 100
 
 
 proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,

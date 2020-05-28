@@ -9,7 +9,7 @@ import board
 # D_in is input dimension
 # D_out is output dimension.
 let
-  (D_in*, D_out) = (5, 1)
+  (D_in*, H1, D_out) = (10, 16, 1)
 
   # Code name and test status for whever I need it.
   # Test status changes with each change to the internal variations on the
@@ -26,9 +26,10 @@ var ctx* = newContext Tensor[float32]
 # This is where the network itself is actually defined.
 network ctx, ChessNet:
   layers:
-    fc1: Linear(D_in, D_out)
+    fc1: Linear(D_in, H1)
+    fc2: Linear(H1, D_out)
   forward x:
-    x.fc1.tanh
+    x.fc1.relu.fc2.tanh
 
 # Initialize the model, in general we'll load a weights file for this.
 # I really hope you're not running it with random weights....
@@ -44,4 +45,4 @@ proc prep_board_for_network*(board: Board): Tensor[float32] =
 
   for piece in board.piece_list[BLACK]:
     if piece.name == 'K' : continue
-    result[piece_index[piece.name]] -= 1
+    result[piece_index[piece.name] + 5] += 1

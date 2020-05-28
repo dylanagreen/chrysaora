@@ -25,7 +25,7 @@ var
 
 let
   # Learning rate and lambda hyperparameters
-  alpha = 0.01'f32
+  alpha = 0.001'f32
 
   lamb = 0.7'f32
 
@@ -107,6 +107,7 @@ proc update_weights*() =
 
 proc save_weights*() =
   # TODO Clear the Nodes somewhere in here????
+  # Clearing the ndoes will reduce the size of the network weights we need to save
   var out_strm = newFileStream(os.joinPath(getAppDir(), &"{base_version}-t2.txt"), fmWrite)
   out_strm.store(model)
   out_strm.close()

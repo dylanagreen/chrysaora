@@ -8,9 +8,14 @@ Chrysaora started as an attempt to use supervised learning and a small image cla
 
 Or at least, that's the plan...
 
+The work on chrysaora is hevily inspired and based by the [Giraffe](https://arxiv.org/pdf/1509.01549.pdf) and [KnightCap](https://arxiv.org/pdf/cs/9901001.pdf) papers, both of which I consulted liberally while writing the engine. Most of my training code only came together after really understanding Knightcap.
+
 ### Naming
-Chrysaora is named after the genus of jellyfish, which in turn is named after Chrysaor, a being from Greek mythology. Chrysaor roughly translates as "he who has a golden armament." Major releases of Chrysaora are codenamed after types of
-jellyfish.
+Chrysaora is named after the genus of jellyfish, which in turn is named after Chrysaor, a being from Greek mythology. Chrysaor roughly translates as "he who has a golden armament." Major releases of Chrysaora are codenamed after other genus or species of jellyfish, typically things I find cool.
+
+For some reason I use female pronouns when referrring to Chrysaora in my head, but I can't imagine she particularly cares considering she's a nonsentient chess engine.
+
+- v0.1.0 **Noctiluca** - Named after a bioluminescent jellyfish as a bioluminescent algae bloom occured while I was coding it. Everyone was quarantined so I coded Chrysaora instead of going to see it. Sad.
 
 ## Support
 Chrysaora will be supported until I get my PhD (in Physics), it wins a season of the TCEC, or Nim dies, whichever comes first.
@@ -19,45 +24,25 @@ Chrysaora will be supported until I get my PhD (in Physics), it wins a season of
 Deep learning is done using [arraymancer](https://github.com/mratsim/Arraymancer), which is the only dependency outside the Nim standard library.
 
 ### Building
-Chrysaora requires a minimum Nim version of 0.20.0. With Nim (and arraymancer) installed, building Chrysaora is as simple as:
+Chrysaora requires a minimum Nim version of 1.20.0. With Nim (and arraymancer) installed, building Chrysaora is as simple as:
 
 ```
 nim c -d:danger -o:chrysaora src/main.nim
 ```
 
 ### Training
-To train Chrysaora, put a selection of games in PGN format into a folder in the chrysaora directory named
-`games/train`. Two positions (at one third and two thirds of the way through the game) will be used for training.
-Chrysaora will self play for 4 plies from these two positions, and then apply TDLeaf(lambda) to update its weights.
+In order to train Chrysaora, you must build a version with the training code implemented. Currently all versions of Chrysaora build with training built in, although in the future this will be an option that must be enabled. Chrysaora learns by playing chess games against an opponent. It is possible to self train Chrysaora by pitting two engine instances against each other, but the weight updates of one engine will overwite the other.
 
-To train, compile and run `src/train.nim`:
-
+Currently Chrysaora will train by setting the in game uci option to true. This is done by running the following after loading an instance of Chrysaora but before telling her to find a move:
 ```
-nim c -d:danger -o:chrysaora-train --run src/train.nim
+setoption name Train value true
 ```
 
-Chrysaora has the ability to bootstrap its training process using its internal handcrafted evaluation function.
-To do this, a different selection of two random positions from the input training games will be used and labeled
-according to the handcrafted evaluation. These two positions will also be color flipped, giving a total of four
-positions from each game. 20 training epochs of supervised learning (using MSE loss) will train the
-network to play like the handcrafted evaluation. This speeds training to a high playing level as it allows the network to
-start near a good minimum, however the network can be trained from scratch without this feature.
-This feature is enabled by default.
+If you use cutechess-cli to run Chrysaora against another engine to train against, you must add `option.Train=true` to Chrysaora's command in order for training mode to be turned on.
 
-In the future I plan to allow bootstrapping to be selectively enable with a command
-line switch:
+While training, Chrysaora will keep a running record of its internal evaluations as well as the gradients used to calculate these evaluations for each of its own color board states. I.e. if Chrysaora is playing white, then it will store evaluations and gradients for all white moves in the game (as these are the moves that Chrysaora herself makes.)
 
-```
-nim c -d:danger -o:chrysaora-train --run src/train.nim --bootstrap
-```
-
-In the future I further plan to allow a command line switch to pass in a weights
-file to start training from, allowing continual start/stop training. This update
-will likely be coupled with the one that will save periodic snapshots of the network.
-
-```
-nim c -d:danger -o:chrysaora-train --run src/train.nim --input:weights.txt
-```
+At the end of the game Chrysaora will use the TDleaf(lambda) update rules to update the internal weights based on the game performance. This is done when either `ucinewgame` or `quit` is passed to Chrysaora. Chrysaora will save the weights only upon exit.
 
 ## Features
 - Move Generation
@@ -71,21 +56,24 @@ nim c -d:danger -o:chrysaora-train --run src/train.nim --input:weights.txt
   - Side to move (1 feature)
   - Castling rights (4 features)
   - Square position (64 features)
-  - Piece existence (32 features)
-  - More in depth network details can be found in the Chrysora Wiki
+  - Piece existence (32 features)i
 - Search
   - Fail-hard alpha-beta pruning minimax
   - Zobrist hashing indexed transposition tables
-  - Iterative Deepening
+  - Iterative deepening
+
+## Planned Features
+- Ability to build non-training versions of Chrysaora
+- Automatic saving of weights after a set number of games
+- Self training
 
 ### Acknowledgements
 I'd like to say a very special thank you to the following engines, which I consulted during the coding of Chrysaora:
-- [Ethereal](https://github.com/AndyGrant/Ethereal), for help with understanding bitboards
+- [Ethereal](https://github.com/AndyGrant/Ethereal), for help with understanding bitboards, as well as their magic numbers
 - [Laser](https://github.com/jeffreyan11/laser-chess-engine), for the idea of recording the ep target square between moves
 - [Stockfish](https://github.com/official-stockfish/Stockfish), for help understanding magic number generation
 - [Lc0](https://github.com/LeelaChessZero/lc0), for paving the way for NN engines
-- [Giraffe](https://github.com/ianfab/Giraffe), for providing the network structure for Chrysaora
-- [Carrasius](https://github.com/dyth/Carassius), because it was the first coding implementation of TDLeaf(lambda) that I actually understood
+- [Giraffe](https://github.com/ianfab/Giraffe), for providing the initial network structures for Chrysaora
 
 Additionally I'd like to thank the Chess Programming Wiki for its help in getting the project started.
 
@@ -113,7 +101,7 @@ Chrysaora to be fast enough that in the same amount of time a neural network qui
 to an additional depth with a handcrafted quiesence.
 
 Additionally, unlike most (if not all?) highly competitive NN engines, Chrysaora uses an alpha-beta pruned minimax
-search rather than a Monte Carlo Tree Search. In this way I've hybridized a NN and a classical engine.
+search rather than a Monte Carlo Tree Search.
 
 ## License
 You can find the details of Chrysaora's license in the LICENSE.txt file. Chrysaora is licensed under GPL-3.

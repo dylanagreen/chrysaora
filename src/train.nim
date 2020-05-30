@@ -77,7 +77,7 @@ proc update_weights*() =
   # Without two states you can't calculate a difference
   # I made min_states a variable in case we want to discount the opening
   # moves since that's typically an open book kind of thing.
-  var min_states = 6
+  var min_states = 2
   if evals.len < min_states:
     logging.debug("Not enough states to compute temporal difference")
     logging.debug(&"At least {min_states} states required")

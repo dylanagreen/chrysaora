@@ -77,6 +77,11 @@ type
     # Evaluations for training, otherwise typically remains empty.
     evals*: seq[float]
 
+    # The location in the piece list of a piece that gets taken.
+    # This is a sequence in case you make something like 40 moves and then
+    # decide to unmake all 40 of them.
+    piece_index*: seq[int]
+
   # Custom move list types
   DisambigMove* = tuple[algebraic: string, state: Tensor[int]]
   ShortAndLongMove* = tuple[short: string, long: string, state: Tensor[int]]
@@ -168,6 +173,8 @@ proc `$`*(piece: Piece): string=
   result = result & "Position: (" & $piece.pos.y & ", " & $piece.pos.x & ") "
   result = result & "Square: " & piece.square & " "
 
+proc `==`*(a, b: Piece): bool=
+  result = (a.name == b.name) and (a.pos == b.pos) and (a.square == b.square)
 
 proc `$`*(move: Move): string=
   result = "(Start: " & $move.start
@@ -714,11 +721,13 @@ proc update_piece_list*(board: Board, move: Move) =
   if 'x' in move.algebraic:
     let index = squares.find(end_alg)
     board.piece_list[opp_color].delete(index)
+    board.piece_index.add(index) # Storing the location we deleted it from for reversion
   # Need to handle en passant on its own since it's weird.
   elif move.algebraic.endsWith("e.p."):
     var ep_square = if opp_color == BLACK: end_square + 8 else: end_square - 8
     let index = squares.find(flat_alg_table[ep_square])
     board.piece_list[opp_color].delete(index)
+    board.piece_index.add(index)
 
   for p in board.piece_list[board.to_move]:
     if p.pos == move.start:
@@ -765,14 +774,16 @@ proc revert_piece_list*(board: Board, move: Move) =
   # what used to be there.
   if 'x' in move.algebraic:
     var piece_name = piece_names[abs(board.current_state[move.fin.y, move.fin.x])]
-    board.piece_list[opp_color].add(Piece(name: piece_name,
+    board.piece_list[opp_color].insert(Piece(name: piece_name,
                                           square: alg_table[move.fin.y, move.fin.x],
-                                          pos: (move.fin.y, move.fin.x)))
+                                          pos: (move.fin.y, move.fin.x)),
+                                          board.piece_index.pop)
   # Need to handle en passant on its own since it's weird.
   elif move.algebraic.endsWith("e.p."):
-    board.piece_list[opp_color].add(Piece(name: 'P',
+    board.piece_list[opp_color].insert(Piece(name: 'P',
                                           square: alg_table[move.start.y, move.fin.x],
-                                          pos: (move.start.y, move.fin.x)))
+                                          pos: (move.start.y, move.fin.x)),
+                                          board.piece_index.pop)
 
   for p in board.piece_list[board.to_move]:
     if p.pos == move.fin:
@@ -1320,7 +1331,7 @@ proc load_fen*(fen: string): Board =
                 long: false, piece_list: piece_list, WHITE_EP: 0'u64, BLACK_EP: 0'u64,
                 castle_history: castle_history, BLACK_PIECES: black_pieces,
                 WHITE_PIECES: white_pieces, BLACK_ATTACKS: 0'u64,
-                WHITE_ATTACKS: 0'u64, zobrist: 111017'u64)
+                WHITE_ATTACKS: 0'u64, zobrist: 111017'u64, piece_index: @[])
 
   result.update_attack_bitmaps(WHITE)
   result.update_attack_bitmaps(BLACK)

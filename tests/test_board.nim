@@ -2,11 +2,11 @@ import unittest
 import tables
 import arraymancer
 import sequtils
+import system
 import tables
 import times
 
 import ../src/board
-import ../src/movegen
 import ../src/perft
 
 suite "short algebraic conversion":
@@ -324,24 +324,38 @@ suite "loading/saving":
       generated = test_board.to_fen()
     check(generated == test_fen)
 
-suite "zobrist tests":
-  test "make/unmake startpos":
+suite "make/unmake tests":
+  # Just tests that changing positions and changing back works good
+  test "startpos e2e4":
     var
       board = new_board()
+      white_pieces = deepCopy(board.piece_list[WHITE])
+      black_pieces = deepCopy(board.piece_list[BLACK])
       zobrist = board.zobrist
     board.make_move("e2e4")
     board.unmake_move()
+    check(board.piece_list[WHITE] == white_pieces)
+    check(board.piece_list[BLACK] == black_pieces)
     check(board.zobrist == zobrist)
 
-  test "make/unmake position 6 capture":
+  # Checks that if a piece is taken and then put back it gets put back into
+  # the correct place in the list.
+  test "position 6 capture":
     var
       board = load_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10")
+      white_pieces = deepCopy(board.piece_list[WHITE])
+      black_pieces = deepCopy(board.piece_list[BLACK])
       zobrist = board.zobrist
     board.make_move("Bc4xf7")
     board.unmake_move()
+    check(board.piece_list[WHITE] == white_pieces)
+    check(board.piece_list[BLACK] == black_pieces)
     check(board.zobrist == zobrist)
 
-  test "unmake recording check status":
+  test "loading game and unmaking moves":
+    # 2/3 of the way through this game, Stockfish was in check but not mate.
+    # This loads the entire pgn, then unmakes 1/3 of the moves to check that
+    # the check status is correct through unmaking moves.
     var
       test_pgn = "LCZero v0.21.1-nT40.T8.610vsStockfish 19050918 2019.05.11 4.1"
       board = load_pgn(test_pgn, "tests")

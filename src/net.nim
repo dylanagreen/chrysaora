@@ -9,7 +9,7 @@ import board
 # D_in is input dimension
 # D_out is output dimension.
 let
-  (D_in*, H1, H2, D_out) = (111, 256, 128, 1)
+  (D_in*, H1, H2, D_out) = (110, 256, 128, 1)
 
   # Code name and test status for whever I need it.
   # Test status changes with each change to the internal variations on the
@@ -56,17 +56,19 @@ template piece_to_position(piece: Piece, color: Color) =
   let num_start = if color == WHITE: 0 else: 5
 
   # In essence the number of things after the numbers before the pieces
-  start = if color == WHITE: 5 else: 53
+  start = if color == WHITE: 4 else: 52
+
+  val = 1
 
   case piece.name
   of 'P':
-    val = 1
+    # val = 1
     # Pawn numbers are stored in 0 (WHITE) and 5 (BLACK)
     result[num_start + 0] += 1
     # Pawn pieces are stored in 15-38 (WHITE) and 63-86 (BLACK)
     start = int(result[num_start + 0]) * 3 + start + 7
   of 'N':
-    val = 2
+    # val = 2
     # Knight numbers are stored in 1 (WHITE) and 6 (BLACK)
     result[num_start + 1] += 1
     # Knight pieces are stored in 39-44 (WHITE) and 87-92 (BLACK)
@@ -81,7 +83,7 @@ template piece_to_position(piece: Piece, color: Color) =
       while result[start] != 0:
         start -= 3
   of 'B':
-    val = 3
+    # val = 3
     # Bishop numbers are stored in 2 (WHITE) and 7 (BLACK)
     result[num_start + 2] += 1
     # Bishop pieces are stored in 45-50 (WHITE) and 93-98 (BLACK)
@@ -92,7 +94,7 @@ template piece_to_position(piece: Piece, color: Color) =
       while result[start] != 0:
         start -= 3
   of 'R':
-    val = 4
+    # val = 4
     # Rook numbers are stored in 3 (WHITE) and 8 (BLACK)
     result[num_start + 3] += 1
     # Rook pieces are stored in 51-56 (WHITE) and 99-104 (BLACK)
@@ -104,7 +106,7 @@ template piece_to_position(piece: Piece, color: Color) =
         start -= 3
   of 'Q':
     # Queen numbers are stored in 4 (WHITE) and 9 (BLACK)
-    val = 5
+    # val = 5
     result[num_start + 4] += 1
     # Queen piece is stored in 57-59 (WHITE) and 105-107 (BLACK)
     if result[num_start + 4] < 2:
@@ -115,7 +117,7 @@ template piece_to_position(piece: Piece, color: Color) =
         start -= 3
   else:
     # King piece is stored in 60-62 (WHITE) and 108-110 (BLACK)
-    val = 6
+    # val = 6
     start = 55 + start
 
 
@@ -128,7 +130,7 @@ proc prep_board_for_network*(board: Board): Tensor[float32] =
     # 13-14: Black castling rights (King, Queen)
     # 15-62: White piece slots: Pawn, Knight, Bishop, Rook, Queen, King
     # 63-110: Black piece slots: Pawn, Knight, Bishop, Rook, Queen, King
-  result = zeros[float32](111)
+  result = zeros[float32](110)
 
   for color in  [WHITE, BLACK]:
     for piece in board.piece_list[color]:
@@ -149,32 +151,34 @@ proc prep_board_for_network*(board: Board): Tensor[float32] =
                           else: float(piece.pos.x - 4)
 
   # Side to move
-  result[10] = if board.to_move == WHITE: 1 else: -1
+  # result[10] = 0#if board.to_move == WHITE: 1 else: -1
 
   # Castling rights
   var rights = board.castle_rights
-  for i in 11..14:
+  for i in 10..13:
     # Pretty much just pops off the first bit and then shifts it right.
     result[i] = float32(rights and 1'u8)
     rights = rights shr 1
 
+  result = result / 8 # Reduce network inputs to be between 0 and 1.
+
 
 # Color swaps the board network tensor
 proc color_swap_board*(board: Tensor[float32]): Tensor[float32] =
-  result = zeros[float32](111)
+  result = zeros[float32](110)
 
   # Swaps the number of the pieces for each color
   result[0..4] = board[5..9]
   result[5..9] = board[0..4]
 
   # Swap the castling rights
-  result[11..12] = board[13..14]
-  result[13..14] = board[11..12]
+  result[10..11] = board[12..13]
+  result[12..13] = board[10..11]
 
   # Swaps the pieces themselves
   let
-    white_start = 15
-    black_start = 63
+    white_start = 14
+    black_start = 62
   result[white_start..<black_start] = board[black_start..<board.shape[0]]
   result[black_start..<board.shape[0]] = board[white_start..<black_start]
 
@@ -184,4 +188,4 @@ proc color_swap_board*(board: Tensor[float32]): Tensor[float32] =
       result[i] = -result[i]
 
   # Swaps side to move
-  result[10] = -board[10]
+  # result[10] = -board[10]

@@ -112,7 +112,7 @@ suite "start of game move generation":
 suite "complicated move generation":
   setup:
     let
-      test_fen = "1nb1kb2/7p/r1p2np1/P2r4/RP5q/2N3P1/1B1PP2P/3QK2R w KQkq -"
+      test_fen = "1nb1kb2/7p/r1p2np1/P2r4/RP5q/2N3P1/1B1PP2P/3QK2R w K -"
       # Loads a complicated fen to test from.
       test_board = load_fen(test_fen)
 

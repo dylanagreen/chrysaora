@@ -211,7 +211,6 @@ proc handcrafted_eval*(board: Board): float =
   # for piece in board.piece_list[BLACK]:
   #   result -= float(value_table[piece.name][7 - piece.pos.y, piece.pos.x])
 
-
 proc network_eval(board: Board): float =
   let x = ctx.variable(board.prep_board_for_network().reshape(1, D_in))
   # Don't want to track this forward operation for changing gradients
@@ -427,11 +426,12 @@ proc search(engine: Engine, max_depth: int): EvalMove =
 
   # Iterative deepening framework.
   for d in 1..max_depth:
-    if not engine.compute:
-      break
     # If we recieve the stop command don't go any deeper just return best move.
-    elif check_for_stop():
+    if not engine.compute or check_for_stop():
       break
+
+    # Accidentally deleted these next two lines at some point, turns out without
+    # them the entire engine blows up. Who knew?
     engine.root_evals = @[]
     # Clear the number of nodes before starting.
     engine.nodes = 0
@@ -448,7 +448,8 @@ proc search(engine: Engine, max_depth: int): EvalMove =
     result = moves[0]
 
     engine.pv = moves.map(proc(x: EvalMove): string = x.best_move).join(" ")
-    send_command(&"info depth {d} seldepth {d} score cp {int(result.eval)} nodes {engine.nodes} nps {nps} time {engine.time} pv {engine.pv}")
+    let temp_eval = int(arctanh(float(result.eval)) * 100)
+    send_command(&"info depth {d} seldepth {d} score cp {temp_eval} nodes {engine.nodes} nps {nps} time {engine.time} pv {engine.pv}")
 
     # Use the magic of iterative deepning to sort moves for more cutoffs.
     # Resort every odd ply in case we found a checkmate and need to search
@@ -462,6 +463,6 @@ proc find_move*(engine: Engine): string =
   let search_result = engine.search(engine.max_depth)
 
   if training:
-      update_training_parameters(engine.board, search_result.eval, engine.pv)
+      update_training_parameters(engine.board, search_result.eval, engine.pv, engine.color == BLACK)
 
   return search_result.best_move

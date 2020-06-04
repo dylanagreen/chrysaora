@@ -25,18 +25,12 @@ var
 
 let
   # Learning rate and lambda hyperparameters
-  alpha = 0.001'f32
+  alpha = 0.01'f32
 
   lamb = 0.7'f32
 
 
-proc update_training_parameters*(board: Board, eval: float, pv: string) =
-  # It should be noted that these evals are calculated as
-  # arctanh(network output) * 100 to convert to centipawns
-  # This is why my learnning rate is ~0.01 since that way it's approx 1
-  # after multiplicatoin which is what giraffe used
-  evals.add(eval)
-
+proc update_training_parameters*(board: Board, eval: float, pv: string, swap: bool = false) =
   # Get the moves and make them so we can look at the leaf node
   let moves = pv.split(" ")
   for m in moves:
@@ -54,14 +48,23 @@ proc update_training_parameters*(board: Board, eval: float, pv: string) =
         field.grad = field.grad.zeros_like
 
   let
-    x = ctx.variable(board.prep_board_for_network().reshape(1, D_in), requires_grad = true)
+    x = ctx.variable(board.prep_board_for_network().reshape(1, D_in), requires_grad=true)
     # I don't actually need this, but I need to run x through in order to compute gradients
     y = model.forward(x)
 
-  grads = @[]
+  y.backprop()
+  # Why add the network eval and not the one we pass out to uci? You ask
+  # Because the checkmate detection code sets evals to be in the thousands.
+  # lol. I'm not super sure if I need to negate these, but I negate them in
+  # minimax search so I should.
+  # if swap:
+  #   evals.add(-y.value[0, 0])
+  # else:
+  evals.add(y.value[0, 0])
 
   # Store the gradients for each of the layers in order, from beginning to
   # end, so that we can update them later.
+  grads = @[]
   for layer in fields(model):
     for field in fields(layer):
       when field is Variable:
@@ -74,6 +77,7 @@ proc update_training_parameters*(board: Board, eval: float, pv: string) =
     board.unmake_move()
 
 proc update_weights*() =
+  logging.debug(&"EVALS? {$evals}")
   # Without two states you can't calculate a difference
   # I made min_states a variable in case we want to discount the opening
   # moves since that's typically an open book kind of thing.
@@ -94,7 +98,7 @@ proc update_weights*() =
     running_diff = running_diff * lamb + diff
     # Weight update caluclated from magical temporal difference formula
     let cur_grads = all_grads[i-2]
-
+    logging.debug(&"DIFF: {running_diff}")
     var j = 0
     for layer in fields(model):
       for field in fields(layer):
@@ -106,6 +110,12 @@ proc update_weights*() =
   grads = @[]
 
 proc save_weights*() =
+  # Gonna zero out those gradients just in case.
+  # for layer in fields(model):
+  #   for field in fields(layer):
+  #     when field is Variable:
+  #       field.grad = field.grad.zeros_like
+
   # TODO Clear the Nodes somewhere in here????
   # Clearing the ndoes will reduce the size of the network weights we need to save
   var out_strm = newFileStream(os.joinPath(getAppDir(), &"{base_version}-t2.txt"), fmWrite)

@@ -171,8 +171,9 @@ proc initialize_network*(name: string = "default.txt") =
     logging.error(&"Attempted to load {weights_name}")
     raise newException(IOError, "Weights File not found!")
 
+  logging.debug("Let's Plant!")
+  sleep(500)
   var strm = newFileStream(weights_loc, fmRead)
-  # strm.load(loaded_values)
   strm.load(model)
   strm.close()
   # Need to make sure we're all good on contexts

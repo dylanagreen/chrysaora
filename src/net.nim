@@ -1,5 +1,3 @@
-# import strformat
-import sequtils
 import tables
 
 import arraymancer
@@ -9,7 +7,7 @@ import board
 # D_in is input dimension
 # D_out is output dimension.
 let
-  (D_in*, H1, H2, D_out) = (110, 256, 128, 1)
+  (D_in*, H1, H2, D_out) = (111, 256, 128, 1)
 
   # Code name and test status for whever I need it.
   # Test status changes with each change to the internal variations on the
@@ -17,8 +15,6 @@ let
   # Input vector changes and large scale changes to internal network structure
   # like number of hidden layers whill get their own code name.
   base_version* = "noctiluca" # A bioluminescent jellyfish
-
-  piece_index = {'P': 0, 'N': 1, 'R': 2, 'B': 3, 'Q': 4}.toTable
 
   # Create the autograd context that will hold the computational graph
 var ctx* = newContext Tensor[float32]
@@ -57,7 +53,6 @@ template piece_to_position(piece: Piece, color: Color) =
 
   # In essence the number of things after the numbers before the pieces
   start = if color == WHITE: 4 else: 52
-
   val = 1
 
   case piece.name
@@ -130,7 +125,7 @@ proc prep_board_for_network*(board: Board): Tensor[float32] =
     # 13-14: Black castling rights (King, Queen)
     # 15-62: White piece slots: Pawn, Knight, Bishop, Rook, Queen, King
     # 63-110: Black piece slots: Pawn, Knight, Bishop, Rook, Queen, King
-  result = zeros[float32](110)
+  result = zeros[float32](D_in)
 
   for color in  [WHITE, BLACK]:
     for piece in board.piece_list[color]:
@@ -151,11 +146,11 @@ proc prep_board_for_network*(board: Board): Tensor[float32] =
                           else: float(piece.pos.x - 4)
 
   # Side to move
-  # result[10] = 0#if board.to_move == WHITE: 1 else: -1
+  result[10] = if board.to_move == WHITE: 1 else: -1
 
   # Castling rights
   var rights = board.castle_rights
-  for i in 10..13:
+  for i in 11..14:
     # Pretty much just pops off the first bit and then shifts it right.
     result[i] = float32(rights and 1'u8)
     rights = rights shr 1
@@ -165,7 +160,7 @@ proc prep_board_for_network*(board: Board): Tensor[float32] =
 
 # Color swaps the board network tensor
 proc color_swap_board*(board: Tensor[float32]): Tensor[float32] =
-  result = zeros[float32](110)
+  result = zeros[float32](D_in)
 
   # Swaps the number of the pieces for each color
   result[0..4] = board[5..9]
@@ -177,8 +172,8 @@ proc color_swap_board*(board: Tensor[float32]): Tensor[float32] =
 
   # Swaps the pieces themselves
   let
-    white_start = 14
-    black_start = 62
+    white_start = 15
+    black_start = 63
   result[white_start..<black_start] = board[black_start..<board.shape[0]]
   result[black_start..<board.shape[0]] = board[white_start..<black_start]
 
@@ -188,4 +183,4 @@ proc color_swap_board*(board: Tensor[float32]): Tensor[float32] =
       result[i] = -result[i]
 
   # Swaps side to move
-  # result[10] = -board[10]
+  result[10] = -board[10]

@@ -33,6 +33,8 @@ let
 
   save_after = 5
 
+  optim = model.optimizerSGD(learning_rate = alpha)
+
 proc save_weights*() =
   # TODO Clear the Nodes somewhere in here????
   # Clearing the ndoes will reduce the size of the network weights we need to save
@@ -59,14 +61,13 @@ proc update_training_parameters*(board: Board, eval: float, pv: string, swap: bo
 
   let
     x = ctx.variable(board.prep_board_for_network().reshape(1, D_in), requires_grad=true)
-    # I don't actually need this, but I need to run x through in order to compute gradients
     y = model.forward(x)
 
   y.backprop()
   # Why add the network eval and not the one we pass out to uci? You ask
   # Because the checkmate detection code sets evals to be in the thousands.
   # lol. I'm not super sure if I need to negate these, but I negate them in
-  # minimax search so I should.
+  # minimax search so I should?
   # if swap:
   #   evals.add(-y.value[0, 0])
   # else:
@@ -99,6 +100,15 @@ proc update_weights*() =
     grads = @[]
     return
 
+  # Zero the gradients because I'm going to add all the temporal difference
+  # wieght updates into the gradient variable so that I can use the optimizer
+  # to step forward. This allows me to easily switch from the original weight
+  # updates (which was essentially SGD) to things like Adam (which Giraffe used)
+  for layer in fields(model):
+    for field in fields(layer):
+      when field is Variable:
+        field.grad = field.grad.zeros_like
+
   var running_diff = 0.0
   # Works backwards from the end, stops at 2  because that gives the first two.
   for i in countdown(evals.len, min_states):
@@ -106,16 +116,17 @@ proc update_weights*() =
 
     # Computes the eligability trace
     running_diff = running_diff * lamb + diff
-    # Weight update caluclated from magical temporal difference formula
+    # Weight update calculated from magical temporal difference formula
     let cur_grads = all_grads[i-2]
     logging.debug(&"DIFF: {running_diff}")
     var j = 0
     for layer in fields(model):
       for field in fields(layer):
         when field is Variable:
-          field.value += alpha * cur_grads[j] * running_diff
+          field.grad += cur_grads[j] * running_diff
           j += 1
 
+  optim.update()
   evals = @[]
   grads = @[]
 

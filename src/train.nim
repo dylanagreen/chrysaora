@@ -20,15 +20,25 @@ var
   all_grads: seq[seq[Tensor[float32]]]
   grads: seq[Tensor[float32]]
 
+  num_increments = 0
+
   # Loaded weight values
   loaded_values* = {'K': 1000}.toTable
 
 let
   # Learning rate and lambda hyperparameters
-  alpha = 0.01'f32
+  alpha = 0.1'f32
 
   lamb = 0.7'f32
 
+  save_after = 5
+
+proc save_weights*() =
+  # TODO Clear the Nodes somewhere in here????
+  # Clearing the ndoes will reduce the size of the network weights we need to save
+  var out_strm = newFileStream(os.joinPath(getAppDir(), &"{base_version}-t1.txt"), fmWrite)
+  out_strm.store(model)
+  out_strm.close()
 
 proc update_training_parameters*(board: Board, eval: float, pv: string, swap: bool = false) =
   # Get the moves and make them so we can look at the leaf node
@@ -109,15 +119,8 @@ proc update_weights*() =
   evals = @[]
   grads = @[]
 
-proc save_weights*() =
-  # Gonna zero out those gradients just in case.
-  # for layer in fields(model):
-  #   for field in fields(layer):
-  #     when field is Variable:
-  #       field.grad = field.grad.zeros_like
+  if num_increments mod save_after == 0:
+    save_weights()
 
-  # TODO Clear the Nodes somewhere in here????
-  # Clearing the ndoes will reduce the size of the network weights we need to save
-  var out_strm = newFileStream(os.joinPath(getAppDir(), &"{base_version}-t2.txt"), fmWrite)
-  out_strm.store(model)
-  out_strm.close()
+  num_increments += 1
+

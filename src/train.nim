@@ -12,18 +12,14 @@ import board
 include net
 
 var
-  # Easier to save the evals and the piece lists.
+  # To save the evals for generating temporal differences
   evals: seq[float] = @[]
 
-  # For this super shitty eval function the gradients are equal to the difference
-  # between white and black pieces
+  # Save the grads into grads then shove that grads into all_grades
   all_grads: seq[seq[Tensor[float32]]]
   grads: seq[Tensor[float32]]
 
   num_increments = 0
-
-  # Loaded weight values
-  loaded_values* = {'K': 1000}.toTable
 
 let
   # Learning rate and lambda hyperparameters
@@ -33,12 +29,13 @@ let
 
   save_after = 5
 
-  optim = model.optimizerSGD(learning_rate = alpha)
+# Today in hellish function definitions that took way too long to figure
+var optim = optimizerSGDMomentum[model, float32](model, learning_rate = alpha, momentum=0.9'f32)
 
 proc save_weights*() =
   # TODO Clear the Nodes somewhere in here????
   # Clearing the ndoes will reduce the size of the network weights we need to save
-  var out_strm = newFileStream(os.joinPath(getAppDir(), &"{base_version}-t1.txt"), fmWrite)
+  var out_strm = newFileStream(os.joinPath(getAppDir(), &"{base_version}-v1-{num_increments}.txt"), fmWrite)
   out_strm.store(model)
   out_strm.close()
 
@@ -113,6 +110,7 @@ proc update_weights*() =
   # Works backwards from the end, stops at 2  because that gives the first two.
   for i in countdown(evals.len, min_states):
     let diff = evals[i-1] - evals[i-2]
+    logging.debug(&"Equality?{all_grads[i-1] == all_grads[i-2]}")
 
     # Computes the eligability trace
     running_diff = running_diff * lamb + diff

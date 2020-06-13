@@ -156,11 +156,23 @@ proc initialize_network*(name: string = "default.txt") =
   # Since this will be sorted this will be in general in order the weights file
   # with the longest stack trace, and then among those with the same stack trace
   # the one with the most training games.
+  var best_count = 0
   if name == "default.txt":
     for f in walkFiles(getAppDir() / "*.txt"):
       let file_name = f.splitPath().tail
       if file_name.startsWith(base_version) and not f.endsWith("bootstrap.txt"):
-        weights_name = file_name
+        if best_count == 0: weights_name = file_name
+        try:
+          # This to ensure we load the weights file with the highest number
+          # of training games.
+          var cur_count = parseInt(file_name.split(".txt")[0].split("-")[^1])
+          if cur_count > best_count:
+            weights_name = file_name
+            best_count = cur_count
+        # Only invoked if it tries to parse something that wasn't an int.
+        # Then we can just pass.
+        except:
+          continue
   else:
     weights_name = name
 
@@ -172,7 +184,7 @@ proc initialize_network*(name: string = "default.txt") =
     raise newException(IOError, "Weights File not found!")
 
   logging.debug("Let's Plant!")
-  sleep(500)
+  sleep(500) # You might think this wasn't necessary. You would be wrong.
   var strm = newFileStream(weights_loc, fmRead)
   strm.load(model)
   strm.close()

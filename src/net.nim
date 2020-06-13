@@ -32,18 +32,6 @@ network ctx, ChessNet:
 # I really hope you're not running it with random weights....
 var model* = ctx.init(ChessNet)
 
-# proc prep_board_for_network*(board: Board): Tensor[float32] =
-#   result = zeros[float32](D_in)
-
-#   for piece in board.piece_list[WHITE]:
-#     # We always have a king on both sides so we're not counting them
-#     if piece.name == 'K' : continue
-#     result[piece_index[piece.name]] += 1
-
-#   for piece in board.piece_list[BLACK]:
-#     if piece.name == 'K' : continue
-#     result[piece_index[piece.name] + 5] += 1
-
 # Turns a piece into a position in the network ready tensor.
 template piece_to_position(piece: Piece, color: Color) =
   # This whole template is mildly magic numbery nonsense. Trust that it works
@@ -52,7 +40,7 @@ template piece_to_position(piece: Piece, color: Color) =
   let num_start = if color == WHITE: 0 else: 5
 
   # In essence the number of things after the numbers before the pieces
-  start = if color == WHITE: 4 else: 52
+  start = if color == WHITE: 5 else: 53
   val = 1
 
   case piece.name
@@ -167,8 +155,8 @@ proc color_swap_board*(board: Tensor[float32]): Tensor[float32] =
   result[5..9] = board[0..4]
 
   # Swap the castling rights
-  result[10..11] = board[12..13]
-  result[12..13] = board[10..11]
+  result[11..12] = board[13..14]
+  result[13..14] = board[11..12]
 
   # Swaps the pieces themselves
   let

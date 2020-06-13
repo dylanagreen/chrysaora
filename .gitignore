@@ -4,7 +4,7 @@ chrysaora//logs/
 
 # Training data for the network
 # And weights files
-src/box-t*
+src/noctiluca-t*
 results/
 
 # Binaries

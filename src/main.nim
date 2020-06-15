@@ -39,6 +39,9 @@ if paramCount() > 0:
   for i in 0 ..< params.len:
     let p = params[i]
     if p == "--parselog":
+      logging.debug("Log parse mode active.")
+      # Need to init this first so we don't run with random weights
+      initialize_network()
       parse = true
       parse_log(params[i + 1], interpreter)
     elif p == "--weightsfile":

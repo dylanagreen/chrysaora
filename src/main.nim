@@ -55,8 +55,13 @@ if not parse:
   cmd = stdin.readLine()
   logging.debug("Input: ", cmd)
 
-  # Sends the identifying strings
-  identify()
+  # Sends the identifying strings if you passed uci. Otherwise just like.
+  # Doesn't do anything I guess.
+  if cmd == "uci":
+    identify()
+  else:
+    echo "Unrecognized identification command, exiting..."
+    quit()
 
 # Core running loop. Receives commands, decrypts them, and then flushes the
 # log to the file at the end of each iteration.

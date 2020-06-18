@@ -21,10 +21,8 @@ type
     # This avoids a slow down when the list of moves becomes unmanagably long.
     previous_cmd*: seq[string]
 
-
 # Authorship information
-const id = {"name": "Chrysaora 0.005-knightcap", "author": "Dylan Green"}.toTable
-
+const id = {"name": "Chrysaora Noctiluca beta-1", "author": "Dylan Green"}.toTable
 
 proc send_command*(cmd: string) =
   # Logs the command we sent out.
@@ -48,7 +46,7 @@ proc identify*() =
   send_command("uciok")
 
 
-proc set_option(option: seq[string]) =
+proc set_option(parser: UCI, option: seq[string]) =
   if option[2] == "Hash":
     try:
       var size = parseFloat(option[^1])
@@ -63,7 +61,7 @@ proc set_option(option: seq[string]) =
 
   elif option[2] == "Train":
     if option[^1].toLowerAscii() == "true":
-      training = true
+      set_up_training(parser.engine)
       logging.debug("Enabled training mode!")
 
 
@@ -219,7 +217,7 @@ proc decrypt_uci*(parser: UCI, cmd: string) =
       # Update all the weights
       update_weights()
   elif to_exec == "setoption":
-    set_option(fields)
+    parser.set_option(fields)
 
 
 proc receive_command*(): string =

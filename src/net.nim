@@ -13,10 +13,10 @@ let
   # Test status changes with each change to the internal variations on the
   # network (hidden layer sizes for example)
   # Input vector changes and large scale changes to internal network structure
-  # like number of hidden layers whill get their own code name.
+  # like number of hidden layers will get their own code name.
   base_version* = "noctiluca" # A bioluminescent jellyfish
 
-  # Create the autograd context that will hold the computational graph
+# Create the autograd context that will hold the computational graph
 var ctx* = newContext Tensor[float32]
 
 # This is where the network itself is actually defined.
@@ -27,6 +27,9 @@ network ctx, ChessNet:
     fc3: Linear(H2, D_out)
   forward x:
     x.fc1.relu.fc2.relu.fc3.tanh
+
+# "Crappy hack" - Jjp137
+export forward
 
 # Initialize the model, in general we'll load a weights file for this.
 # I really hope you're not running it with random weights....

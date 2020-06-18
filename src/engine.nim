@@ -17,7 +17,6 @@ import arraymancer
 import board
 import movegen
 include net
-import train
 
 type
 
@@ -63,8 +62,8 @@ type
     nodes: int
 
     # The moves at the root node and their corresponding evals for move ordering
-    root_moves: seq[Move]
-    root_evals: seq[tuple[move: Move, eval: float]]
+    root_moves*: seq[Move]
+    root_evals*: seq[tuple[move: Move, eval: float]]
 
     # Number of moves to get into the remaining time, for time control.
     moves_to_go*: int
@@ -76,17 +75,23 @@ type
     # Cumulative time spent searching
     time: int
 
-    # The actual network we use to evaluate
-    network*: ChessNet
-
     # Storing this for training purposes
     pv: string
+
+    on_move_found*: proc(board: Board, eval: float, pv: string, swap: bool = false)
 
 var
   tt* = newSeq[Transposition](200)
   # Whether or not we're in training mode
   training* = false
 
+  best: Tensor[float32]
+
+# proc `$`*(tt: Transposition): string=
+#   result &= &"zobrist {tt.zobrist},"
+#   result &= &"eval {tt.eval}"
+#   result &= &"score_type {tt.score_type}"
+#   result &= &"depth {tt.depth}"
 
 # Piece-square tables. These tables are partially designed based on those on
 # the chess programming wiki and partially self designed based on my own
@@ -324,6 +329,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
       let best_lower = engine.minimax_search(search_board, depth - 1, cur_alpha,
                                              cur_beta, search_board.to_move)
 
+      let temp_net = search_board.prep_board_for_network().reshape(1, D_in)
       # Unmake the move
       search_board.unmake_move()
 
@@ -333,6 +339,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
         if best_lower[0].eval > result[0].eval:
           best_move = m
           result = @[(m.uci, best_lower[0].eval)].concat(best_lower)
+          best = temp_net
 
         # If we're doing alpha cut offs we're looking for the maximum on
         # this ply, so if the valuation is more than the highest we update it.
@@ -342,6 +349,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
         if best_lower[0].eval < result[0].eval:
           best_move = m
           result = @[(m.uci, best_lower[0].eval)].concat(best_lower)
+          best = temp_net
 
         # If we're doing beta cut offs we're looking for the minimum on
         # this ply, so if the valuation is less than the lowest we update it.
@@ -461,7 +469,7 @@ proc search(engine: Engine, max_depth: int): EvalMove =
     result = moves[0]
 
     engine.pv = moves.map(proc(x: EvalMove): string = x.best_move).join(" ")
-    let temp_eval = int(arctanh(float(result.eval)) * 100)
+    let temp_eval = float(result.eval)#int(arctanh(float(result.eval)) * 100)
     send_command(&"info depth {d} seldepth {d} score cp {temp_eval} nodes {engine.nodes} nps {nps} time {engine.time} pv {engine.pv}")
 
     # Use the magic of iterative deepning to sort moves for more cutoffs.
@@ -475,7 +483,7 @@ proc find_move*(engine: Engine): string =
   engine.color = engine.board.to_move
   let search_result = engine.search(engine.max_depth)
 
-  if training:
-      update_training_parameters(engine.board, search_result.eval, engine.pv, engine.color == BLACK)
+  if training and engine.onMoveFound != nil:
+    engine.on_move_found(engine.board, search_result.eval, engine.pv, engine.color == BLACK)
 
   return search_result.best_move

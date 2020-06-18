@@ -1,15 +1,14 @@
 import logging
 import marshal
-import math
 import os
 import streams
 import strformat
 import strutils
-import tables
-import times
+
+import arraymancer
 
 import board
-include net
+import engine
 
 var
   # To save the evals for generating temporal differences
@@ -23,11 +22,11 @@ var
 
 let
   # Learning rate and lambda hyperparameters
-  alpha = 0.1'f32
+  alpha = 0.001'f32
 
   lamb = 0.7'f32
 
-  save_after = 5
+  save_after = 10
 
 # Today in hellish function definitions that took way too long to figure
 var optim = optimizerSGDMomentum[model, float32](model, learning_rate = alpha, momentum=0.9'f32)
@@ -35,7 +34,7 @@ var optim = optimizerSGDMomentum[model, float32](model, learning_rate = alpha, m
 proc save_weights*() =
   # TODO Clear the Nodes somewhere in here????
   # Clearing the ndoes will reduce the size of the network weights we need to save
-  var out_strm = newFileStream(os.joinPath(getAppDir(), &"{base_version}-v1-{num_increments}.txt"), fmWrite)
+  var out_strm = newFileStream(os.joinPath(getAppDir(), &"{base_version}-t1-{num_increments}.txt"), fmWrite)
   out_strm.store(model)
   out_strm.close()
 
@@ -51,19 +50,20 @@ proc update_training_parameters*(board: Board, eval: float, pv: string, swap: bo
     board.make_move(alg_move)
 
   # Gonna zero out those gradients just in case.
+  # TODO: Investigate if this is necessary or not.
   for layer in fields(model):
     for field in fields(layer):
       when field is Variable:
         field.grad = field.grad.zeros_like
 
   let
-    x = ctx.variable(board.prep_board_for_network().reshape(1, D_in), requires_grad=true)
+    x = ctx.variable(board.prep_board_for_network().reshape(1, D_in))
     y = model.forward(x)
 
   y.backprop()
-  # Why add the network eval and not the one we pass out to uci? You ask
+  # Why add the network eval and not the one we pass out to uci? You ask.
   # Because the checkmate detection code sets evals to be in the thousands.
-  # lol. I'm not super sure if I need to negate these, but I negate them in
+  # I answer. I'm not super sure if I need to negate these, but I negate them in
   # minimax search so I should?
   # if swap:
   #   evals.add(-y.value[0, 0])
@@ -85,7 +85,7 @@ proc update_training_parameters*(board: Board, eval: float, pv: string, swap: bo
     board.unmake_move()
 
 proc update_weights*() =
-  logging.debug(&"EVALS? {$evals}")
+  logging.debug(&"EVALS {$evals}")
   # Without two states you can't calculate a difference
   # I made min_states a variable in case we want to discount the opening
   # moves since that's typically an open book kind of thing.
@@ -107,10 +107,10 @@ proc update_weights*() =
         field.grad = field.grad.zeros_like
 
   var running_diff = 0.0
-  # Works backwards from the end, stops at 2  because that gives the first two.
+  # Works backwards from the end, stops at min_states which needs to be greater
+  # than 2, since 2 will give the first two states.
   for i in countdown(evals.len, min_states):
     let diff = evals[i-1] - evals[i-2]
-    logging.debug(&"Equality?{all_grads[i-1] == all_grads[i-2]}")
 
     # Computes the eligability trace
     running_diff = running_diff * lamb + diff
@@ -133,3 +133,6 @@ proc update_weights*() =
 
   num_increments += 1
 
+proc set_up_training*(cur_eng: Engine) =
+  training = true
+  cur_eng.on_move_found = update_training_parameters

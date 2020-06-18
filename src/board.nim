@@ -94,7 +94,6 @@ const
   piece_names* = {100: 'P', 500: 'R', 310: 'N',
                   300: 'B', 900: 'Q', 1000: 'K'}.toOrderedTable
 
-  base_version* = "noctiluca" # A bioluminescent jellyfish
 
 var temp: seq[tuple[key: char, val: int]] = @[]
 for key, value in piece_names:

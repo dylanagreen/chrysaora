@@ -467,7 +467,7 @@ proc search(engine: Engine, max_depth: int): EvalMove =
 
     # Checkmates are in thousands, but network evals are arctanh limited
     var temp_eval = float(result.eval)
-    let rep_eval = if temp_eval < 1: int(arctanh(temp_eval) * 100) else: int(temp_eval)
+    let rep_eval = if abs(temp_eval) < 1: int(arctanh(temp_eval) * 100) else: int(temp_eval)
     send_command(&"info depth {d} seldepth {d} score cp {rep_eval} nodes {engine.nodes} nps {nps} time {engine.time} pv {engine.pv}")
 
     # Use the magic of iterative deepning to sort moves for more cutoffs.

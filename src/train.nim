@@ -22,7 +22,7 @@ var
 
 let
   # Learning rate and lambda hyperparameters
-  alpha = 0.001'f32
+  alpha = 0.01'f32
 
   lamb = 0.7'f32
 
@@ -101,10 +101,10 @@ proc update_weights*() =
   # wieght updates into the gradient variable so that I can use the optimizer
   # to step forward. This allows me to easily switch from the original weight
   # updates (which was essentially SGD) to things like Adam (which Giraffe used)
-  for layer in fields(model):
-    for field in fields(layer):
-      when field is Variable:
-        field.grad = field.grad.zeros_like
+  # for layer in fields(model):
+  #   for field in fields(layer):
+  #     when field is Variable:
+  #       field.grad = field.grad.zeros_like
 
   var running_diff = 0.0
   # Works backwards from the end, stops at min_states which needs to be greater
@@ -121,10 +121,11 @@ proc update_weights*() =
     for layer in fields(model):
       for field in fields(layer):
         when field is Variable:
-          field.grad += cur_grads[j] * running_diff
+          field.value += alpha * cur_grads[j] * running_diff
+          # field.grad += cur_grads[j] * running_diff
           j += 1
 
-  optim.update()
+  # optim.update()
   evals = @[]
   grads = @[]
 

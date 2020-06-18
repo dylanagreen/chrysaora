@@ -85,8 +85,6 @@ var
   # Whether or not we're in training mode
   training* = false
 
-  best: Tensor[float32]
-
 # proc `$`*(tt: Transposition): string=
 #   result &= &"zobrist {tt.zobrist},"
 #   result &= &"eval {tt.eval}"
@@ -329,7 +327,6 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
       let best_lower = engine.minimax_search(search_board, depth - 1, cur_alpha,
                                              cur_beta, search_board.to_move)
 
-      let temp_net = search_board.prep_board_for_network().reshape(1, D_in)
       # Unmake the move
       search_board.unmake_move()
 
@@ -339,7 +336,6 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
         if best_lower[0].eval > result[0].eval:
           best_move = m
           result = @[(m.uci, best_lower[0].eval)].concat(best_lower)
-          best = temp_net
 
         # If we're doing alpha cut offs we're looking for the maximum on
         # this ply, so if the valuation is more than the highest we update it.
@@ -349,7 +345,6 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
         if best_lower[0].eval < result[0].eval:
           best_move = m
           result = @[(m.uci, best_lower[0].eval)].concat(best_lower)
-          best = temp_net
 
         # If we're doing beta cut offs we're looking for the minimum on
         # this ply, so if the valuation is less than the lowest we update it.
@@ -469,8 +464,11 @@ proc search(engine: Engine, max_depth: int): EvalMove =
     result = moves[0]
 
     engine.pv = moves.map(proc(x: EvalMove): string = x.best_move).join(" ")
-    let temp_eval = float(result.eval)#int(arctanh(float(result.eval)) * 100)
-    send_command(&"info depth {d} seldepth {d} score cp {temp_eval} nodes {engine.nodes} nps {nps} time {engine.time} pv {engine.pv}")
+
+    # Checkmates are in thousands, but network evals are arctanh limited
+    var temp_eval = float(result.eval)
+    let rep_eval = if temp_eval < 1: int(arctanh(temp_eval) * 100) else: int(temp_eval)
+    send_command(&"info depth {d} seldepth {d} score cp {rep_eval} nodes {engine.nodes} nps {nps} time {engine.time} pv {engine.pv}")
 
     # Use the magic of iterative deepning to sort moves for more cutoffs.
     # Resort every odd ply in case we found a checkmate and need to search

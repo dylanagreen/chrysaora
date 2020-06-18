@@ -8,7 +8,7 @@ Chrysaora started as an attempt to use supervised learning and a small image cla
 
 Or at least, that's the plan...
 
-The work on chrysaora is hevily inspired and based by the [Giraffe](https://arxiv.org/pdf/1509.01549.pdf) and [KnightCap](https://arxiv.org/pdf/cs/9901001.pdf) papers, both of which I consulted liberally while writing the engine. Most of my training code only came together after really understanding Knightcap.
+The work on chrysaora is hevily inspired by and based on the [Giraffe](https://arxiv.org/pdf/1509.01549.pdf) and [KnightCap](https://arxiv.org/pdf/cs/9901001.pdf) papers, both of which I consulted liberally while writing the engine. Most of my training code only came together after really understanding Knightcap.
 
 ### Naming
 Chrysaora is named after the genus of jellyfish, which in turn is named after Chrysaor, a being from Greek mythology. Chrysaor roughly translates as "he who has a golden armament." Major releases of Chrysaora are codenamed after other genus or species of jellyfish, typically things I find cool.
@@ -17,11 +17,24 @@ For some reason I use female pronouns when referrring to Chrysaora in my head, b
 
 - v0.1.0 **Noctiluca** - Named after a bioluminescent jellyfish as a bioluminescent algae bloom occured while I was coding it. Everyone was quarantined so I coded Chrysaora instead of going to see it. Sad.
 
+#### Weightsfile Naming
+Each weights file is labeled by its major version, a training iteration delimiter, and the number of games that went into that training run.
+
+For example:
+
+```
+noctiluca-t1-20.txt
+```
+
+This weights file uses the network defined by the base version **noctiluca** and run through one training run (**t1**). The **20** denotes that this training run used 20 games of play to update the weights.
+
+**t0** is specifically reserved for bootstrapped weights.
+
 ## Support
 Chrysaora will be supported until I get my PhD (in Physics), it wins a season of the TCEC, or Nim dies, whichever comes first.
 
 ## Dependencies
-Deep learning is done using [arraymancer](https://github.com/mratsim/Arraymancer), which is the only dependency outside the Nim standard library.
+Learning is done using [arraymancer](https://github.com/mratsim/Arraymancer), which is the only dependency outside the Nim standard library.
 
 ### Building
 Chrysaora requires a minimum Nim version of 1.20.0. With Nim (and arraymancer) installed, building Chrysaora is as simple as:
@@ -42,7 +55,9 @@ If you use cutechess-cli to run Chrysaora against another engine to train agains
 
 While training, Chrysaora will keep a running record of its internal evaluations as well as the gradients used to calculate these evaluations for each of its own color board states. I.e. if Chrysaora is playing white, then it will store evaluations and gradients for all white moves in the game (as these are the moves that Chrysaora herself makes.)
 
-At the end of the game Chrysaora will use the TDleaf(lambda) update rules to update the internal weights based on the game performance. This is done when either `ucinewgame` or `quit` is passed to Chrysaora. Chrysaora will save the weights only upon exit.
+At the end of the game Chrysaora will use the TDleaf(lambda) update rules to update the internal weights based on the game performance. This is done when either `ucinewgame` or `quit` is passed to Chrysaora.
+
+Chrysaora will save the weights after every 10 games, and upon exit. You can change the number of games between saves by modifying the `save_after` variable in `train.nim`.
 
 ## Features
 - Move Generation
@@ -56,15 +71,15 @@ At the end of the game Chrysaora will use the TDleaf(lambda) update rules to upd
   - Side to move (1 feature)
   - Castling rights (4 features)
   - Square position (64 features)
-  - Piece existence (32 features)i
+  - Piece existence (32 features)
 - Search
   - Fail-hard alpha-beta pruning minimax
-  - Zobrist hashing indexed transposition tables
+  - Zobrist hashing indexed transposition table
   - Iterative deepening
 
 ## Planned Features
-- Ability to build non-training versions of Chrysaora
-- Automatic saving of weights after a set number of games
+- Ability to build non-training and handcrafted evaluation versions of Chrysaora
+- Using the handcrafted eval for depth 1 move ordering.
 - Self training
 
 ### Acknowledgements

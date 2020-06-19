@@ -81,7 +81,12 @@ type
     on_move_found*: proc(board: Board, eval: float, pv: string, swap: bool = false)
 
 var
+  # Transposition table
   tt* = newSeq[Transposition](200)
+
+  # Number of games in the highest weights file loaded.
+  best_count* = 0
+
   # Whether or not we're in training mode
   training* = false
 
@@ -159,7 +164,6 @@ proc initialize_network*(name: string = "default.txt") =
   # Since this will be sorted this will be in general in order the weights file
   # with the longest stack trace, and then among those with the same stack trace
   # the one with the most training games.
-  var best_count = 0
   if name == "default.txt":
     for f in walkFiles(getAppDir() / "*.txt"):
       let file_name = f.splitPath().tail

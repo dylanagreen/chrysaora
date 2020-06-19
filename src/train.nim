@@ -34,7 +34,7 @@ var optim = optimizerSGDMomentum[model, float32](model, learning_rate = alpha, m
 proc save_weights*(bootstrap:bool = false) =
   # TODO Clear the Nodes somewhere in here????
   # Clearing the ndoes will reduce the size of the network weights we need to save
-  let name = if bootstrap: &"{base_version}-t0.txt" else: &"{base_version}-t1-{num_increments}.txt"
+  let name = if bootstrap: &"{base_version}-t0.txt" else: &"{base_version}-t1-{num_increments + best_count}.txt"
   var out_strm = newFileStream(os.joinPath(getAppDir(), name), fmWrite)
   out_strm.store(model)
   out_strm.close()
@@ -133,7 +133,7 @@ proc update_weights*() =
   evals = @[]
   grads = @[]
 
-  if num_increments mod save_after == 0:
+  if num_increments mod save_after == 0 and num_increments > 0:
     save_weights()
 
   num_increments += 1

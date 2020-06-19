@@ -6,7 +6,9 @@ import arraymancer
 
 import board
 import engine
+
 import train
+import bootstrap
 
 type
   UCI* = ref object
@@ -218,6 +220,8 @@ proc decrypt_uci*(parser: UCI, cmd: string) =
       update_weights()
   elif to_exec == "setoption":
     parser.set_option(fields)
+  elif to_exec == "bootstrap":
+    bootstrap()
 
 
 proc receive_command*(): string =

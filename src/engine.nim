@@ -214,7 +214,7 @@ proc check_for_stop(): bool =
       result = true
 
 
-proc handcrafted_eval(board: Board): float =
+proc handcrafted_eval*(board: Board): float =
   # Starts by summing to get the straight piece value difference
   result = float(sum(board.current_state))
 

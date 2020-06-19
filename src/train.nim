@@ -31,12 +31,16 @@ let
 # Today in hellish function definitions that took way too long to figure
 var optim = optimizerSGDMomentum[model, float32](model, learning_rate = alpha, momentum=0.9'f32)
 
-proc save_weights*() =
+proc save_weights*(bootstrap:bool = false) =
   # TODO Clear the Nodes somewhere in here????
   # Clearing the ndoes will reduce the size of the network weights we need to save
-  var out_strm = newFileStream(os.joinPath(getAppDir(), &"{base_version}-t1-{num_increments}.txt"), fmWrite)
+  let name = if bootstrap: &"{base_version}-t0.txt" else: &"{base_version}-t1-{num_increments}.txt"
+  var out_strm = newFileStream(os.joinPath(getAppDir(), name), fmWrite)
   out_strm.store(model)
   out_strm.close()
+
+  if bootstrap:
+    echo &"Saved bootsrap weights as {name}."
 
 proc update_training_parameters*(board: Board, eval: float, pv: string, swap: bool = false) =
   # Get the moves and make them so we can look at the leaf node

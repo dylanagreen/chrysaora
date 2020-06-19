@@ -8,7 +8,7 @@ Chrysaora started as an attempt to use supervised learning and a small image cla
 
 Or at least, that's the plan...
 
-The work on chrysaora is hevily inspired by and based on the [Giraffe](https://arxiv.org/pdf/1509.01549.pdf) and [KnightCap](https://arxiv.org/pdf/cs/9901001.pdf) papers, both of which I consulted liberally while writing the engine. Most of my training code only came together after really understanding Knightcap.
+The work on chrysaora is heavily inspired by and based on the [Giraffe](https://arxiv.org/pdf/1509.01549.pdf) and [KnightCap](https://arxiv.org/pdf/cs/9901001.pdf) papers, both of which I consulted liberally while writing the engine. Most of my training code only came together after really understanding Knightcap.
 
 ### Dependencies
 Learning is done using [arraymancer](https://github.com/mratsim/Arraymancer), which is the only dependency outside the Nim standard library.
@@ -16,11 +16,11 @@ Learning is done using [arraymancer](https://github.com/mratsim/Arraymancer), wh
 ### Naming
 Chrysaora is named after the genus of jellyfish, which in turn is named after Chrysaor, a being from Greek mythology. Chrysaor roughly translates as "he who has a golden armament." Major releases of Chrysaora are codenamed after other genus or species of jellyfish, typically things I find cool.
 
-For some reason I use female pronouns when referrring to Chrysaora in my head, but I can't imagine she particularly cares considering she's a nonsentient chess engine.
+For some reason I use female pronouns when referring to Chrysaora in my head, but I can't imagine she particularly cares considering she's a nonsentient chess engine.
 
-- v0.1.x **Noctiluca** - Named after a bioluminescent jellyfish as a bioluminescent algae bloom occured while I was coding it. Everyone was quarantined so I coded Chrysaora instead of going to see it. Sad.
+- v0.1.x **Noctiluca** - Named after a bioluminescent jellyfish as a bioluminescent algae bloom occurred while I was coding it. Everyone was quarantined so I coded Chrysaora instead of going to see it. Sad.
 
-#### Weightsfile Naming
+#### Weights File Naming
 Each weights file is labeled by its major version, a training iteration delimiter, and the number of games that went into that training run.
 
 For example:
@@ -37,14 +37,14 @@ This weights file uses the network defined by the base version **noctiluca** and
 Chrysaora will be supported until I get my PhD (in Physics), it wins a season of the TCEC, or Nim dies, whichever comes first.
 
 ### Building
-Chrysaora requires a minimum Nim version of 1.20.0. With Nim (and arraymancer) installed, building Chrysaora is as simple as:
+Chrysaora requires a minimum Nim version of 1.2.0. With Nim (and arraymancer) installed, building Chrysaora is as simple as:
 
 ```
 nim c -d:danger -o:chrysaora src/main.nim
 ```
 
 ## Training
-In order to train Chrysaora, you must build a version with the training code implemented. Currently all versions of Chrysaora build with training built in, although in the future this will be an option that must be enabled. Chrysaora learns by playing chess games against an opponent. It is possible to self train Chrysaora by pitting two engine instances against each other, but the weight updates of one engine will overwite the other.
+In order to train Chrysaora, you must build a version with the training code implemented. Currently all versions of Chrysaora build with training built in, although in the future this will be an option that must be enabled. Chrysaora learns by playing chess games against an opponent. It is possible to self train Chrysaora by pitting two engine instances against each other, but the weight updates of one engine will overwrite the other.
 
 Currently Chrysaora will train by setting the in game uci option to true. This is done by running the following after loading an instance of Chrysaora but before telling her to find a move:
 ```
@@ -63,7 +63,7 @@ Chrysaora will save the weights after every 10 games, and upon exit. You can cha
 
 Chrysaora can bootstrap her weights to approximate its own internal handcrafted evaluation function. This can be done by running `bootstrap x` from the uci interface at any time once the engine is initialized, where `x` is the number of training epochs to use for bootstrapping. The bootstrap weights will be saved as `majorversion-t0.txt`. Chrysaora can train from random weights, but by bootstrapping and putting herself near a good minimum in parameter space the training time to get "good" is massively reduced.
 
-Chrysaora bootstraps by pulling two game states from pgns that are saved in `/games/train/`. These game states are passed to the network both in their original form and a colorswapped version. This helps Chrysaora leran to play both colors on the chess board.
+Chrysaora bootstraps by pulling two game states from pgns that are saved in `/games/train/`. These game states are passed to the network both in their original form and a colorswapped version. This helps Chrysaora learn to play both colors on the chess board.
 
 
 ## Features

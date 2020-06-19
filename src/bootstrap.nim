@@ -141,8 +141,10 @@ proc generate_bootstrap_data(): tuple[batches, evals: seq[Tensor[float32]]] =
 
       # e1 and e2 are the evaluations of board 1 and 2 respectively.
       # tanh and divided to get them between the -1 and 1 of the network.
-      e1 = [tanh(board1.handcrafted_eval() / 100)].toTensor().astype(float32)
-      e2 = [tanh(board2.handcrafted_eval() / 100)].toTensor().astype(float32)
+      e1 = [tanh(board1.handcrafted_eval() / 1000)].toTensor().astype(float32)
+      e2 = [tanh(board2.handcrafted_eval() / 1000)].toTensor().astype(float32)
+      # I remember now that I divided these by 1000 instead of 100 so I can
+      # restrict the evals to be closer to 0 and avoid eval runaway.
 
     v1 = v1.reshape(1, D_in)
     v2 = v2.reshape(1, D_in)
@@ -189,7 +191,7 @@ proc generate_bootstrap_data(): tuple[batches, evals: seq[Tensor[float32]]] =
   logging.debug(&"Data is in {result.batches.len - 1} batches of 100 states and one batch of {result.batches[^1].shape[0]} states.")
 
 
-proc bootstrap*() =
+proc bootstrap*(num_epoch: int = 100) =
   let (batches, evals) = generate_bootstrap_data()
   # Adam optimizer needs to be variable as it learns during training
   # Adam works better for the bootstrapping process. Allegedly.
@@ -200,7 +202,7 @@ proc bootstrap*() =
 
   # For the time being I'm restricting the training to avoid overfitting.
   # At some point I can make the number of bootstrap epochs variable.
-  for t in 1 .. 100:
+  for t in 1 .. num_epoch:
     var running_loss = 0.0
     for i, minibatch in batches:
       # Generates the prediction, finds the loss

@@ -222,8 +222,11 @@ proc decrypt_uci*(parser: UCI, cmd: string) =
     parser.set_option(fields)
   elif to_exec == "bootstrap":
     try:
-      var num_epoch = parseInt(fields[1])
-      bootstrap(num_epoch)
+      if len(fields) > 1:
+        var num_epoch = parseInt(fields[1])
+        bootstrap(num_epoch)
+      else:
+        bootstrap()
     except ValueError:
       echo "Invalid number of training epochs"
 

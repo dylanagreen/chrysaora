@@ -100,7 +100,12 @@ proc set_up_position(parser: UCI, cmd: seq[string]) =
       parser.board = new_board()
 
     # Converts the moves to long algebraic to make them.
-    for move in moves_to_make:
+    for i, move in moves_to_make:
+      # I can't believe I need a sanity check to ignore duplicated moves
+      # but for some reason the lichess bot passed the same move twice.
+      if i > 0 and move == moves_to_make[i - 1]:
+        logging.debug("Skipped duplicate move", move)
+        continue
       var converted = parser.board.uci_to_algebraic(move)
       parser.board.make_move(converted)
 

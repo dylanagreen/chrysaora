@@ -225,7 +225,7 @@ proc decrypt_uci*(parser: UCI, cmd: string) =
       update_weights()
   elif to_exec == "setoption":
     parser.set_option(fields)
-  elif to_exec == "bootstrap":
+  if training and to_exec == "bootstrap":
     try:
       if len(fields) > 1:
         var num_epoch = parseInt(fields[1])

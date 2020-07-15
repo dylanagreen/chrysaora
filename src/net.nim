@@ -109,13 +109,13 @@ template piece_to_position(piece: Piece, color: Color) =
 
 proc prep_board_for_network*(board: Board): Tensor[float32] =
   # Structure:
-    # 0-4: Num of white pieces (excluding King)
-    # 5-9: Num of black pieces (Excluding King)
-    # 10: Side to move
-    # 11-12: White castling rights (King, Queen)
-    # 13-14: Black castling rights (King, Queen)
-    # 15-62: White piece slots: Pawn, Knight, Bishop, Rook, Queen, King
-    # 63-110: Black piece slots: Pawn, Knight, Bishop, Rook, Queen, King
+  # 0-4: Num of white pieces (excluding King)
+  # 5-9: Num of black pieces (excluding King)
+  # 10: Side to move
+  # 11-12: White castling rights (King, Queen)
+  # 13-14: Black castling rights (King, Queen)
+  # 15-62: White piece slots: Pawn, Knight, Bishop, Rook, Queen, King
+  # 63-110: Black piece slots: Pawn, Knight, Bishop, Rook, Queen, King
   result = zeros[float32](D_in)
 
   for color in  [WHITE, BLACK]:

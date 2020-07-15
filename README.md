@@ -83,10 +83,10 @@ Chrysaora bootstraps by pulling two game states from pgns that are saved in `/ga
   - Fail-hard alpha-beta pruning minimax
   - Zobrist hashing indexed transposition table
   - Iterative deepening
+    - Handcrafted move ordering for depth <= 2 plies
 
 ### Planned Features
 - Ability to build non-training and handcrafted evaluation versions of Chrysaora
-- Using the handcrafted eval for depth 1 move ordering.
 - Self training
 
 ## Acknowledgements

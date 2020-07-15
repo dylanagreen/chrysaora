@@ -260,7 +260,10 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
 
   if depth == 0:
     engine.nodes += 1
-    result[0].eval = network_eval(search_board)
+    if engine.cur_depth <= 2:
+      result[0].eval = handcrafted_eval(search_board)
+    else:
+      result[0].eval = network_eval(search_board)
 
     # Just in case my network exploded.
     if result[0].eval == NegInf:

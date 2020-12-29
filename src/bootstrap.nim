@@ -29,7 +29,7 @@ proc split_game(name: string, folder: string = "games") =
     raise newException(IOError, "PGN not found!")
 
   # Creates the folder for the split games.
-  if not existsDir(folder / "train"):
+  if not dirExists(folder / "train"):
     createDir(folder / "train")
 
   let data = open(start_loc)

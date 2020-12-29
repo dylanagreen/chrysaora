@@ -12,7 +12,7 @@ import uci
 # Makes the folder for the logs if it doesn't exist yet. For now just makes it
 # in the folder the program is in.
 let log_folder = getAppDir() / "logs"
-if not existsDir(log_folder):
+if not dirExists(log_folder):
     createDir(log_folder)
 
 # Initiliazes the log.

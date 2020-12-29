@@ -4,6 +4,13 @@ import arraymancer
 
 import board
 
+# A definition of the tanh activation function. On Arraymancer > 0.5.2 compilation
+# will fail as the compiler is not sure if you're referring to nnp_activation.tanh
+# or ufunc.tanh. Annoying but I haven't found a great fix for it yet besides this.
+# See https://github.com/mratsim/Arraymancer/issues/459
+proc tanh*[T: SomeFloat](t: Tensor[T]): Tensor[T] {.noInit.} =
+  t.map_inline tanh(x)
+
 # D_in is input dimension
 # D_out is output dimension.
 let
@@ -22,6 +29,7 @@ var ctx* = newContext Tensor[float32]
 # This is where the network itself is actually defined.
 network ctx, ChessNet:
   layers:
+    x:   Input([D_in])
     fc1: Linear(D_in, H1)
     fc2: Linear(H1, H2)
     fc3: Linear(H2, D_out)

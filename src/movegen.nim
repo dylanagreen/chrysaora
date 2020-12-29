@@ -125,7 +125,8 @@ proc bits_to_algebraic(possible_moves: uint64, start_pos: Position,
     fin = possible_moves.firstSetBit()
 
 
-proc generate_piece_moves(board: Board, color: Color, piece: char): seq[Move] =
+proc generate_piece_moves(board: Board, color: Color, piece: char,
+                          captures: bool = false): seq[Move] =
   let starts = board.find_piece(color, piece)
   var long: seq[Move]
 
@@ -142,25 +143,35 @@ proc generate_piece_moves(board: Board, color: Color, piece: char): seq[Move] =
       possible_moves = if color == BLACK: possible_moves and (not board.WHITE_ATTACKS)
                        else: possible_moves and (not board.BLACK_ATTACKS)
 
+    # Generates only moves that end in captures by doing simple bit and with
+    # the opposite color's pieces.
+    if captures:
+      possible_moves = if color == BLACK: possible_moves and board.WHITE_PIECES
+                       else: possible_moves and board.BLACK_PIECES
     long = long.concat(bits_to_algebraic(possible_moves, pos, piece, board))
 
   result = board.remove_moves_in_check(long, color)
 
 
-proc generate_knight_moves*(board: Board, color: Color): seq[Move] =
-  result = generate_piece_moves(board, color, 'N')
+proc generate_knight_moves*(board: Board, color: Color,
+                            captures: bool = false): seq[Move] =
+  result = generate_piece_moves(board, color, 'N', captures)
 
-proc generate_king_moves*(board: Board, color: Color): seq[Move] =
-  result = generate_piece_moves(board, color, 'K')
+proc generate_king_moves*(board: Board, color: Color,
+                          captures: bool = false): seq[Move] =
+  result = generate_piece_moves(board, color, 'K', captures)
 
-proc generate_bishop_moves*(board: Board, color: Color): seq[Move] =
-  result = generate_piece_moves(board, color, 'B')
+proc generate_bishop_moves*(board: Board, color: Color,
+                            captures: bool = false): seq[Move] =
+  result = generate_piece_moves(board, color, 'B', captures)
 
-proc generate_rook_moves*(board: Board, color: Color): seq[Move] =
-  result = generate_piece_moves(board, color, 'R')
+proc generate_rook_moves*(board: Board, color: Color,
+                          captures: bool = false): seq[Move] =
+  result = generate_piece_moves(board, color, 'R', captures)
 
-proc generate_queen_moves*(board: Board, color: Color): seq[Move] =
-  result = generate_piece_moves(board, color, 'Q')
+proc generate_queen_moves*(board: Board, color: Color,
+                           captures: bool = false): seq[Move] =
+  result = generate_piece_moves(board, color, 'Q', captures)
 
 
 proc pawn_bits_to_algebraic(possible_moves: uint64, color: Color, board: Board,
@@ -344,3 +355,12 @@ proc generate_all_moves*(board: Board, color: Color): seq[Move] =
   result = result.concat(board.generate_pawn_captures(color))
   result = result.concat(board.generate_king_moves(color))
   result = result.concat(board.generate_castle_moves(color))
+
+
+proc generate_captures*(board: Board, color: Color): seq[Move] =
+  result = result.concat(board.generate_queen_moves(color, true))
+  result = result.concat(board.generate_rook_moves(color, true))
+  result = result.concat(board.generate_bishop_moves(color, true))
+  result = result.concat(board.generate_knight_moves(color, true))
+  result = result.concat(board.generate_pawn_captures(color))
+  result = result.concat(board.generate_king_moves(color, true))

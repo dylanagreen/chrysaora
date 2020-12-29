@@ -24,8 +24,30 @@ suite "start of game move generation":
 
     check(alg == expected)
 
+  test "knight captures":
+    var moves = test_board.generate_knight_moves(WHITE, true)
+
+    # This strips out the algebraic parts of the moves.
+    var alg: HashSet[string] = initHashSet[string]()
+    for i, m in moves:
+      alg.incl(m.algebraic)
+    var expected = initHashSet[string]()
+
+    check(alg == expected)
+
   test "rook moves":
     var moves = test_board.generate_rook_moves(WHITE)
+
+    # This strips out the algebraic parts of the moves.
+    var alg: HashSet[string] = initHashSet[string]()
+    for i, m in moves:
+      alg.incl(m.algebraic)
+    var expected = initHashSet[string]()
+
+    check(alg == expected)
+
+  test "rook captures":
+    var moves = test_board.generate_rook_moves(WHITE, true)
 
     # This strips out the algebraic parts of the moves.
     var alg: HashSet[string] = initHashSet[string]()
@@ -46,6 +68,17 @@ suite "start of game move generation":
 
     check(alg == expected)
 
+  test "bishop captures":
+    var moves = test_board.generate_bishop_moves(WHITE, true)
+
+    # This strips out the algebraic parts of the moves.
+    var alg: HashSet[string] = initHashSet[string]()
+    for i, m in moves:
+      alg.incl(m.algebraic)
+    var expected = initHashSet[string]()
+
+    check(alg == expected)
+
   test "queen moves":
     var moves = test_board.generate_queen_moves(WHITE)
 
@@ -57,8 +90,30 @@ suite "start of game move generation":
 
     check(alg == expected)
 
+  test "queen captures":
+    var moves = test_board.generate_queen_moves(WHITE, true)
+
+    # This strips out the algebraic parts of the moves.
+    var alg: HashSet[string] = initHashSet[string]()
+    for i, m in moves:
+      alg.incl(m.algebraic)
+    var expected = initHashSet[string]()
+
+    check(alg == expected)
+
   test "king moves":
     var moves = test_board.generate_king_moves(WHITE)
+
+    # This strips out the algebraic parts of the moves.
+    var alg: HashSet[string] = initHashSet[string]()
+    for i, m in moves:
+      alg.incl(m.algebraic)
+    var expected = initHashSet[string]()
+
+    check(alg == expected)
+
+  test "king captures":
+    var moves = test_board.generate_king_moves(WHITE, true)
 
     # This strips out the algebraic parts of the moves.
     var alg: HashSet[string] = initHashSet[string]()
@@ -107,6 +162,17 @@ suite "start of game move generation":
                     "d2d4", "e2e3", "e2e4", "f2f3", "f2f4", "g2g3", "g2g4",
                     "h2h3", "h2h4", "Nb1a3", "Nb1c3", "Ng1f3", "Ng1h3"].toHashSet
 
+    check(alg == expected)
+
+  test "all captures":
+    var moves = test_board.generate_captures(WHITE,)
+
+    # This strips out the algebraic parts of the moves.
+    var alg: HashSet[string] = initHashSet[string]()
+    for i, m in moves:
+      alg.incl(m.algebraic)
+
+    var expected = initHashSet[string]()
     check(alg == expected)
 
 suite "complicated move generation":
@@ -212,6 +278,94 @@ suite "complicated move generation":
                     "Bb2a3", "Qd1a1", "Qd1b1", "Qd1c1", "Qd1c2", "Qd1b3",
                     "Ke1f1", "Ke1f2", "b4b5", "d2d3", "d2d4", "e2e3", "e2e4",
                     "h2h3", "g3xh4", "O-O"].toHashSet
+
+    check(alg == expected)
+
+
+suite "complicated capture generation":
+  setup:
+    let
+      # Lichess Puzzle 12/29/20 with an added black knight at a5
+      test_fen = "2r3k1/pp2npp1/3r3p/n4q2/2BBp3/1PP3Rb/P4P2/R2Q3K w - - 1 29"
+      # Loads a complicated fen to test from.
+      test_board = load_fen(test_fen)
+
+  test "knight captures":
+    var moves = test_board.generate_knight_moves(BLACK, true)
+
+    # This strips out the algebraic parts of the moves.
+    var alg: HashSet[string] = initHashSet[string]()
+    for i, m in moves:
+      alg.incl(m.algebraic)
+    var expected = ["Na5xb3", "Na5xc4"].toHashSet
+
+    check(alg == expected)
+
+  test "rook captures":
+    var moves = test_board.generate_rook_moves(WHITE, true)
+
+    # This strips out the algebraic parts of the moves.
+    var alg: HashSet[string] = initHashSet[string]()
+    for i, m in moves:
+      alg.incl(m.algebraic)
+    var expected = ["Rg3xg7", "Rg3xh3"].toHashSet
+
+    check(alg == expected)
+
+  test "bishop captures":
+    var moves = test_board.generate_bishop_moves(WHITE, true)
+
+    # This strips out the algebraic parts of the moves.
+    var alg: HashSet[string] = initHashSet[string]()
+    for i, m in moves:
+      alg.incl(m.algebraic)
+    var expected = ["Bd4xg7", "Bc4xf7", "Bd4xa7"].toHashSet
+
+    check(alg == expected)
+
+  test "queen captures":
+    # No queen captures on the white side.
+    var moves = test_board.generate_queen_moves(BLACK, true)
+
+    # This strips out the algebraic parts of the moves.
+    var alg: HashSet[string] = initHashSet[string]()
+    for i, m in moves:
+      alg.incl(m.algebraic)
+    var expected = ["Qf5xf2"].toHashSet
+
+    check(alg == expected)
+
+  test "king captures":
+    var moves = test_board.generate_king_moves(WHITE, true)
+
+    # This strips out the algebraic parts of the moves.
+    var alg: HashSet[string] = initHashSet[string]()
+    for i, m in moves:
+      alg.incl(m.algebraic)
+    var expected = initHashSet[string]()
+
+    check(alg == expected)
+
+  test "pawn captures":
+    let moves = test_Board.generate_pawn_captures(WHITE)
+
+    # This strips out the algebraic parts of the moves.
+    var alg: HashSet[string] = initHashSet[string]()
+    for i, m in moves:
+      alg.incl(m.algebraic)
+    var expected = initHashSet[string]()
+
+    check(alg == expected)
+
+  test "all captures":
+    var moves = test_board.generate_captures(WHITE,)
+
+    # This strips out the algebraic parts of the moves.
+    var alg: HashSet[string] = initHashSet[string]()
+    for i, m in moves:
+      alg.incl(m.algebraic)
+
+    var expected = ["Bd4xg7", "Bc4xf7", "Bd4xa7", "Rg3xg7", "Rg3xh3"].toHashSet
 
     check(alg == expected)
 

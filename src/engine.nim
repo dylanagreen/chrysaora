@@ -190,13 +190,17 @@ proc initialize_network*(name: string = "default.txt") =
     logging.error(&"Attempted to load {weights_name}")
     raise newException(IOError, "Weights File not found!")
 
-  logging.debug("Let's Plant!")
+  logging.debug("Let's Plant!") # A print line that I left from debugging because it's funny
   sleep(500) # You might think this wasn't necessary. You would be wrong.
   var strm = newFileStream(weights_loc, fmRead)
   strm.load(model)
   strm.close()
   # Need to make sure we're all good on contexts
   ctx = engine.model.fc1.weight.context
+
+  # This following line is a hacky fix for the following issue:
+  # https://github.com/nim-lang/Nim/issues/16496
+  engine.model.fc2.weight.context = engine.model.fc1.weight.context
 
   # For future reference so we know what weights file was loaded.
   logging.debug(&"Loaded weights file: {weights_name}")
@@ -235,8 +239,10 @@ proc network_eval(board: Board): float =
   let x = ctx.variable(board.prep_board_for_network().reshape(1, D_in))
   # Don't want to track this forward operation for changing gradients
   no_grad_mode ctx:
+    # echo model.fc1.weight.context != model.fc2.weight.context
+    # echo model.fc1.weight.context != model.fc3.weight.context
+    # echo model.fc2.weight.context != model.fc3.weight.context
     result = model.forward(x).value[0, 0]
-
   # Converts network output to centipawns.
   # result = arctanh(result) * 100
 

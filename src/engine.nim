@@ -239,9 +239,6 @@ proc network_eval(board: Board): float =
   let x = ctx.variable(board.prep_board_for_network().reshape(1, D_in))
   # Don't want to track this forward operation for changing gradients
   no_grad_mode ctx:
-    # echo model.fc1.weight.context != model.fc2.weight.context
-    # echo model.fc1.weight.context != model.fc3.weight.context
-    # echo model.fc2.weight.context != model.fc3.weight.context
     result = model.forward(x).value[0, 0]
   # Converts network output to centipawns.
   # result = arctanh(result) * 100

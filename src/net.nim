@@ -1,3 +1,7 @@
+import marshal
+import os
+import streams
+import strformat
 import tables
 
 import arraymancer
@@ -183,3 +187,10 @@ proc color_swap_board*(board: Tensor[float32]): Tensor[float32] =
 
   # Swaps side to move
   result[10] = -board[10]
+
+# Functionality for generating a completely random (ish) weights file.
+if isMainModule:
+  var weights_loc = os.joinPath(getAppDir(), &"{base_version}-t0.txt")
+  var out_strm = newFileStream(weights_loc, fmWrite)
+  out_strm.store(model)
+  out_strm.close()

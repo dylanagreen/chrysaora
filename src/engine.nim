@@ -243,6 +243,89 @@ proc network_eval(board: Board): float =
   # Converts network output to centipawns.
   # result = arctanh(result) * 100
 
+# Takes an etwork value and a handcrafted quiesence value
+# and returns a "confidence" value that represents how much confidence we
+# have in the network value. If the handcrafted quiesence value is well below
+# the network value for this node then returned value is <1 otherwise it is
+# approx 1, excepting in cases where the handcrafted is super confident that
+# the network undersetimated this node.
+proc quiesence_eval(netval, qval: float): float =
+  # Basically this is restricted between 0 and 2, 0 if qval << netval and 2 if
+  # qval >> netval. Otherwise it'll hover near 1. It will take a difference
+  # of 500 centipawns to change this multiplier away from 1 by a half.
+  result = tanh(qval - netval / 1000) + 1
+
+
+proc is_quiet(search_board: Board): bool =
+  result = false
+
+# This is only ever called from minimax if a node appears unquiet.
+# in theory we do not need to return an entire move seq. We only need to make
+# sure that we have a quiet endpoint in sight.
+# We do not return a sequence for the quiesence search. I use it only to modify
+# the flat evaluation of the node. For example, modifying the eval to
+# 60% of its original value if the node is worse than expected after the horizon
+proc quiesence_search(engine: Engine, search_board: Board, depth: int = 1,
+                      alpha: float = -50000.0, beta: float = 50000.0, color: Color):
+                      float =
+
+  # Initializes the result sequence.
+  let
+    min_eval = -50000.0
+    max_eval = -min_eval
+  result = if color == engine.color: min_eval else: max_eval
+
+  if (epochTime() - engine.start_time) * 1000 > engine.time_per_move:
+    engine.compute = false
+
+  var
+    cur_alpha = alpha
+    cur_beta = beta
+
+  if depth == 0:
+    result = handcrafted_eval(search_board)
+    if engine.color == BLACK: result *= -1
+    return
+  else:
+    # We only need to quiesence search captures, we will naively assume that
+    # any move the opponent can make that is a non capture is "quiet"
+    let moves = search_board.generate_captures(search_board.to_move)
+
+    for m in moves:
+      # Generate a new board state for move generation.
+      search_board.make_move(m, skip=true)
+
+      # Best move from the next lower ply
+      let best_lower = engine.quiesence_search(search_board, depth - 1,
+                                               cur_alpha, cur_beta,
+                                               search_board.to_move)
+
+      # Unmake the move
+      search_board.unmake_move()
+
+      # Updates the best found move so far. We look for the max if it's our
+      # color and min if it's not (the guiding principle of minimax...)
+      if color == engine.color:
+        if best_lower > result:
+          result = best_lower
+
+        # If we're doing alpha cut offs we're looking for the maximum on
+        # this ply, so if the valuation is more than the highest we update it.
+        cur_alpha = max([cur_alpha, result])
+
+      else:
+        if best_lower < result:
+          result = best_lower
+
+        # If we're doing beta cut offs we're looking for the minimum on
+        # this ply, so if the valuation is less than the lowest we update it.
+        cur_beta = min([cur_beta, result])
+
+      # Once alpha exceeds beta, i.e. once the minimum score that
+      # the engine will receieve on a node (alpha) exceeds the
+      # maximum score that the engine predicts for the opponent (beta)
+      if cur_alpha >= cur_beta or not engine.compute:
+        return
 
 proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
                     alpha: float = -50000.0, beta: float = 50000.0, color: Color):
@@ -268,13 +351,23 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
     else:
       result[0].eval = network_eval(search_board)
 
+      # If this node seems "unquiet" make sure that the evaluation is accurate.
+      # Only do this once we're network searching.
+      if not search_board.is_quiet():
+        let
+          qval = engine.quiesence_search(search_board, depth=2, color=color)
+          mult = if qval == min_eval or qval == max_eval: 1.0 # When no nodes to qsearch
+                 else: quiesence_eval(result[0].eval, qval)
+
+        result[0].eval *= mult
+
     # Just in case my network exploded.
     if result[0].eval == NegInf:
       result[0].eval = min_eval
     elif result[0].eval == Inf:
         result[0].eval = max_eval
     # Flip the sign for Black moves.
-    if engine.color == BLACK: result[0].eval = result[0].eval * -1
+    if engine.color == BLACK: result[0].eval *= -1
     return
   else:
     var

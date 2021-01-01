@@ -87,6 +87,9 @@ var
   # Number of games in the highest weights file loaded.
   best_count* = 0
 
+  # Number of training iterations in weights file loaded
+  num_train* = 0
+
   # Whether or not we're in training mode
   training* = false
 
@@ -176,6 +179,9 @@ proc initialize_network*(name: string = "default.txt") =
           if cur_count > best_count:
             weights_name = file_name
             best_count = cur_count
+
+            # For incrementig the number of individual trainig runs we've done
+            num_train = parseInt(file_name.split("-")[1][1..^1])
         # Only invoked if it tries to parse something that wasn't an int.
         # Then we can just pass.
         except:
@@ -250,10 +256,10 @@ proc network_eval(board: Board): float =
 # approx 1, excepting in cases where the handcrafted is super confident that
 # the network undersetimated this node.
 proc quiesence_eval(netval, qval: float): float =
-  # Basically this is restricted between 0 and 2, 0 if qval << netval and 2 if
-  # qval >> netval. Otherwise it'll hover near 1. It will take a difference
-  # of 500 centipawns to change this multiplier away from 1 by a half.
-  result = tanh(qval - netval / 1000) + 1
+
+  # qval is on a whole different plane of values lol.
+  # Weighted average between the hand crafted qsearch and the original net valuation.
+  result = (0.2 * tanh(qval / 1000) + 0.8 * netval)
 
 
 proc is_quiet(search_board: Board): bool =
@@ -354,12 +360,10 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
       # If this node seems "unquiet" make sure that the evaluation is accurate.
       # Only do this once we're network searching.
       if not search_board.is_quiet():
-        let
-          qval = engine.quiesence_search(search_board, depth=2, color=color)
-          mult = if qval == min_eval or qval == max_eval: 1.0 # When no nodes to qsearch
-                 else: quiesence_eval(result[0].eval, qval)
+        let qval = engine.quiesence_search(search_board, depth=2, color=color)
 
-        result[0].eval *= mult
+        if not (qval == min_eval or qval == max_eval):
+          result[0].eval =  quiesence_eval(result[0].eval, qval)
 
     # Just in case my network exploded.
     if result[0].eval == NegInf:

@@ -29,12 +29,14 @@ let
   save_after = 10
 
 # Today in hellish function definitions that took way too long to figure
-var optim = optimizerSGDMomentum[model, float32](model, learning_rate = alpha, momentum=0.9'f32)
+# var optim = optimizerSGDMomentum[model, float32](model, learning_rate = alpha, momentum=0.9'f32)
 
 proc save_weights*(bootstrap:bool = false) =
   # TODO Clear the Nodes somewhere in here????
   # Clearing the ndoes will reduce the size of the network weights we need to save
-  let name = if bootstrap: &"{base_version}-t0.txt" else: &"{base_version}-t1-{num_increments + best_count}.txt"
+  # I think.
+  let name = if bootstrap: &"{base_version}-t0.txt"
+             else: &"{base_version}-t{num_train + 1}-{num_increments + best_count}.txt"
   var out_strm = newFileStream(os.joinPath(getAppDir(), name), fmWrite)
   out_strm.store(model)
   out_strm.close()

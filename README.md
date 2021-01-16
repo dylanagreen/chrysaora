@@ -37,13 +37,20 @@ This weights file uses the network defined by the base version **noctiluca** and
 Chrysaora will be supported until I get my PhD (in Physics), it wins a season of the TCEC, or Nim dies, whichever comes first.
 
 ### Building
-Chrysaora requires a minimum Nim version of 1.2.0. With Nim (and arraymancer@0.6.1) installed, building Chrysaora is (ostensibly) as simple as:
+The easiest way to build Chrysaora is to use nimble, which will handle the requirements and dependencies for you:
+```
+nimble build -d:danger
+```
+
+You can also self build.
+Chrysaora requires a minimum Nim version of 1.2.0. With Nim (and arraymancer@0.6.1) installed, you can
+instead build Chrysaora with
 
 ```
 nim c -d:danger src/chrysaora.nim
 ```
 
-However, if you want to build chrysaora and then train it yourself you **must** have the
+However, if you want to build Chrysaora and then train it yourself you **must** have the
 Boehm GC installed and instead build as
 
 ```
@@ -51,9 +58,12 @@ nim c -d:danger --gc:boehm src/chrysaora.nim
 ```
 
 This is because Chrysaora will crash the default GC when on Nim >= 1.4.6.
+Why? I don't actually know. In all honesty, Chrysaora pushes Nim pretty hard,
+both in and of itself but also through Arraymancer, which also tends to push
+Nim to its limits.
 
 ## Training
-In order to train Chrysaora, you must build a version that can support training. Currently all versions of Chrysaora build with training built in, however, if you try and build it with the default GC you will segfault the GC. Sorry. See the **Building** section for details on how to work around this.
+In order to train Chrysaora, you must build a version that can support training. Currently all versions of Chrysaora build with training built in. However, if you try and build it with the default GC you will segfault the GC. Sorry. See the **Building** section for details on how to work around this.
 
 Chrysaora learns by playing chess games against an opponent. It is possible to self train Chrysaora by pitting two engine instances against each other, but the weight updates of one engine will overwrite the other.
 I would recommend providing a file of openings to start from, as Chrysaora will play subsequent games very similarly if she is allowed to pick the opening moves every time.
@@ -69,7 +79,7 @@ While training, Chrysaora will keep a running record of its internal evaluations
 
 At the end of the game Chrysaora will use the TDleaf(lambda) update rules to update the internal weights based on the game performance. This is done when either `ucinewgame` or `quit` is passed to Chrysaora.
 
-Chrysaora will save the weights after every 10 games, and upon exit. You can change the number of games between saves by modifying the `save_after` variable in `train.nim`.
+Chrysaora will save the weights after every 10 games and upon exit. You can change the number of games between saves by modifying the `save_after` variable in `train.nim`.
 
 ### Bootstrapping
 
@@ -98,7 +108,7 @@ Chrysaora bootstraps by pulling two game states from pgns that are saved in `/ga
     - Handcrafted move ordering for depth <= 2 plies
 
 ### Planned Features
-- Ability to build non-training and handcrafted evaluation versions of Chrysaora
+- Ability to build handcrafted evaluation versions of Chrysaora
 - Self training
 
 ## Acknowledgements

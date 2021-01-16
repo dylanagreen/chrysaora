@@ -259,7 +259,8 @@ proc quiesence_eval(netval, qval: float): float =
 
   # qval is on a whole different plane of values lol.
   # Weighted average between the hand crafted qsearch and the original net valuation.
-  result = (0.2 * tanh(qval / 1000) + 0.8 * netval)
+  let trust = 0.85 # How much we trust the network's evaluation of this node.
+  result = ((1 - trust) * tanh(qval / 1000) + trust * netval)
 
 
 proc is_quiet(search_board: Board): bool =

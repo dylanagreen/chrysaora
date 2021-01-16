@@ -11,6 +11,7 @@ results/
 src/main
 src/perft
 src/train
+src/net
 tests/test_board
 tests/test_movegen
 tests/test_net

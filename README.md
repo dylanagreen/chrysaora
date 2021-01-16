@@ -40,20 +40,23 @@ Chrysaora will be supported until I get my PhD (in Physics), it wins a season of
 Chrysaora requires a minimum Nim version of 1.2.0. With Nim (and arraymancer@0.6.1) installed, building Chrysaora is (ostensibly) as simple as:
 
 ```
-nim c -d:danger -o:chrysaora src/main.nim
+nim c -d:danger src/chrysaora.nim
 ```
 
 However, if you want to build chrysaora and then train it yourself you **must** have the
 Boehm GC installed and instead build as
 
 ```
-nim c -d:danger -o:chrysaora --gc:boehm src/main.nim
+nim c -d:danger --gc:boehm src/chrysaora.nim
 ```
 
 This is because Chrysaora will crash the default GC when on Nim >= 1.4.6.
 
 ## Training
-In order to train Chrysaora, you must build a version with the training code implemented. Currently all versions of Chrysaora build with training built in, although in the future this will be an option that must be enabled. Chrysaora learns by playing chess games against an opponent. It is possible to self train Chrysaora by pitting two engine instances against each other, but the weight updates of one engine will overwrite the other.
+In order to train Chrysaora, you must build a version that can support training. Currently all versions of Chrysaora build with training built in, however, if you try and build it with the default GC you will segfault the GC. Sorry. See the **Building** section for details on how to work around this.
+
+Chrysaora learns by playing chess games against an opponent. It is possible to self train Chrysaora by pitting two engine instances against each other, but the weight updates of one engine will overwrite the other.
+I would recommend providing a file of openings to start from, as Chrysaora will play subsequent games very similarly if she is allowed to pick the opening moves every time.
 
 Currently Chrysaora will train by setting the in game uci option to true. This is done by running the following after loading an instance of Chrysaora but before telling her to find a move:
 ```

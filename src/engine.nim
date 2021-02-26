@@ -93,6 +93,9 @@ var
   # Whether or not we're in training mode
   training* = false
 
+  # How much trust to put in the network when evaluating the quiescence search
+  trust* = 0.85
+
 # proc `$`*(tt: Transposition): string=
 #   result &= &"zobrist {tt.zobrist},"
 #   result &= &"eval {tt.eval}"
@@ -249,7 +252,7 @@ proc network_eval(board: Board): float =
   # Converts network output to centipawns.
   # result = arctanh(result) * 100
 
-# Takes an etwork value and a handcrafted quiesence value
+# Takes a network value and a handcrafted quiesence value
 # and returns a "confidence" value that represents how much confidence we
 # have in the network value. If the handcrafted quiesence value is well below
 # the network value for this node then returned value is <1 otherwise it is
@@ -259,7 +262,6 @@ proc quiesence_eval(netval, qval: float): float =
 
   # qval is on a whole different plane of values lol.
   # Weighted average between the hand crafted qsearch and the original net valuation.
-  let trust = 0.85 # How much we trust the network's evaluation of this node.
   result = ((1 - trust) * tanh(qval / 1000) + trust * netval)
 
 

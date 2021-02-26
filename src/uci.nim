@@ -42,6 +42,7 @@ proc identify*() =
 
   # Id the options
   send_command("option name Hash type spin default 16 min 1 max 4096")
+  send_command("option name Trust type spin default 85 min 0 max 100")
   send_command("option name Train type check default false")
 
   # Writes the ok command at the end.
@@ -60,6 +61,18 @@ proc set_option(parser: UCI, option: seq[string]) =
       engine.tt = newSeq[Transposition](int(floor(size)))
     except:
       echo "Invalid hash size input, defaulting to 16."
+
+  elif option[2] == "Trust":
+    try:
+      var trust_val = parseFloat(option[^1])
+
+      assert trust_val >= 0
+      assert trust_val <= 100
+
+      engine.trust = trust_val / 100
+    except:
+      echo "Invalid trust value, defaulting to 85%"
+
 
   elif option[2] == "Train":
     if option[^1].toLowerAscii() == "true":

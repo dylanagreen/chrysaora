@@ -165,7 +165,7 @@ let
 
 
 proc initialize_network*(name: string = "default.txt") =
-  var weights_name: string
+  var weights_name: string = name
   # Searches for the most developed weights file with the current version name.
   # Since this will be sorted this will be in general in order the weights file
   # with the longest stack trace, and then among those with the same stack trace
@@ -173,7 +173,7 @@ proc initialize_network*(name: string = "default.txt") =
   if name == "default.txt":
     for f in walkFiles(getAppDir() / "*.txt"):
       let file_name = f.splitPath().tail
-      if file_name.startsWith(base_version) and not f.endsWith("bootstrap.txt"):
+      if file_name.startsWith(base_version):
         if best_count == 0: weights_name = file_name
         try:
           # This to ensure we load the weights file with the highest number
@@ -189,15 +189,20 @@ proc initialize_network*(name: string = "default.txt") =
         # Then we can just pass.
         except:
           continue
-  else:
-    weights_name = name
 
   let weights_loc = getAppDir() / weights_name
-  # Idiot proofing.
+  # Idiot proofing. We load random weights if we tried to load the default
+  # and did not find any weights to load.
   if not fileExists(weights_loc):
-    logging.error("Weights File not found!")
-    logging.error(&"Attempted to load {weights_name}")
-    raise newException(IOError, "Weights File not found!")
+    if weights_name == "default.txt":
+      logging.error("Default weights file not found!")
+      logging.error("Using random weights")
+      random_weights()
+      return
+    else:
+      logging.error("Weights File not found!")
+      logging.error(&"Attempted to load {weights_name}")
+      raise newException(IOError, "Weights File not found!")
 
   logging.debug("Let's Plant!") # A print line that I left from debugging because it's funny
   sleep(500) # You might think this wasn't necessary. You would be wrong.

@@ -24,22 +24,21 @@ let
   # Learning rate and lambda hyperparameters
   alpha = 0.01'f32
 
-  lamb = 0.7'f32
+  lamb = 0.70'f32
 
   save_after = 10
 
-# Today in hellish function definitions that took way too long to figure
+# Today in hellish function definitions that took way too long to figure out
 # var optim = optimizerSGDMomentum[model, float32](model, learning_rate = alpha, momentum=0.9'f32)
 
 proc save_weights*(bootstrap:bool = false) =
-  # TODO Clear the Nodes somewhere in here????
-  # Clearing the ndoes will reduce the size of the network weights we need to save
-  # I think.
   let name = if bootstrap: &"{base_version}-t0.txt"
              else: &"{base_version}-t{num_train + 1}-{num_increments + best_count}.txt"
   var out_strm = newFileStream(os.joinPath(getAppDir(), name), fmWrite)
   out_strm.store(model)
   out_strm.close()
+
+  logging.debug(&"Saved weights after game {num_increments} as {name}")
 
   if bootstrap:
     echo &"Saved bootsrap weights as {name}."

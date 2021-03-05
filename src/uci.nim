@@ -1,4 +1,5 @@
 import logging
+import strformat
 import strutils
 import tables
 
@@ -44,6 +45,7 @@ proc identify*() =
   send_command("option name Hash type spin default 16 min 1 max 4096")
   send_command("option name Trust type spin default 85 min 0 max 100")
   send_command("option name Train type check default false")
+  send_command("option name Weights type string default default.txt")
 
   # Writes the ok command at the end.
   send_command("uciok")
@@ -78,6 +80,10 @@ proc set_option(parser: UCI, option: seq[string]) =
     if option[^1].toLowerAscii() == "true":
       set_up_training(parser.engine)
       logging.debug("Enabled training mode!")
+
+  elif option[2] == "Weights":
+    initialize_network(option[^1])
+    logging.debug(&"Loaded weights {option[^1]} from UI")
 
 
 proc set_up_position(parser: UCI, cmd: seq[string]) =

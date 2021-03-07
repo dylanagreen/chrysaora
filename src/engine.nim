@@ -367,11 +367,9 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
 
       # If this node seems "unquiet" make sure that the evaluation is accurate.
       # Only do this once we're network searching.
-      if not search_board.is_quiet():
-        # We also don't do this if we're training since we're training our
-        # eval function to be strong without the qsearch.
-        if training:
-          return
+      # We also don't do this if we're training since we're training our
+      # eval function to be strong without the qsearch.
+      if not search_board.is_quiet() and not training:
         let qval = engine.quiesence_search(search_board, depth=2, color=color)
 
         if not (qval == min_eval or qval == max_eval):

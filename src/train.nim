@@ -22,8 +22,7 @@ var
 
 let
   # Learning rate and lambda hyperparameters
-  alpha = 0.01'f32
-
+  alpha = 1'f32
   lamb = 0.70'f32
 
   save_after = 10
@@ -41,7 +40,7 @@ proc save_weights*(bootstrap:bool = false) =
   logging.debug(&"Saved weights after game {num_increments} as {name}")
 
   if bootstrap:
-    echo &"Saved bootsrap weights as {name}."
+    echo &"Saved bootstrap weights as {name}."
 
 proc update_training_parameters*(board: Board, eval: float, pv: string, swap: bool = false) =
   # Get the moves and make them so we can look at the leaf node

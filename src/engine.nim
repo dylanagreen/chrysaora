@@ -215,6 +215,7 @@ proc initialize_network*(name: string = "default.txt") =
   # This following line is a hacky fix for the following issue:
   # https://github.com/nim-lang/Nim/issues/16496
   # engine.model.fc2.weight.context = engine.model.fc1.weight.context
+  engine.model.fc1.bias.context = engine.model.fc1.weight.context
 
   # For future reference so we know what weights file was loaded.
   logging.debug(&"Loaded weights file: {weights_name}")

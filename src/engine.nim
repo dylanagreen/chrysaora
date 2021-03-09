@@ -214,7 +214,7 @@ proc initialize_network*(name: string = "default.txt") =
 
   # This following line is a hacky fix for the following issue:
   # https://github.com/nim-lang/Nim/issues/16496
-  engine.model.fc2.weight.context = engine.model.fc1.weight.context
+  # engine.model.fc2.weight.context = engine.model.fc1.weight.context
 
   # For future reference so we know what weights file was loaded.
   logging.debug(&"Loaded weights file: {weights_name}")
@@ -297,7 +297,7 @@ proc quiesence_search(engine: Engine, search_board: Board, depth: int = 1,
     cur_beta = beta
 
   if depth == 0:
-    result = handcrafted_eval(search_board)
+    result = network_eval(search_board)
     if engine.color == BLACK: result *= -1
     return
   else:
@@ -373,7 +373,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
         let qval = engine.quiesence_search(search_board, depth=2, color=color)
 
         if not (qval == min_eval or qval == max_eval):
-          result[0].eval =  quiesence_eval(result[0].eval, qval)
+          result[0].eval = qval # quiesence_eval(result[0].eval, qval)
 
     # Just in case my network exploded.
     if result[0].eval == NegInf:

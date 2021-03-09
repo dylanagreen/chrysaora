@@ -18,7 +18,7 @@ proc tanh*[T: SomeFloat](t: Tensor[T]): Tensor[T] {.noInit.} =
 # D_in is input dimension
 # D_out is output dimension.
 let
-  (D_in*, H1, H2, D_out) = (111, 256, 128, 1)
+  (D_in*, H1, H2, D_out) = (15, 256, 128, 1)
 
   # Code name and test status for whever I need it.
   # Test status changes with each change to the internal variations on the
@@ -28,17 +28,19 @@ let
   base_version* = "noctiluca" # A bioluminescent jellyfish
 
 # Create the autograd context that will hold the computational graph
-var ctx* = newContext Tensor[float32]
+var
+  ctx* = newContext Tensor[float32]
+  beta = 1
 
 # This is where the network itself is actually defined.
 network ctx, ChessNet:
   layers:
     x:   Input([D_in])
-    fc1: Linear(D_in, H1)
-    fc2: Linear(H1, H2)
-    fc3: Linear(H2, D_out)
+    fc1: Linear(D_in, D_out)
+    # fc2: Linear(H1, H2)
+    # fc3: Linear(H2, D_out)
   forward x:
-    x.fc1.relu.fc2.relu.fc3.tanh
+    x.fc1.tanh
 
 # "Crappy hack" - Jjp137
 export forward
@@ -46,78 +48,7 @@ export forward
 # Initialize the model, in general we'll load a weights file for this.
 # I really hope you're not running it with random weights....
 var model* = ctx.init(ChessNet)
-
-# Turns a piece into a position in the network ready tensor.
-template piece_to_position(piece: Piece, color: Color) =
-  # This whole template is mildly magic numbery nonsense. Trust that it works
-  # and if you don't believe me run test_net.
-  # The start of the number of each piece count for each color
-  let num_start = if color == WHITE: 0 else: 5
-
-  # In essence the number of things after the numbers before the pieces
-  start = if color == WHITE: 5 else: 53
-  val = 1
-
-  case piece.name
-  of 'P':
-    # val = 1
-    # Pawn numbers are stored in 0 (WHITE) and 5 (BLACK)
-    result[num_start + 0] += 1
-    # Pawn pieces are stored in 15-38 (WHITE) and 63-86 (BLACK)
-    start = int(result[num_start + 0]) * 3 + start + 7
-  of 'N':
-    # val = 2
-    # Knight numbers are stored in 1 (WHITE) and 6 (BLACK)
-    result[num_start + 1] += 1
-    # Knight pieces are stored in 39-44 (WHITE) and 87-92 (BLACK)
-    if result[num_start + 1] < 3:
-      start = int(result[num_start + 1]) * 3 + start + 31
-    # This handles promotions, in which case we have more than 2 knights.
-    # We start by looking from the end of the pawns backwards (in case we
-    # haven't filled in all the pawns yet). The loops is necessary in case
-    # we have more than one promotion, but in general we don't.
-    else:
-      start = start + 31
-      while result[start] != 0:
-        start -= 3
-  of 'B':
-    # val = 3
-    # Bishop numbers are stored in 2 (WHITE) and 7 (BLACK)
-    result[num_start + 2] += 1
-    # Bishop pieces are stored in 45-50 (WHITE) and 93-98 (BLACK)
-    if result[num_start + 2] < 3:
-      start = int(result[num_start + 2]) * 3 + start + 37
-    else:
-      start = start + 31
-      while result[start] != 0:
-        start -= 3
-  of 'R':
-    # val = 4
-    # Rook numbers are stored in 3 (WHITE) and 8 (BLACK)
-    result[num_start + 3] += 1
-    # Rook pieces are stored in 51-56 (WHITE) and 99-104 (BLACK)
-    if result[num_start + 3] < 3:
-      start = int(result[num_start + 3]) * 3 + start + 43
-    else:
-      start = start + 31
-      while result[start] != 0:
-        start -= 3
-  of 'Q':
-    # Queen numbers are stored in 4 (WHITE) and 9 (BLACK)
-    # val = 5
-    result[num_start + 4] += 1
-    # Queen piece is stored in 57-59 (WHITE) and 105-107 (BLACK)
-    if result[num_start + 4] < 2:
-      start = 52 + start
-    else:
-      start = start + 31
-      while result[start] != 0:
-        start -= 3
-  else:
-    # King piece is stored in 60-62 (WHITE) and 108-110 (BLACK)
-    # val = 6
-    start = 55 + start
-
+const piece_indices: array[5, char] = ['P', 'N', 'B', 'R', 'Q']
 
 proc prep_board_for_network*(board: Board): Tensor[float32] =
   # Structure:
@@ -132,21 +63,13 @@ proc prep_board_for_network*(board: Board): Tensor[float32] =
 
   for color in  [WHITE, BLACK]:
     for piece in board.piece_list[color]:
-      #let sq = float(piece.pos.y * 8 + piece.pos.x)
-      var
-        start: int
-        val: float
+      if piece.name == 'K': continue
 
-      piece_to_position(piece, color)
+      let
+        num_start = if color == WHITE: 0 else: 5
+        ind = num_start + piece_indices.find(piece.name)
 
-      # Converts the 0-8 coordinates into -4-4 coordinates. I'm pretty sure but
-      # not convinced that this will be better for the engine to learn center is good
-      # might even invert these bad boys at some point.
-      result[start] = val
-      result[start + 1] = if piece.pos.y > 3: float(piece.pos.y - 3)
-                          else: float(piece.pos.y - 4)
-      result[start + 2] = if piece.pos.x > 3: float(piece.pos.x - 3)
-                          else: float(piece.pos.x - 4)
+      result[ind] += 1.0
 
   # Side to move
   result[10] = if board.to_move == WHITE: 1 else: -1
@@ -172,18 +95,6 @@ proc color_swap_board*(board: Tensor[float32]): Tensor[float32] =
   # Swap the castling rights
   result[11..12] = board[13..14]
   result[13..14] = board[11..12]
-
-  # Swaps the pieces themselves
-  let
-    white_start = 15
-    black_start = 63
-  result[white_start..<black_start] = board[black_start..<board.shape[0]]
-  result[black_start..<board.shape[0]] = board[white_start..<black_start]
-
-  # Vertically swaps the positions of the pieces.
-  for i in countup(white_start + 1, board.shape[0], 3):
-    if result[i] != 0:
-      result[i] = -result[i]
 
   # Swaps side to move
   result[10] = -board[10]

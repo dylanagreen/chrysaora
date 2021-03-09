@@ -16,21 +16,22 @@ suite "board state to tensor":
     let expected = [8, 2, 2, 2, 1, # White piece count
                     8, 2, 2, 2, 1, # Black piece count
                     1, # Side to move (WHITE)
-                    1, 1, 1, 1, # Castling rights
-                    1, 3, -4, 1, 3, -3, 1, 3, -2, 1, 3, -1,
-                    1, 3, 1, 1, 3, 2, 1, 3, 3, 1, 3, 4, # White pawns
-                    1, 4, -3, 1, 4, 3, # White knights (hahahahahaha)
-                    1, 4, -2, 1, 4, 2, # White bishops
-                    1, 4, -4, 1, 4, 4, # White rooks
-                    1, 4, -1, # White queen
-                    1, 4, 1, # White king
-                    1, -3, -4, 1, -3, -3, 1, -3, -2, 1, -3, -1,
-                    1, -3, 1, 1, -3, 2, 1, -3, 3, 1, -3, 4, # Black pawns
-                    1, -4, -3, 1, -4, 3, # Black knights
-                    1, -4, -2, 1, -4, 2, # Black bishops
-                    1, -4, -4, 1, -4, 4, # Black rooks
-                    1, -4, -1, # Black queen
-                    1, -4, 1].toTensor().astype(float32) # Black King
+                    1, 1, 1, 1 # Castling rights
+                    # 1, 3, -4, 1, 3, -3, 1, 3, -2, 1, 3, -1,
+                    # 1, 3, 1, 1, 3, 2, 1, 3, 3, 1, 3, 4, # White pawns
+                    # 1, 4, -3, 1, 4, 3, # White knights (hahahahahaha)
+                    # 1, 4, -2, 1, 4, 2, # White bishops
+                    # 1, 4, -4, 1, 4, 4, # White rooks
+                    # 1, 4, -1, # White queen
+                    # 1, 4, 1, # White king
+                    # 1, -3, -4, 1, -3, -3, 1, -3, -2, 1, -3, -1,
+                    # 1, -3, 1, 1, -3, 2, 1, -3, 3, 1, -3, 4, # Black pawns
+                    # 1, -4, -3, 1, -4, 3, # Black knights
+                    # 1, -4, -2, 1, -4, 2, # Black bishops
+                    # 1, -4, -4, 1, -4, 4, # Black rooks
+                    # 1, -4, -1, # Black queen
+                    # 1, -4, 1
+                    ].toTensor().astype(float32) # Black King
 
     check(observed == expected / 8)
 
@@ -42,21 +43,22 @@ suite "board state to tensor":
     let expected = [3, 1, 1, 1, 0, # White piece count
                     3, 1, 1, 1, 0, # Black piece count
                     -1, # Side to move (BLACK)
-                    0, 0, 0, 0, # Castling rights
-                    1, 2, 2, 1, 3, 3, 1, 3, 4, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, # White pawns
-                    1, -1, 1, 0, 0, 0, # White knights
-                    1, -2, 3, 0, 0, 0, # White bishops
-                    1, -4, 1, 0, 0, 0, # White rooks
-                    0, 0, 0, # White queen
-                    1, 2, 3, # White king
-                    1, -3, 3, 1, -2, 1, 1, -2, 4, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, # Black pawns
-                    1, 4, 1, 0, 0, 0, # Black knights
-                    1, -1, -1, 0, 0, 0, # Black bishops
-                    1, 3, -1, 0, 0, 0, # Black rooks
-                    0, 0, 0, # Black queen
-                    1, -3, 1].toTensor().astype(float32) # Black king
+                    0, 0, 0, 0 # Castling rights
+                    # 1, 2, 2, 1, 3, 3, 1, 3, 4, 0, 0, 0,
+                    # 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, # White pawns
+                    # 1, -1, 1, 0, 0, 0, # White knights
+                    # 1, -2, 3, 0, 0, 0, # White bishops
+                    # 1, -4, 1, 0, 0, 0, # White rooks
+                    # 0, 0, 0, # White queen
+                    # 1, 2, 3, # White king
+                    # 1, -3, 3, 1, -2, 1, 1, -2, 4, 0, 0, 0,
+                    # 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, # Black pawns
+                    # 1, 4, 1, 0, 0, 0, # Black knights
+                    # 1, -1, -1, 0, 0, 0, # Black bishops
+                    # 1, 3, -1, 0, 0, 0, # Black rooks
+                    # 0, 0, 0, # Black queen
+                    # 1, -3, 1
+                    ].toTensor().astype(float32) # Black king
 
     check(observed == expected / 8)
 
@@ -66,21 +68,22 @@ suite "board state to tensor":
     let expected = [8, 2, 2, 2, 1, # White piece count
                     8, 2, 2, 2, 1, # Black piece count
                     -1, # Side to move (BLACK)
-                    1, 1, 1, 1, # Castling rights
-                    1, 3, -4, 1, 3, -3, 1, 3, -2, 1, 3, -1,
-                    1, 3, 1, 1, 3, 2, 1, 3, 3, 1, 3, 4, # White pawns
-                    1, 4, -3, 1, 4, 3, # White knights
-                    1, 4, -2, 1, 4, 2, # White bishops
-                    1, 4, -4, 1, 4, 4, # White rooks
-                    1, 4, -1, # White queen
-                    1, 4, 1, # White king
-                    1, -3, -4, 1, -3, -3, 1, -3, -2, 1, -3, -1,
-                    1, -3, 1, 1, -3, 2, 1, -3, 3, 1, -3, 4, # Black pawns
-                    1, -4, -3, 1, -4, 3, # Black knights
-                    1, -4, -2, 1, -4, 2, # Black bishops
-                    1, -4, -4, 1, -4, 4, # Black rooks
-                    1, -4, -1, # Black queen
-                    1, -4, 1].toTensor().astype(float32) # Black King
+                    1, 1, 1, 1 # Castling rights
+                    # 1, 3, -4, 1, 3, -3, 1, 3, -2, 1, 3, -1,
+                    # 1, 3, 1, 1, 3, 2, 1, 3, 3, 1, 3, 4, # White pawns
+                    # 1, 4, -3, 1, 4, 3, # White knights
+                    # 1, 4, -2, 1, 4, 2, # White bishops
+                    # 1, 4, -4, 1, 4, 4, # White rooks
+                    # 1, 4, -1, # White queen
+                    # 1, 4, 1, # White king
+                    # 1, -3, -4, 1, -3, -3, 1, -3, -2, 1, -3, -1,
+                    # 1, -3, 1, 1, -3, 2, 1, -3, 3, 1, -3, 4, # Black pawns
+                    # 1, -4, -3, 1, -4, 3, # Black knights
+                    # 1, -4, -2, 1, -4, 2, # Black bishops
+                    # 1, -4, -4, 1, -4, 4, # Black rooks
+                    # 1, -4, -1, # Black queen
+                    # 1, -4, 1
+                    ].toTensor().astype(float32) # Black King
 
     check(observed == expected / 8)
 
@@ -93,21 +96,22 @@ suite "board state to tensor":
     let expected = [6, 1, 0, 2, 1, # White piece count
                     6, 0, 1, 3, 1, # Black piece count
                     1, # Side to move (WHITE)
-                    0, 0, 0, 0, # Castling rights
-                    1, 1, -4, 1, 1, 1, 1, 1, 2, 1, 2, -3,
-                    1, 2, -1, 1, 2, 3, 0, 0, 0, 0, 0, 0, # White pawns
-                    1, -1, 1, 0, 0, 0, # White knights
-                    0, 0, 0, 0, 0, 0, # White bishops
-                    1, 3, 2, 1, 4, 3, # White rooks
-                    1, 4, -4, # White queen
-                    1, 4, 2, # White king
-                    1, -3, -4, 1, -3, 2, 1, -2, -3, 1, -2, 4,
-                    1, -1, -2, 1, 1, -1, 0, 0, 0, 1, 4, 4, # Black pawns and promoted rook
-                    0, 0, 0, 0, 0, 0, # Black knights
-                    1, -4, -1, 0, 0, 0, # Black bishops
-                    1, -4, 1, 1, -4, 2, # Black rooks
-                    1, -4, -2, # Black queen
-                    1, -3, 3].toTensor().astype(float32) # Black king
+                    0, 0, 0, 0 # Castling rights
+                    # 1, 1, -4, 1, 1, 1, 1, 1, 2, 1, 2, -3,
+                    # 1, 2, -1, 1, 2, 3, 0, 0, 0, 0, 0, 0, # White pawns
+                    # 1, -1, 1, 0, 0, 0, # White knights
+                    # 0, 0, 0, 0, 0, 0, # White bishops
+                    # 1, 3, 2, 1, 4, 3, # White rooks
+                    # 1, 4, -4, # White queen
+                    # 1, 4, 2, # White king
+                    # 1, -3, -4, 1, -3, 2, 1, -2, -3, 1, -2, 4,
+                    # 1, -1, -2, 1, 1, -1, 0, 0, 0, 1, 4, 4, # Black pawns and promoted rook
+                    # 0, 0, 0, 0, 0, 0, # Black knights
+                    # 1, -4, -1, 0, 0, 0, # Black bishops
+                    # 1, -4, 1, 1, -4, 2, # Black rooks
+                    # 1, -4, -2, # Black queen
+                    # 1, -3, 3
+                    ].toTensor().astype(float32) # Black king
 
     check(observed == expected / 8)
 
@@ -120,21 +124,22 @@ suite "board state to tensor":
     let expected = [6, 0, 1, 3, 1, # White piece count
                     6, 1, 0, 2, 1, # Black piece count
                     -1, # Side to move (BLACK)
-                    0, 0, 0, 0, # Castling rights
-                    1, 3, -4, 1, 3, 2, 1, 2, -3, 1, 2, 4,
-                    1, 1, -2, 1, -1, -1, 0, 0, 0, 1, -4, 4, # White pawns and promoted rook
-                    0, 0, 0, 0, 0, 0, # White knights
-                    1, 4, -1, 0, 0, 0, # White bishops
-                    1, 4, 1, 1, 4, 2, # White rooks
-                    1, 4, -2, # White queen
-                    1, 3, 3, # White king
-                    1, -1, -4, 1, -1, 1, 1, -1, 2, 1, -2, -3,
-                    1, -2, -1, 1, -2, 3, 0, 0, 0, 0, 0, 0, # Black pawns
-                    1, 1, 1, 0, 0, 0, # Black knights
-                    0, 0, 0, 0, 0, 0, # Black bishops
-                    1, -3, 2, 1, -4, 3, # Black rooks
-                    1, -4, -4, # Black queen
-                    1, -4, 2].toTensor().astype(float32) # Black king
+                    0, 0, 0, 0 # Castling rights
+                    # 1, 3, -4, 1, 3, 2, 1, 2, -3, 1, 2, 4,
+                    # 1, 1, -2, 1, -1, -1, 0, 0, 0, 1, -4, 4, # White pawns and promoted rook
+                    # 0, 0, 0, 0, 0, 0, # White knights
+                    # 1, 4, -1, 0, 0, 0, # White bishops
+                    # 1, 4, 1, 1, 4, 2, # White rooks
+                    # 1, 4, -2, # White queen
+                    # 1, 3, 3, # White king
+                    # 1, -1, -4, 1, -1, 1, 1, -1, 2, 1, -2, -3,
+                    # 1, -2, -1, 1, -2, 3, 0, 0, 0, 0, 0, 0, # Black pawns
+                    # 1, 1, 1, 0, 0, 0, # Black knights
+                    # 0, 0, 0, 0, 0, 0, # Black bishops
+                    # 1, -3, 2, 1, -4, 3, # Black rooks
+                    # 1, -4, -4, # Black queen
+                    # 1, -4, 2
+                    ].toTensor().astype(float32) # Black king
 
     check(observed == expected / 8)
 

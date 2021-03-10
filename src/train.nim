@@ -31,6 +31,7 @@ let
 # var optim = optimizerSGDMomentum[model, float32](model, learning_rate = alpha, momentum=0.9'f32)
 
 proc save_weights*(bootstrap:bool = false) =
+  if num_increments == 0 and not bootstrap: return # Do not save on no training games.
   let name = if bootstrap: &"{base_version}-t0.txt"
              else: &"{base_version}-t{num_train + 1}-{num_increments + best_count}.txt"
   var out_strm = newFileStream(os.joinPath(getAppDir(), name), fmWrite)

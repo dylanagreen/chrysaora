@@ -25,7 +25,7 @@ type
     previous_cmd*: seq[string]
 
 # Authorship information
-const id = {"name": "Chrysaora Noctiluca beta-1", "author": "Dylan Green"}.toTable
+const id = {"name": "Chrysaora Noctiluca gamma-1", "author": "Dylan Green"}.toTable
 
 proc send_command*(cmd: string) =
   # Logs the command we sent out.
@@ -43,7 +43,7 @@ proc identify*() =
 
   # Id the options
   send_command("option name Hash type spin default 16 min 1 max 4096")
-  send_command("option name Trust type spin default 85 min 0 max 100")
+  send_command(&"option name Trust type spin default {trust*100} min 0 max 100")
   send_command("option name Train type check default false")
   send_command("option name Weights type string default default.txt")
 

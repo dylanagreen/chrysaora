@@ -133,11 +133,10 @@ proc update_weights*() =
   # optim.update()
   evals = @[]
   grads = @[]
+  num_increments += 1
 
   if num_increments mod save_after == 0 and num_increments > 0:
     save_weights()
-
-  num_increments += 1
 
 proc set_up_training*(cur_eng: Engine) =
   training = true

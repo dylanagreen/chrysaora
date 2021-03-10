@@ -18,7 +18,7 @@ proc tanh*[T: SomeFloat](t: Tensor[T]): Tensor[T] {.noInit.} =
 # D_in is input dimension
 # D_out is output dimension.
 let
-  (D_in*, H1, H2, D_out) = (15, 256, 128, 1)
+  (D_in*, H1, H2, D_out) = (10, 256, 128, 1)
 
   # Code name and test status for whever I need it.
   # Test status changes with each change to the internal variations on the
@@ -52,13 +52,10 @@ const piece_indices: array[5, char] = ['P', 'N', 'B', 'R', 'Q']
 
 proc prep_board_for_network*(board: Board): Tensor[float32] =
   # Structure:
-  # 0-4: Num of white pieces (excluding King)
-  # 5-9: Num of black pieces (excluding King)
-  # 10: Side to move
-  # 11-12: White castling rights (King, Queen)
-  # 13-14: Black castling rights (King, Queen)
-  # 15-62: White piece slots: Pawn, Knight, Bishop, Rook, Queen, King
-  # 63-110: Black piece slots: Pawn, Knight, Bishop, Rook, Queen, King
+  # 0-4: Num difference of pieces excluding King (White - Black)
+  # 5: Side to move
+  # 6-7: White castling rights (King, Queen)
+  # 8-9: Black castling rights (King, Queen)
   result = zeros[float32](D_in)
 
   for color in  [WHITE, BLACK]:
@@ -66,17 +63,17 @@ proc prep_board_for_network*(board: Board): Tensor[float32] =
       if piece.name == 'K': continue
 
       let
-        num_start = if color == WHITE: 0 else: 5
-        ind = num_start + piece_indices.find(piece.name)
+        diff = if color == WHITE: 1.0 else: -1.0
+        ind = piece_indices.find(piece.name)
 
-      result[ind] += 1.0
+      result[ind] += diff
 
   # Side to move
-  result[10] = if board.to_move == WHITE: 1 else: -1
+  result[5] = if board.to_move == WHITE: 1 else: -1
 
   # Castling rights
   var rights = board.castle_rights
-  for i in 11..14:
+  for i in 6..9:
     # Pretty much just pops off the first bit and then shifts it right.
     result[i] = float32(rights and 1'u8)
     rights = rights shr 1
@@ -89,15 +86,16 @@ proc color_swap_board*(board: Tensor[float32]): Tensor[float32] =
   result = zeros[float32](D_in)
 
   # Swaps the number of the pieces for each color
-  result[0..4] = board[5..9]
-  result[5..9] = board[0..4]
-
-  # Swap the castling rights
-  result[11..12] = board[13..14]
-  result[13..14] = board[11..12]
+  result[0..4] = -board[0..4]
+  # result[5..9] = board[0..4]
 
   # Swaps side to move
-  result[10] = -board[10]
+  result[5] = -board[5]
+
+  # Swap the castling rights
+  result[6..7] = board[8..9]
+  result[8..9] = board[6..7]
+
 
 # Functionality for generating a completely random (ish) weights file.
 proc random_weights*() =

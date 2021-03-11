@@ -1297,7 +1297,8 @@ proc load_fen*(fen: string): Board =
     opp_color = if side_to_move == WHITE: BLACK else: WHITE
 
   if len(fields) > 3:
-    ep_square[opp_color] = fields[3]
+    if fields[3] != "-":
+      ep_square[opp_color] = fields[3]
 
   # Gets the half move clock if its in the fen.
   var half_move = 0

@@ -258,7 +258,7 @@ suite "loading/saving":
 
   test "loading fen":
     var
-      test_fen = "1nb1kb2/7p/r1p2np1/P2r4/RP5q/2N3P1/1B1PP2P/3QK2R w KQkq -"
+      test_fen = "1nb1kb2/7p/r1p2np1/P2r4/RP5q/2N3P1/1B1PP2P/3QK2R w KQ -"
       test_board = load_fen(test_fen)
       expected = @[[0, -310, -300, 0, -1000, -300, 0, 0],
                    [0, 0, 0, 0, 0, 0, 0, -100],
@@ -270,6 +270,7 @@ suite "loading/saving":
                    [0, 0, 0, 900, 1000, 0, 0, 500]].toTensor
 
     check(test_board.current_state == expected)
+    check(test_board.castle_rights == 3)
 
   test "saving fen":
     var
@@ -366,6 +367,92 @@ suite "make/unmake tests":
 
     check(board.check[WHITE] == false)
     check(board.check[BLACK] == true)
+
+suite "color swapping":
+  test "start pos":
+    let
+      b1 = new_board()
+      b2 = b1.color_swap()
+
+      # Checking that the opposite to_move is copied good.
+      opp_to_move = if b2.to_move == WHITE: BLACK else: WHITE
+
+    # Check all the things that are color based
+    for color in [WHITE, BLACK]:
+      let opp_color = if color == WHITE: BLACK else: WHITE
+
+      check(b1.ep_square[color] == b2.ep_square[opp_color])
+      check(b1.check[color] == b2.check[opp_color])
+      check(b1.piece_list[color] == b2.piece_list[opp_color])
+
+    check(b1.zobrist == b2.zobrist)
+    check(b1.status == b2.status)
+    check(b1.to_move == opp_to_move)
+    check(b1.half_move_clock == b2.half_move_clock)
+    check(b1.long == b2.long)
+    check(b1.status == b2.status)
+    check(b1.current_state == -b2.current_state[^1..0|-1, _])
+
+    # In this case the castling rights should be the same for both obv
+    check(b1.castle_rights == 15)
+    check(b1.castle_rights == b2.castle_rights)
+
+  test "complicated pos":
+    let
+      b1 = load_fen("r4rk1/1p2qpb1/5np1/4p1Bp/p2nP2P/2N5/PPP1Q1P1/N1KR3R w - - 4 18")
+      b2 = b1.color_swap()
+
+      # Checking that the opposite to_move is copied good.
+      opp_to_move = if b2.to_move == WHITE: BLACK else: WHITE
+
+    # Check all the things that are color based
+    for color in [WHITE, BLACK]:
+      let opp_color = if color == WHITE: BLACK else: WHITE
+
+      check(b1.ep_square[color] == b2.ep_square[opp_color])
+      check(b1.check[color] == b2.check[opp_color])
+      check(b1.piece_list[color] == b2.piece_list[opp_color])
+
+    check(b1.zobrist == b2.zobrist)
+    check(b1.status == b2.status)
+    check(b1.to_move == opp_to_move)
+    check(b1.half_move_clock == b2.half_move_clock)
+    check(b1.long == b2.long)
+    check(b1.status == b2.status)
+    check(b1.current_state == -b2.current_state[^1..0|-1, _])
+
+    # In this case the castling rights should be the same for both obv
+    check(b1.castle_rights == 0)
+    check(b1.castle_rights == b2.castle_rights)
+
+  test "position 4":
+    let
+      b1 = load_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1")
+      b2 = b1.color_swap()
+
+      # Checking that the opposite to_move is copied good.
+      opp_to_move = if b2.to_move == WHITE: BLACK else: WHITE
+
+    # Check all the things that are color based
+    for color in [WHITE, BLACK]:
+      let opp_color = if color == WHITE: BLACK else: WHITE
+
+      check(b1.ep_square[color] == b2.ep_square[opp_color])
+      check(b1.check[color] == b2.check[opp_color])
+      check(b1.piece_list[color] == b2.piece_list[opp_color])
+
+    check(b1.zobrist == b2.zobrist)
+    check(b1.status == b2.status)
+    check(b1.to_move == opp_to_move)
+    check(b1.half_move_clock == b2.half_move_clock)
+    check(b1.long == b2.long)
+    check(b1.status == b2.status)
+    check(b1.current_state == -b2.current_state[^1..0|-1, _])
+
+    # Castling rights are a bit wonky
+    check(b1.castle_rights == 12)
+    check(b2.castle_rights == 3)
+
 
 suite "perft tests":
   test "position 1 depth 4":

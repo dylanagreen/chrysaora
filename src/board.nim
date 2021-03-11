@@ -1136,6 +1136,16 @@ proc color_swap*(board: Board): Board =
       # Xoring with 56 magically vertically flips square numbers
       piece.square = flat_alg_table[flat_alg_table.find(piece.square) xor 56]
 
+  # Swapping the castling rights.
+  let
+    white_castle = (board.castle_rights and 3)
+    black_castle = (board.castle_rights and 12)
+  result.castle_rights = ((white_castle shl 2) or (black_castle shr 2))
+
+  # Reverse the y direction of the current state in the new state.
+  # Also negate it to swap black to white pieces.
+  result.current_state = -board.current_state[^1..0|-1, _]
+
   # I'm copying things over manually because frankly it'll be faster. I don't
   # need the full move history (it's incorrect anyway) nor a history
   # of tensor board states (also incorrect and it's insane to try and flip
@@ -1145,6 +1155,7 @@ proc color_swap*(board: Board): Board =
   result.to_move = if board.to_move == WHITE: BLACK else: WHITE
   result.half_move_clock = board.half_move_clock
   result.long = board.long
+  result.status = board.status
 
 
 proc to_fen*(board: Board): string =

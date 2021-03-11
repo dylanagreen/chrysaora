@@ -1117,6 +1117,7 @@ proc unmake_move*(board: Board) =
 
 # To be used for training, color swaps everything on the board.
 proc color_swap*(board: Board): Board =
+  result = new_board() # To start somewhere.
   result.ep_square = {WHITE: "", BLACK: ""}.toTable()
 
   for color in [WHITE, BLACK]:

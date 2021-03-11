@@ -9,15 +9,14 @@ type
   Magic* = tuple[magic, mask, shift, start: uint64]
 
 const
-  # Note that this is backwards to basically every chess engine I've ever
-  # seen. Most of them do black in the 4/8 bits and white in 1/2. Oops.
-  BLACK_QUEENSIDE*:uint8 = 0x1
-  BLACK_KINGSIDE*:uint8 = 0x2
-  WHITE_QUEENSIDE*:uint8 = 0x4
-  WHITE_KINGSIDE*:uint8 = 0x8
+  # Old Dylan should have made these the right way round so new Dylan didn't have to.
+  WHITE_QUEENSIDE*: uint8 = 0x1
+  WHITE_KINGSIDE*: uint8 = 0x2
+  BLACK_QUEENSIDE*: uint8 = 0x4
+  BLACK_KINGSIDE*: uint8 = 0x8
 
-  BLACK_CASTLING*:uint8 = BLACK_KINGSIDE or BLACK_QUEENSIDE
-  WHITE_CASTLING*:uint8 = WHITE_KINGSIDE or WHITE_QUEENSIDE
+  BLACK_CASTLING*: uint8 = BLACK_KINGSIDE or BLACK_QUEENSIDE
+  WHITE_CASTLING*: uint8 = WHITE_KINGSIDE or WHITE_QUEENSIDE
 
   A_FILE*: uint64 = 0x0101010101010101'u64
   B_FILE*: uint64 = A_FILE shl 1
@@ -87,7 +86,7 @@ proc init_simple_tables*() =
 
 
 const
-  # These magics are Ethereal's magics. For now.
+  # These magics are Ethereal's magics. For now?
   BISHOP_MAGICS*: array[64, uint64] =
      [0xFFEDF9FD7CFCFFFF'u64, 0xFC0962854A77F576'u64, 0x5822022042000000'u64, 0x2CA804A100200020'u64,
      0x0204042200000900'u64, 0x2002121024000002'u64, 0xFC0A66C64A7EF576'u64, 0x7FFDFDFCBD79FFFF'u64,
@@ -266,7 +265,7 @@ proc init_magic_tables*() =
 # Initializes the bitstrings for the zobrist hashing.
 proc init_zobrist*() =
   # Initialize random number generator with a seed for reproducibility
-  var r = initRand(1106)
+  var r = initRand(031021)
   # Loops over each square
   for s in 0..63:
     # Loops over the 12 possible pieces.

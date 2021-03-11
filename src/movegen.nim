@@ -298,10 +298,10 @@ proc generate_castle_moves*(board: Board, color: Color): seq[Move] =
     rank = if color == WHITE: 7 else: 0
 
     # Key values to check in the castling table for castling rights.
-    kingside = if color == WHITE: board.castle_rights.testBit(3)
-               else: board.castle_rights.testBit(1)
-    queenside = if color == WHITE: board.castle_rights.testBit(2)
-                else: board.castle_rights.testBit(0)
+    kingside = if color == WHITE: board.castle_rights.testBit(1)
+               else: board.castle_rights.testBit(3)
+    queenside = if color == WHITE: board.castle_rights.testBit(0)
+                else: board.castle_rights.testBit(2)
     orig_color = board.to_move
   var
     # Slice representing the two spaces between the king and the kingside rook.

@@ -405,8 +405,8 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
   # Kingside castling
   if new_move == "O-O" or new_move == "0-0":
     var
-      check_side = if board.to_move == WHITE: (board.castle_rights and 0x8) == 0x8
-                   else: (board.castle_rights and 0x2) == 0x2
+      check_side = if board.to_move == WHITE: (board.castle_rights and WHITE_KINGSIDE) == WHITE_KINGSIDE
+                   else: (board.castle_rights and BLACK_KINGSIDE) == BLACK_KINGSIDE
       # The two spaces between the king and rook.
       between = board.current_state[king_rank, 5..6]
 
@@ -427,8 +427,8 @@ proc short_algebraic_to_long_algebraic*(board: Board, move: string): string =
   # Queenside castling
   elif new_move == "O-O-O" or new_move == "0-0-0":
     var
-      check_side = if board.to_move == WHITE: (board.castle_rights and 0x4) == 0x4
-                   else: (board.castle_rights and 0x1) == 0x1
+      check_side = if board.to_move == WHITE: (board.castle_rights and WHITE_QUEENSIDE) == WHITE_QUEENSIDE
+                   else: (board.castle_rights and BLACK_QUEENSIDE) == BLACK_QUEENSIDE
       # The three spaces between the king and rook.
       between = board.current_state[king_rank, 1..3]
 

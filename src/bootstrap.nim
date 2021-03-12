@@ -89,7 +89,7 @@ proc split_all_games() =
     echo &"Split {file.extractFilename()}"
 
 
-proc generate_bootstrap_data(): tuple[batches, evals: seq[Tensor[float32]]] =
+proc generate_bootstrap_data*(): tuple[batches, evals: seq[Tensor[float32]]] =
   echo "Generating bootstrap data..."
   # Location of the training games
   let train_loc = parentDir(getAppDir()) / "games" / "train"
@@ -141,8 +141,8 @@ proc generate_bootstrap_data(): tuple[batches, evals: seq[Tensor[float32]]] =
 
       # e1 and e2 are the evaluations of board 1 and 2 respectively.
       # tanh and divided to get them between the -1 and 1 of the network.
-      e1 = [tanh(board1.handcrafted_eval() / 1000)].toTensor().astype(float32)
-      e2 = [tanh(board2.handcrafted_eval() / 1000)].toTensor().astype(float32)
+      e1 = [board1.handcrafted_eval() / 100].toTensor().astype(float32)
+      e2 = [board2.handcrafted_eval() / 100].toTensor().astype(float32)
       # I remember now that I divided these by 1000 instead of 100 so I can
       # restrict the evals to be closer to 0 and avoid eval runaway.
 
@@ -195,7 +195,7 @@ proc bootstrap*(num_epoch: int = 100) =
   let (batches, evals) = generate_bootstrap_data()
   # Adam optimizer needs to be variable as it learns during training
   # Adam works better for the bootstrapping process. Allegedly.
-  var optim = optimizerAdam[model, float32](model, learning_rate = 1e-4'f32)
+  var optim = optimizerAdam[model, float32](model, learning_rate = 1e-2'f32)
 
   # Timer to see how long the training takes.
   let t1 = epochtime()

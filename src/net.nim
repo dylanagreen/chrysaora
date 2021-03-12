@@ -18,7 +18,7 @@ proc tanh*[T: SomeFloat](t: Tensor[T]): Tensor[T] {.noInit.} =
 # D_in is input dimension
 # D_out is output dimension.
 let
-  (D_in*, H1, H2, D_out) = (10, 256, 128, 1)
+  (D_in*, H1, H2, D_out) = (5, 256, 128, 1)
 
   # Code name and test status for whever I need it.
   # Test status changes with each change to the internal variations on the
@@ -30,7 +30,6 @@ let
 # Create the autograd context that will hold the computational graph
 var
   ctx* = newContext Tensor[float32]
-  beta = 1
 
 # This is where the network itself is actually defined.
 network ctx, ChessNet:
@@ -40,7 +39,7 @@ network ctx, ChessNet:
     # fc2: Linear(H1, H2)
     # fc3: Linear(H2, D_out)
   forward x:
-    x.fc1.tanh
+    x.fc1
 
 # "Crappy hack" - Jjp137
 export forward
@@ -68,17 +67,17 @@ proc prep_board_for_network*(board: Board): Tensor[float32] =
 
       result[ind] += diff
 
-  # Side to move
-  result[5] = if board.to_move == WHITE: 1 else: -1
+  # # Side to move
+  # result[5] = if board.to_move == WHITE: 1 else: -1
 
-  # Castling rights
-  var rights = board.castle_rights
-  for i in 6..9:
-    # Pretty much just pops off the first bit and then shifts it right.
-    result[i] = float32(rights and 1'u8)
-    rights = rights shr 1
+  # # Castling rights
+  # var rights = board.castle_rights
+  # for i in 6..9:
+  #   # Pretty much just pops off the first bit and then shifts it right.
+  #   result[i] = float32(rights and 1'u8)
+  #   rights = rights shr 1
 
-  result = result / 8 # Reduce network inputs to be between 0 and 1.
+  # result = result / 8 # Reduce network inputs to be between 0 and 1.
 
 
 # Color swaps the board network tensor
@@ -89,12 +88,12 @@ proc color_swap_board*(board: Tensor[float32]): Tensor[float32] =
   result[0..4] = -board[0..4]
   # result[5..9] = board[0..4]
 
-  # Swaps side to move
-  result[5] = -board[5]
+  # # Swaps side to move
+  # result[5] = -board[5]
 
-  # Swap the castling rights
-  result[6..7] = board[8..9]
-  result[8..9] = board[6..7]
+  # # Swap the castling rights
+  # result[6..7] = board[8..9]
+  # result[8..9] = board[6..7]
 
 
 # Functionality for generating a completely random (ish) weights file.

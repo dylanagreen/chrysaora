@@ -1,5 +1,6 @@
 import logging
 import marshal
+import math
 import os
 import streams
 import strformat
@@ -24,6 +25,7 @@ let
   # Learning rate and lambda hyperparameters
   alpha = 1'f32
   lamb = 0.70'f32
+  beta = arctanh(0.25)
 
   save_after = 10
 
@@ -66,14 +68,15 @@ proc update_training_parameters*(board: Board, eval: float, pv: string, swap: bo
     y = model.forward(x)
 
   y.backprop()
-  # Why add the network eval and not the one we pass out to uci? You ask.
-  # Because the checkmate detection code sets evals to be in the thousands.
+  # Why add the network eval and not the one we pass out to uci?
+  # Largely because we compute temporal difference with beta*tanh values.
   # I answer. I'm not super sure if I need to negate these, but I negate them in
   # minimax search so I should?
   # if swap:
   #   evals.add(-y.value[0, 0])
   # else:
-  evals.add(y.value[0, 0])
+  let reduced_val = tanh(beta * y.value[0, 0])
+  evals.add(reduced_val)
 
   # Store the gradients for each of the layers in order, from beginning to
   # end, so that we can update them later.
@@ -81,7 +84,8 @@ proc update_training_parameters*(board: Board, eval: float, pv: string, swap: bo
   for layer in fields(model):
     for field in fields(layer):
       when field is Variable:
-        grads.add(field.grad)
+        # We need the gradient of the reduced_val not just the y value
+        grads.add(field.grad * (1 - reduced_val^2) * beta)
   all_grads.add(grads)
 
   # Return the board to its original state

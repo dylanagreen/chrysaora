@@ -145,8 +145,8 @@ let
   queen_table = [[-2, -1, -1, -1, -1, -1, -1, -2],
                  [-1, 0, 0, 0, 0, 0, 0, -1],
                  [-1, 1, 1, 1, 1, 1, 1, -1],
-                 [-1, 0, 0, 2, 2, 0, 0, -1],
-                 [-1, 0, 0, 2, 2, 0, 0, -1],
+                 [-1, 0, 1, 2, 2, 1, 0, -1],
+                 [-1, 0, 1, 2, 2, 1, 0, -1],
                  [-1, 1, 1, 1, 1, 1, 1, -1],
                  [-1, 0, 1, 0, 0, 1, 0, -1],
                  [-2, -1, -1, -1, -1, -1, -1, -2]].toTensor * 10
@@ -244,11 +244,11 @@ proc handcrafted_eval*(board: Board): float =
   # This loops over the pieces and gets their evaluations from the piece-square
   # tables up above and adds them to the table if they're white, or subtracts
   # if they're black.
-  for piece in board.piece_list[WHITE]:
-    result += float(value_table[piece.name][piece.pos.y, piece.pos.x])
+  # for piece in board.piece_list[WHITE]:
+  #   result += float(value_table[piece.name][piece.pos.y, piece.pos.x])
 
-  for piece in board.piece_list[BLACK]:
-    result -= float(value_table[piece.name][7 - piece.pos.y, piece.pos.x])
+  # for piece in board.piece_list[BLACK]:
+  #   result -= float(value_table[piece.name][7 - piece.pos.y, piece.pos.x])
 
 proc network_eval(board: Board): float =
   let x = ctx.variable(board.prep_board_for_network().reshape(1, D_in))
@@ -370,11 +370,11 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
       # Only do this once we're network searching.
       # We also don't do this if we're training since we're training our
       # eval function to be strong without the qsearch.
-      if not search_board.is_quiet() and not training:
-        let qval = engine.quiesence_search(search_board, depth=2, color=color)
+      # if not search_board.is_quiet() and not training:
+      #   let qval = engine.quiesence_search(search_board, depth=2, color=color)
 
-        if not (qval == min_eval or qval == max_eval):
-          result[0].eval = qval # quiesence_eval(result[0].eval, qval)
+      #   if not (qval == min_eval or qval == max_eval):
+      #     result[0].eval = qval # quiesence_eval(result[0].eval, qval)
 
     # Just in case my network exploded.
     if result[0].eval == NegInf:
@@ -585,7 +585,8 @@ proc search(engine: Engine, max_depth: int): EvalMove =
 
     # Checkmates are in thousands, but network evals are arctanh limited
     var temp_eval = float(result.eval)
-    let rep_eval = if abs(temp_eval) < 1: int(arctanh(temp_eval) * 100) else: int(temp_eval)
+    let rep_eval = int(temp_eval * 100)
+    # let rep_eval = if abs(temp_eval) < 1: int(arctanh(temp_eval) * 100) else: int(temp_eval)
     send_command(&"info depth {d} seldepth {d} score cp {rep_eval} nodes {engine.nodes} nps {nps} time {engine.time} pv {engine.pv}")
 
     # Use the magic of iterative deepning to sort moves for more cutoffs.

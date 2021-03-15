@@ -25,7 +25,7 @@ let
   # Learning rate and lambda hyperparameters
   alpha = 1'f32
   lamb = 0.70'f32
-  beta = arctanh(0.25)
+  beta = arctanh(0.25) # To constrain eval outputs
 
   save_after = 10
 
@@ -93,8 +93,7 @@ proc update_training_parameters*(board: Board, eval: float, pv: string, swap: bo
     if m == "": continue
     board.unmake_move()
 
-proc update_weights*() =
-  logging.debug(&"EVALS {$evals}")
+proc update_weights*(status: Status = IN_PROGRESS, color: COLOR = WHITE) =
   # Without two states you can't calculate a difference
   # I made min_states a variable in case we want to discount the opening
   # moves since that's typically an open book kind of thing.
@@ -105,6 +104,20 @@ proc update_weights*() =
     evals = @[]
     grads = @[]
     return
+
+  # Adds the result of the game to the difference, which should help training
+  # When trained against stockfish Chrysaora will probably lose every game
+  # but its the thought that counts.
+  if status == DRAW:
+    evals.add(0)
+  elif status != IN_PROGRESS:
+    let win = (color == WHITE and status == WHITE_VICTORY) or (color == BLACK and status == BLACK_VICTORY)
+    if win:
+      evals.add(1)
+    else:
+      evals.add(-1)
+
+  logging.debug(&"EVALS {$evals}")
 
   # Zero the gradients because I'm going to add all the temporal difference
   # wieght updates into the gradient variable so that I can use the optimizer
@@ -125,7 +138,7 @@ proc update_weights*() =
     running_diff = running_diff * lamb + diff
     # Weight update calculated from magical temporal difference formula
     let cur_grads = all_grads[i-2]
-    logging.debug(&"DIFF: {running_diff}")
+    logging.debug(&"DIFF: {evals[i-1]} - {evals[i-2]}: {running_diff}")
     var j = 0
     for layer in fields(model):
       for field in fields(layer):

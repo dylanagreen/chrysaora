@@ -229,19 +229,21 @@ proc decrypt_uci*(parser: UCI, cmd: string) =
   elif to_exec == "quit":
     if training:
       # Update and save the weights before quitting.
-      update_weights()
+      update_weights(parser.board.status, parser.engine.color)
       save_weights()
     quit()
   elif to_exec == "ucinewgame":
+    # Update weights before clearing board status
+    if training:
+      # Update all the weights
+      update_weights(parser.board.status, parser.engine.color)
+
     parser.board = new_board()
     parser.previous_cmd = @[]
 
     # Need to clear the transposition table
     engine.tt = newSeq[Transposition](engine.tt.len)
 
-    if training:
-      # Update all the weights
-      update_weights()
   elif to_exec == "setoption":
     parser.set_option(fields)
   if training and to_exec == "bootstrap":

@@ -111,8 +111,8 @@ proc update_weights*(status: Status = IN_PROGRESS, color: COLOR = WHITE) =
   if status == DRAW:
     evals.add(0)
   elif status != IN_PROGRESS:
-    let win = (color == WHITE and status == WHITE_VICTORY) or (color == BLACK and status == BLACK_VICTORY)
-    if win:
+    # let win = (color == WHITE and status == WHITE_VICTORY) or (color == BLACK and status == BLACK_VICTORY)
+    if status == WHITE_VICTORY:
       evals.add(1)
     else:
       evals.add(-1)

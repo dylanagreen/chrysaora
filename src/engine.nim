@@ -244,11 +244,11 @@ proc handcrafted_eval*(board: Board): float =
   # This loops over the pieces and gets their evaluations from the piece-square
   # tables up above and adds them to the table if they're white, or subtracts
   # if they're black.
-  # for piece in board.piece_list[WHITE]:
-  #   result += float(value_table[piece.name][piece.pos.y, piece.pos.x])
+  for piece in board.piece_list[WHITE]:
+    result += float(value_table[piece.name][piece.pos.y, piece.pos.x])
 
-  # for piece in board.piece_list[BLACK]:
-  #   result -= float(value_table[piece.name][7 - piece.pos.y, piece.pos.x])
+  for piece in board.piece_list[BLACK]:
+    result -= float(value_table[piece.name][7 - piece.pos.y, piece.pos.x])
 
 proc network_eval(board: Board): float =
   let x = ctx.variable(board.prep_board_for_network().reshape(1, D_in))

@@ -47,7 +47,9 @@ export forward
 # Initialize the model, in general we'll load a weights file for this.
 # I really hope you're not running it with random weights....
 var model* = ctx.init(ChessNet)
-const piece_indices: array[5, char] = ['P', 'N', 'B', 'R', 'Q']
+const
+  piece_indices: array[5, char] = ['P', 'N', 'B', 'R', 'Q']
+  max_pieces* = {'P': 8.0, 'N': 2.0, 'R': 2.0, 'B': 2.0, 'Q': 1.0}.toTable
 
 proc prep_board_for_network*(board: Board): Tensor[float32] =
   # Structure:
@@ -61,9 +63,12 @@ proc prep_board_for_network*(board: Board): Tensor[float32] =
     for piece in board.piece_list[color]:
       if piece.name == 'K': continue
 
-      let
+      var
         diff = if color == WHITE: 1.0 else: -1.0
         ind = piece_indices.find(piece.name)
+
+      # Normalizes inputs to be between -1 and 1.
+      diff = diff / max_pieces[piece.name]
 
       result[ind] += diff
 

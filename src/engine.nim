@@ -364,7 +364,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
     if engine.cur_depth <= 2:
       result[0].eval = handcrafted_eval(search_board)
     else:
-      result[0].eval = network_eval(search_board)
+      result[0].eval = handcrafted_eval(search_board)
 
       # If this node seems "unquiet" make sure that the evaluation is accurate.
       # Only do this once we're network searching.
@@ -586,6 +586,10 @@ proc search(engine: Engine, max_depth: int): EvalMove =
     # Checkmates are in thousands, handcrafted evals are in centipawns already
     # and network evals are in pawns. What a nuisance.
     var temp_eval = float(result.eval)
+    # Eval is negated when playing black to find the best move, since we want to
+    # find the most negative postion when black which requires negating the moves
+    # to make them positive so that the minimum/maximum works correctly.
+    if engine.color == BLACK: temp_eval *= -1
     let rep_eval = if abs(temp_eval) > 100 or d < 3: int(temp_eval) else: int(temp_eval * 100)
     # let rep_eval = if abs(temp_eval) < 1: int(arctanh(temp_eval) * 100) else: int(temp_eval)
     send_command(&"info depth {d} seldepth {d} score cp {rep_eval} nodes {engine.nodes} nps {nps} time {engine.time} pv {engine.pv}")

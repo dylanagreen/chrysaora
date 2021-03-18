@@ -583,9 +583,10 @@ proc search(engine: Engine, max_depth: int): EvalMove =
 
     engine.pv = moves.map(proc(x: EvalMove): string = x.best_move).join(" ")
 
-    # Checkmates are in thousands, but network evals are arctanh limited
+    # Checkmates are in thousands, handcrafted evals are in centipawns already
+    # and network evals are in pawns. What a nuisance.
     var temp_eval = float(result.eval)
-    let rep_eval = int(temp_eval * 100)
+    let rep_eval = if abs(temp_eval) > 100 or d < 3: int(temp_eval) else: int(temp_eval * 100)
     # let rep_eval = if abs(temp_eval) < 1: int(arctanh(temp_eval) * 100) else: int(temp_eval)
     send_command(&"info depth {d} seldepth {d} score cp {rep_eval} nodes {engine.nodes} nps {nps} time {engine.time} pv {engine.pv}")
 

@@ -10,10 +10,10 @@ type
 
 const
   # Old Dylan should have made these the right way round so new Dylan didn't have to.
-  WHITE_QUEENSIDE*: uint8 = 0x1
-  WHITE_KINGSIDE*: uint8 = 0x2
-  BLACK_QUEENSIDE*: uint8 = 0x4
-  BLACK_KINGSIDE*: uint8 = 0x8
+  WHITE_KINGSIDE*: uint8 = 0x1
+  WHITE_QUEENSIDE*: uint8 = 0x2
+  BLACK_KINGSIDE*: uint8 = 0x4
+  BLACK_QUEENSIDE*: uint8 = 0x8
 
   BLACK_CASTLING*: uint8 = BLACK_KINGSIDE or BLACK_QUEENSIDE
   WHITE_CASTLING*: uint8 = WHITE_KINGSIDE or WHITE_QUEENSIDE

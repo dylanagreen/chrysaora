@@ -214,8 +214,8 @@ proc initialize_network*(name: string = "default.txt") =
 
   # This following line is a hacky fix for the following issue:
   # https://github.com/nim-lang/Nim/issues/16496
-  # engine.model.fc2.weight.context = engine.model.fc1.weight.context
-  engine.model.fc1.bias.context = engine.model.fc1.weight.context
+  engine.model.fc2.weight.context = engine.model.fc1.weight.context
+  # engine.model.fc1.bias.context = engine.model.fc1.weight.context
 
   # For future reference so we know what weights file was loaded.
   logging.debug(&"Loaded weights file: {weights_name}")
@@ -364,7 +364,7 @@ proc minimax_search(engine: Engine, search_board: Board, depth: int = 1,
     if engine.cur_depth <= 2:
       result[0].eval = handcrafted_eval(search_board)
     else:
-      result[0].eval = handcrafted_eval(search_board)
+      result[0].eval = network_eval(search_board)
 
       # If this node seems "unquiet" make sure that the evaluation is accurate.
       # Only do this once we're network searching.
@@ -590,7 +590,7 @@ proc search(engine: Engine, max_depth: int): EvalMove =
     # find the most negative postion when black which requires negating the moves
     # to make them positive so that the minimum/maximum works correctly.
     if engine.color == BLACK: temp_eval *= -1
-    let rep_eval = if abs(temp_eval) > 100 or d < 3: int(temp_eval) else: int(temp_eval * 100)
+    let rep_eval = if abs(temp_eval) > 50 or d < 3: int(temp_eval) else: int(temp_eval * 100)
     # let rep_eval = if abs(temp_eval) < 1: int(arctanh(temp_eval) * 100) else: int(temp_eval)
     send_command(&"info depth {d} seldepth {d} score cp {rep_eval} nodes {engine.nodes} nps {nps} time {engine.time} pv {engine.pv}")
 

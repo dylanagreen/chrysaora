@@ -19,13 +19,19 @@ var
   all_grads: seq[seq[Tensor[float32]]]
   grads: seq[Tensor[float32]]
 
+  # For momentum
+  prev_grads: seq[Tensor[float32]]
+
   num_increments = 0
 
 let
   # Learning rate and lambda hyperparameters
-  alpha = 1'f32
+  alpha = 0.1'f32
   lamb = 0.70'f32
   beta = arctanh(0.25) # To constrain eval outputs
+
+  # Momentum term
+  gamma = 0.9'f32
 
   save_after = 10
 
@@ -81,11 +87,13 @@ proc update_training_parameters*(board: Board, eval: float, pv: string, swap: bo
   # Store the gradients for each of the layers in order, from beginning to
   # end, so that we can update them later.
   grads = @[]
+  prev_grads = @[]
   for layer in fields(model):
     for field in fields(layer):
       when field is Variable:
         # We need the gradient of the reduced_val not just the y value
         grads.add(field.grad * (1 - reduced_val^2) * beta)
+        prev_grads.add(field.grad.zeros_like)
   all_grads.add(grads)
 
   # Return the board to its original state
@@ -143,7 +151,9 @@ proc update_weights*(status: Status = IN_PROGRESS, color: COLOR = WHITE) =
     for layer in fields(model):
       for field in fields(layer):
         when field is Variable:
-          field.value += alpha * cur_grads[j] * running_diff
+          let delta = alpha * cur_grads[j] * running_diff - gamma * prev_grads[j]
+          prev_grads[j] = delta
+          field.value += delta
           # field.grad += cur_grads[j] * running_diff
           j += 1
 
@@ -158,3 +168,8 @@ proc update_weights*(status: Status = IN_PROGRESS, color: COLOR = WHITE) =
 proc set_up_training*(cur_eng: Engine) =
   training = true
   cur_eng.on_move_found = update_training_parameters
+
+  logging.debug("Training parameters used for this run:")
+  logging.debug(&"alpha (lr) = {alpha}")
+  logging.debug(&"lambda (decay) = {lamb}")
+  logging.debug(&"gamma (momentum) = {gamma}")

@@ -19,7 +19,10 @@ suite "board state to tensor":
 #               0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, # Rook Ranks
 #               0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, # Rook Files
 #               0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, # Queen Ranks
-#               0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 # Queen Files
+#               0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, # Queen Files
+#               0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, # Pawn Ranks
+#               0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, # Pawn Files
+#               0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 # Doubled Pawns by file
 
   test "start pos":
     let board = new_board()
@@ -34,7 +37,10 @@ suite "board state to tensor":
                     -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, # Rook Ranks
                     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, # Rook Files
                     -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, # Queen Ranks
-                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 # Queen Files
+                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, # Queen Files
+                    0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, # Pawn Ranks
+                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, # Pawn Files
+                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 # Doubled Pawns by file
                     ].toTensor().astype(float32)
 
     check(observed == expected)
@@ -54,7 +60,10 @@ suite "board state to tensor":
                     0.5, 0.0, 0.0, 0.0, 0.0, 0.0, -0.5, 0.0, # Rook Ranks
                     0.0, 0.0, 0.0, -0.5, 0.5, 0.0, 0.0, 0.0, # Rook Files
                     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, # Queen Ranks
-                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 # Queen Files
+                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, # Queen Files
+                    0.0, -0.125, -0.25, 0.0, 0.0, 0.125, 0.25, 0.0, # Pawn Ranks
+                    0.0, 0.0, 0.0, 0.0, -1.0, 1.0, 0.0, 0.0, # Pawn Files
+                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 # Doubled Pawns by file
                     ].toTensor().astype(float32)
 
     check(observed == expected)
@@ -72,7 +81,10 @@ suite "board state to tensor":
                     -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, # Rook Ranks
                     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, # Rook Files
                     -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, # Queen Ranks
-                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 # Queen Files
+                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, # Queen Files
+                    0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, # Pawn Ranks
+                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, # Pawn Files
+                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 # Doubled Pawns by file
                     ].toTensor().astype(float32)
 
     check(observed == expected)
@@ -94,7 +106,10 @@ suite "board state to tensor":
                     -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, # Rook Ranks
                     0.0, 0.0, 0.0, 0.0, -0.5, 0.0, 0.5, -0.5, # Rook Files
                     -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, # Queen Ranks
-                    1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0 # Queen Files
+                    1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, # Queen Files
+                    0.0, -0.25, -0.25, -0.125, 0.25, 0.375, 0.0, 0.0, # Pawn Ranks
+                    0.0, 0.0, -1.0, 0.0, 1.0, 0.0, 1.0, -1.0, # Pawn Files
+                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 # Doubled Pawns by file
                     ].toTensor().astype(float32)
 
     check(observed == expected)
@@ -115,12 +130,15 @@ suite "board state to tensor":
                     0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, # Rook Ranks
                     0.0, 0.0, 0.0, 0.0, 0.5, 0.0, -0.5, 0.5, # Rook Files
                     -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, # Queen Ranks
-                    -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0 # Queen Files
+                    -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, # Queen Files
+                    0.0, 0.0, -0.375, -0.25, 0.125, 0.25, 0.25, 0.0, # Pawn Ranks
+                    0.0, 0.0, 1.0, 0.0, -1.0, 0.0, -1.0, 1.0, # Pawn Files
+                    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 # Doubled Pawns by file
                     ].toTensor().astype(float32)
 
     check(observed == expected)
 
-  test "white to move, unequal castling rights":
+  test "white to move, unequal castling rights, doubled d-file":
     # Testing to make sure that we're putting the castling rights into the right place
     # in the network tensor.
     # Position from lichess puzzle, March 17, 2021
@@ -136,7 +154,33 @@ suite "board state to tensor":
                     -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, # Rook Ranks
                     0.5, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, # Rook Files
                     0.0, 0.0, -1.0, 0.0, 0.0, 1.0, 0.0, 0.0, # Queen Ranks
-                    0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0 # Queen Files
+                    0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, # Queen Files
+                    0.0, -0.125, -0.25, 0.0, 0.0, 0.25, 0.25, 0.0, # Pawn Ranks
+                    0.0, 0.0, 1.0, 1.0, -1.0, 0.0, -1.0, 0.0, # Pawn Files
+                    0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0 # Doubled Pawns by file
+                    ].toTensor().astype(float32)
+
+    check(observed == expected)
+
+  test "black to move, doubled c-file":
+    # Testing to make sure that doubled black pawns work as expected
+    # Position from lichess puzzle, April 4, 2021
+    let board = load_fen("r1bQRrk1/ppp3pp/2p5/5q2/5PP1/2N5/PP5P/5RK1 b - - 0 19")
+    let observed = board.prep_board_for_network()
+    let expected = [-0.125, 0.5, -0.5, 0.0, 0.0, # Piece difference
+                    -1.0, # Side to move (WHITE)
+                    0.0, 0.0, # Castling rights
+                    0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, # Knight Ranks
+                    0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, # Knight Files
+                    -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, # Bishop Ranks
+                    0.0, 0.0, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, # Bishop Files
+                    -0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, # Rook Ranks
+                    -0.5, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, # Rook Files
+                    1.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, # Queen Ranks
+                    0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0, # Queen Files
+                    0.0, -0.625, -0.125, 0.0, 0.25, 0.0, 0.375, 0.0, # Pawn Ranks
+                    0.0, 0.0, -1.0, 0.0, 0.0, 1.0, 0.0, 0.0, # Pawn Files
+                    0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0 # Doubled Pawns by file
                     ].toTensor().astype(float32)
 
     check(observed == expected)

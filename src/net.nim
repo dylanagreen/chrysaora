@@ -15,10 +15,17 @@ import board
 proc tanh*[T: SomeFloat](t: Tensor[T]): Tensor[T] {.noInit.} =
   t.map_inline tanh(x)
 
+# I am not speed - Lightning McChrysaora
+proc `<`(x: Tensor[float32], y: float): Tensor[float32] =
+  result = x.map(proc(i:float32): float32 = float32(i < y))
+
+proc `>`(x: Tensor[float32], y: float): Tensor[float32] =
+  result = x.map(proc(i:float32): float32 = float32(i > y))
+
 # D_in is input dimension
 # D_out is output dimension.
 let
-  (D_in*, H1, H2, D_out) = (72, 64, 128, 1)
+  (D_in*, H1, H2, D_out) = (96, 64, 128, 1)
 
   # Code name and test status for whever I need it.
   # Test status changes with each change to the internal variations on the
@@ -50,8 +57,8 @@ var model* = ctx.init(ChessNet)
 const
   piece_indices: array[5, char] = ['P', 'N', 'B', 'R', 'Q']
   max_pieces* = {'P': 8.0, 'N': 2.0, 'R': 2.0, 'B': 2.0, 'Q': 1.0}.toTable
-  files = {'N': 16, 'B': 32, 'R': 48, 'Q': 64}.toTable
-  ranks = {'N': 8, 'B': 24, 'R': 40, 'Q': 56}.toTable
+  files = {'N': 16, 'B': 32, 'R': 48, 'Q': 64, 'P': 80}.toTable
+  ranks = {'N': 8, 'B': 24, 'R': 40, 'Q': 56, 'P': 72}.toTable
 
 proc prep_board_for_network*(board: Board): Tensor[float32] =
   # Structure:
@@ -65,11 +72,15 @@ proc prep_board_for_network*(board: Board): Tensor[float32] =
   # 40-47: Rook Ranks
   # 48-55: Rook Files
   # 56-63: Queen Ranks
-  # 64-72: Queen Files
+  # 64-71: Queen Files
+  # 72-79: Pawn Ranks
+  # 80-87: Pawn Files
+  # 88-95: Doubled Pawn by File
   result = zeros[float32](D_in)
 
   for color in [WHITE, BLACK]:
     for piece in board.piece_list[color]:
+      # We don't care about kings for piece diff (or positioning for now)
       if piece.name == 'K': continue
 
       var
@@ -82,17 +93,40 @@ proc prep_board_for_network*(board: Board): Tensor[float32] =
       result[ind] += diff
 
       # Notes the piece in the rank and file for that piece
-      if piece.name == 'P': continue
+      # if piece.name == 'P': continue
 
-      let
+      var
         r = ranks[piece.name] + piece.pos.y
         f = files[piece.name] + piece.pos.x
 
+      # We store white pawn files in the regular place and black in the doubled
+      # pawn section briefly.
+      if piece.name == 'P' and color == BLACK:
+        f += 8
+
       # To ensure that inputs remain between 0 and 1
-      diff = if piece.name == 'Q': 1.0 else: 0.5
+      diff = if piece.name == 'Q' or piece.name == 'P': 1.0 else: 0.5
       result[r] = if color == WHITE: result[r] + diff else: result[r] - diff
       result[f] = if color == WHITE: result[f] + diff else: result[f] - diff
 
+
+  # This block reduces a doubled pawn.
+  # Subtract from where white is doubled, where black is doubled
+  # then put piece numbers in by subtracting black num from white num
+  let
+    f = files['P']
+    # dub_white = result[f..(f + 8)].map(proc(x:float32): float32 = float32(x > 0.0))
+    # dub_black = result[f..(f + 8)].map(proc(x:float32): float32 = float32(x < 0.0))
+    doubled = (result[f..(f + 7)] > 1.0) - (result[(f + 8)..(f + 15)] < -1.0)
+    # doubled = dub_white - dub_black
+
+  # Subtracting the black from the white plus the doubled to make sure it's
+  # between 0 and 1.
+  result[f..(f + 7)] = result[f..(f + 7)] + result[(f + 8)..(f + 15)] - doubled
+  result[(f + 8)..(f + 15)] = doubled
+
+  # Reducing pawn rank to be maximum of 1 (if all 8 pawns are on the same rank)
+  result[(f - 8)..(f - 1)] = result[(f - 8)..(f - 1)] / 8
 
   # Side to move
   result[5] = if board.to_move == WHITE: 1 else: -1
@@ -130,10 +164,14 @@ proc color_swap_board*(board: Tensor[float32]): Tensor[float32] =
   result[6..7] = -board[6..7]
 
   # We don't need to swap the files since we flip vertically.
-  # Hence ranks get swapped (reversed) and the fiels do not.
+  # Need to negate files to swap piece value though.
+  # Hence ranks get swapped (reversed) and the files do not.
   for p, pos in ranks:
     result[pos..(pos + 7)] = -board[(pos + 7)..pos|-1]
     result[(pos + 8)..(pos + 15)] = -board[(pos + 8)..(pos + 15)]
+
+  # Swapping doubled pawns
+  result[88..95] = -board[88..95]
 
 
 # Functionality for generating a completely random (ish) weights file.

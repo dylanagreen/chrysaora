@@ -18,6 +18,7 @@ var
   # Save the grads into grads then shove that grads into all_grades
   all_grads: seq[seq[Tensor[float32]]]
   grads: seq[Tensor[float32]]
+  update: seq[Tensor[float32]]
 
   # For momentum
   prev_grads: seq[Tensor[float32]]
@@ -34,6 +35,13 @@ let
   gamma = 0.9'f32
 
   save_after = 10
+
+proc init_prev_grads*() =
+  prev_grads = @[]
+  for layer in fields(model):
+    for field in fields(layer):
+      when field is Variable:
+        prev_grads.add(field.grad.zeros_like)
 
 # Today in hellish function definitions that took way too long to figure out
 # var optim = optimizerSGDMomentum[model, float32](model, learning_rate = alpha, momentum=0.9'f32)
@@ -87,13 +95,13 @@ proc update_training_parameters*(board: Board, eval: float, pv: string, swap: bo
   # Store the gradients for each of the layers in order, from beginning to
   # end, so that we can update them later.
   grads = @[]
-  prev_grads = @[]
+  update = @[]
   for layer in fields(model):
     for field in fields(layer):
       when field is Variable:
         # We need the gradient of the reduced_val not just the y value
         grads.add(field.grad * (1 - reduced_val^2) * beta)
-        prev_grads.add(field.grad.zeros_like)
+        update.add(field.grad.zeros_like)
   all_grads.add(grads)
 
   # Return the board to its original state
@@ -127,37 +135,39 @@ proc update_weights*(status: Status = IN_PROGRESS, color: COLOR = WHITE) =
 
   logging.debug(&"EVALS {$evals}")
 
-  # Zero the gradients because I'm going to add all the temporal difference
-  # wieght updates into the gradient variable so that I can use the optimizer
-  # to step forward. This allows me to easily switch from the original weight
-  # updates (which was essentially SGD) to things like Adam (which Giraffe used)
-  # for layer in fields(model):
-  #   for field in fields(layer):
-  #     when field is Variable:
-  #       field.grad = field.grad.zeros_like
-
   var running_diff = 0.0
   # Works backwards from the end, stops at min_states which needs to be greater
   # than 2, since 2 will give the first two states.
+  grads = @[]
   for i in countdown(evals.len, min_states):
-    let diff = evals[i-1] - evals[i-2]
-
     # Computes the eligability trace
-    running_diff = running_diff * lamb + diff
+    let diff = evals[i-1] - evals[i-2]
+    running_diff = diff + running_diff * lamb
+
     # Weight update calculated from magical temporal difference formula
     let cur_grads = all_grads[i-2]
     logging.debug(&"DIFF: {evals[i-1]} - {evals[i-2]}: {running_diff}")
+
+    # Add the delta for this diff/eval into the grads sequence
+    # I changed this from the previous method so that we can store the
+    # TOTAL accumulated gradient for things like momentum.
     var j = 0
     for layer in fields(model):
       for field in fields(layer):
         when field is Variable:
-          let delta = alpha * cur_grads[j] * running_diff - gamma * prev_grads[j]
-          prev_grads[j] = delta
-          field.value += delta
-          # field.grad += cur_grads[j] * running_diff
+          update[j] += cur_grads[j] * running_diff
           j += 1
 
-  # optim.update()
+  # Do the actual update with the accumulated gradient.
+  var j = 0
+  for layer in fields(model):
+    for field in fields(layer):
+      when field is Variable:
+        let delta = alpha * update[j] + gamma * prev_grads[j]
+        prev_grads[j] = delta
+        field.value += delta
+        j += 1
+
   evals = @[]
   grads = @[]
   num_increments += 1
@@ -168,6 +178,8 @@ proc update_weights*(status: Status = IN_PROGRESS, color: COLOR = WHITE) =
 proc set_up_training*(cur_eng: Engine) =
   training = true
   cur_eng.on_move_found = update_training_parameters
+
+  init_prev_grads()
 
   logging.debug("Training parameters used for this run:")
   logging.debug(&"alpha (lr) = {alpha}")

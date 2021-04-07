@@ -23,6 +23,9 @@ var
   # For momentum
   prev_grads: seq[Tensor[float32]]
 
+  # For ADADELTA
+  prev_updates: seq[Tensor[float32]]
+
   num_increments = 0
 
 let
@@ -32,7 +35,11 @@ let
   beta = arctanh(0.25) # To constrain eval outputs
 
   # Momentum term
-  gamma = 0.9'f32
+  gamma = 0'f64 #0.9'f32
+
+  # ADADELTA terms
+  rho = 0.9'f32
+  epsilon = 1e-5'f32
 
   save_after = 10
 
@@ -41,7 +48,13 @@ proc init_prev_grads*() =
   for layer in fields(model):
     for field in fields(layer):
       when field is Variable:
-        prev_grads.add(field.grad.zeros_like)
+        prev_grads.add(field.grad.zeros_like +. epsilon)
+        prev_updates.add(field.grad.zeros_like)
+
+
+proc safe_square(t: Tensor[float32]): Tensor[float32] =
+  result = map_inline(t):
+    if x > epsilon / 10: x^2 else: epsilon / 10
 
 # Today in hellish function definitions that took way too long to figure out
 # var optim = optimizerSGDMomentum[model, float32](model, learning_rate = alpha, momentum=0.9'f32)
@@ -101,7 +114,7 @@ proc update_training_parameters*(board: Board, eval: float, pv: string, swap: bo
       when field is Variable:
         # We need the gradient of the reduced_val not just the y value
         grads.add(field.grad * (1 - reduced_val^2) * beta)
-        update.add(field.grad.zeros_like)
+        update.add(field.grad.zeros_like +. epsilon)
   all_grads.add(grads)
 
   # Return the board to its original state
@@ -163,9 +176,21 @@ proc update_weights*(status: Status = IN_PROGRESS, color: COLOR = WHITE) =
   for layer in fields(model):
     for field in fields(layer):
       when field is Variable:
-        let delta = alpha * update[j] + gamma * prev_grads[j]
-        prev_grads[j] = delta
-        field.value += delta
+        # ADADELTA
+        # Accumulate Gradient
+        prev_grads[j] = rho * prev_grads[j] + (1 - rho) * (safe_square(update[j]))
+
+        # Calculate Update
+        var delta = map2_inline(sqrt(prev_updates[j] +. epsilon), sqrt(prev_grads[j] +. epsilon)): x + y
+        delta = map2_inline(delta, update[j]): x * y
+
+        # Accumulate Updates
+        prev_updates[j] = rho * prev_updates[j] + (1 - rho) * (safe_square(delta))
+        field.value += alpha * delta
+
+        # let delta = alpha * update[j] + gamma * prev_grads[j]
+        # prev_grads[j] = delta
+        # field.value += delta
         j += 1
 
   evals = @[]

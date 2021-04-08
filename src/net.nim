@@ -181,5 +181,5 @@ proc random_weights*() =
   out_strm.store(model)
   out_strm.close()
 
-if isMainModule:
-  random_weights()
+# if isMainModule:
+#   random_weights()

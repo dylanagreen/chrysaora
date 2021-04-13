@@ -28,6 +28,8 @@ var
 
   num_increments = 0
 
+  update_rule = "base"
+
 let
   # Learning rate and lambda hyperparameters
   alpha = 0.1'f32
@@ -35,7 +37,7 @@ let
   beta = arctanh(0.25) # To constrain eval outputs
 
   # Momentum term
-  gamma = 0'f64 #0.9'f32
+  gamma = 0.9'f32
 
   # ADADELTA terms
   rho = 0.9'f32
@@ -90,18 +92,14 @@ proc update_training_parameters*(board: Board, eval: float, pv: string, swap: bo
       when field is Variable:
         field.grad = field.grad.zeros_like
 
-  let
+  var
     x = ctx.variable(board.prep_board_for_network().reshape(1, D_in))
     y = model.forward(x)
 
   y.backprop()
   # Why add the network eval and not the one we pass out to uci?
-  # Largely because we compute temporal difference with beta*tanh values.
-  # I answer. I'm not super sure if I need to negate these, but I negate them in
-  # minimax search so I should?
-  # if swap:
-  #   evals.add(-y.value[0, 0])
-  # else:
+  # Largely because we compute temporal difference with tanh(beta * y) values.
+  # I answer.
   let reduced_val = tanh(beta * y.value[0, 0])
   evals.add(reduced_val)
 
@@ -123,6 +121,7 @@ proc update_training_parameters*(board: Board, eval: float, pv: string, swap: bo
     board.unmake_move()
 
 proc update_weights*(status: Status = IN_PROGRESS, color: COLOR = WHITE) =
+  num_increments += 1
   # Without two states you can't calculate a difference
   # I made min_states a variable in case we want to discount the opening
   # moves since that's typically an open book kind of thing.
@@ -133,6 +132,8 @@ proc update_weights*(status: Status = IN_PROGRESS, color: COLOR = WHITE) =
     evals = @[]
     grads = @[]
     return
+
+  # init_prev_grads()
 
   # Adds the result of the game to the difference, which should help training
   # When trained against stockfish Chrysaora will probably lose every game
@@ -159,7 +160,7 @@ proc update_weights*(status: Status = IN_PROGRESS, color: COLOR = WHITE) =
 
     # Weight update calculated from magical temporal difference formula
     let cur_grads = all_grads[i-2]
-    logging.debug(&"DIFF: {evals[i-1]} - {evals[i-2]}: {running_diff}")
+    logging.debug(&"DIFF: {evals[i-1]} - {evals[i-2]}: {diff}, {running_diff}")
 
     # Add the delta for this diff/eval into the grads sequence
     # I changed this from the previous method so that we can store the
@@ -169,6 +170,8 @@ proc update_weights*(status: Status = IN_PROGRESS, color: COLOR = WHITE) =
       for field in fields(layer):
         when field is Variable:
           update[j] += cur_grads[j] * running_diff
+          # prev_grads[j] = alpha * cur_grads[j] * running_diff - gamma * prev_grads[j]
+          # update[j] += prev_grads[j]
           j += 1
 
   # Do the actual update with the accumulated gradient.
@@ -176,26 +179,25 @@ proc update_weights*(status: Status = IN_PROGRESS, color: COLOR = WHITE) =
   for layer in fields(model):
     for field in fields(layer):
       when field is Variable:
-        # ADADELTA
-        # Accumulate Gradient
-        prev_grads[j] = rho * prev_grads[j] + (1 - rho) * (safe_square(update[j]))
+        if update_rule == "adadelta":
+          # ADADELTA
+          # Accumulate Gradient
+          prev_grads[j] = rho * prev_grads[j] + (1 - rho) * (safe_square(update[j]))
 
-        # Calculate Update
-        var delta = map2_inline(sqrt(prev_updates[j] +. epsilon), sqrt(prev_grads[j] +. epsilon)): x + y
-        delta = map2_inline(delta, update[j]): x * y
+          # Calculate Update
+          var delta = map2_inline(sqrt(prev_updates[j] +. epsilon), sqrt(prev_grads[j] +. epsilon)): x + y
+          delta = map2_inline(delta, update[j]): x * y
 
-        # Accumulate Updates
-        prev_updates[j] = rho * prev_updates[j] + (1 - rho) * (safe_square(delta))
-        field.value += alpha * delta
+          # Accumulate Updates
+          prev_updates[j] = rho * prev_updates[j] + (1 - rho) * (safe_square(delta))
+          field.value += alpha * delta
+        else:
+          field.value += alpha * update[j] / cbrt(float(num_increments))
 
-        # let delta = alpha * update[j] + gamma * prev_grads[j]
-        # prev_grads[j] = delta
-        # field.value += delta
         j += 1
 
   evals = @[]
   grads = @[]
-  num_increments += 1
 
   if num_increments mod save_after == 0 and num_increments > 0:
     save_weights()

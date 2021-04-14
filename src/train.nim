@@ -121,7 +121,6 @@ proc update_training_parameters*(board: Board, eval: float, pv: string, swap: bo
     board.unmake_move()
 
 proc update_weights*(status: Status = IN_PROGRESS, color: COLOR = WHITE) =
-  num_increments += 1
   # Without two states you can't calculate a difference
   # I made min_states a variable in case we want to discount the opening
   # moves since that's typically an open book kind of thing.
@@ -133,18 +132,22 @@ proc update_weights*(status: Status = IN_PROGRESS, color: COLOR = WHITE) =
     grads = @[]
     return
 
+  num_increments += 1
   # init_prev_grads()
 
   # Adds the result of the game to the difference, which should help training
   # When trained against stockfish Chrysaora will probably lose every game
   # but its the thought that counts.
   if status == DRAW:
+    logging.debug("Status: DRAW")
     evals.add(0)
   elif status != IN_PROGRESS:
     # let win = (color == WHITE and status == WHITE_VICTORY) or (color == BLACK and status == BLACK_VICTORY)
     if status == WHITE_VICTORY:
+      logging.debug("Status: WHITE_VICTORY")
       evals.add(1)
     else:
+      logging.debug("Status: BLACK_VICTORY")
       evals.add(-1)
 
   logging.debug(&"EVALS {$evals}")

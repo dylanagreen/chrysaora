@@ -195,7 +195,7 @@ proc bootstrap*(num_epoch: int = 100) =
   let (batches, evals) = generate_bootstrap_data()
   # Adam optimizer needs to be variable as it learns during training
   # Adam works better for the bootstrapping process. Allegedly.
-  var optim = optimizerAdam[model, float32](model, learning_rate = 1e-2'f32)
+  var optim = optimizerAdam[model, float32](model, learning_rate = 1e-3'f32)
 
   # Timer to see how long the training takes.
   let t1 = epochtime()

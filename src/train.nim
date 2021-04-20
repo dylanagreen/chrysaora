@@ -32,7 +32,7 @@ var
 
 let
   # Learning rate and lambda hyperparameters
-  alpha = 0.1'f32
+  alpha = 0.05'f32
   lamb = 0.70'f32
   beta = arctanh(0.25) # To constrain eval outputs
 
@@ -195,13 +195,18 @@ proc update_weights*(status: Status = IN_PROGRESS, color: COLOR = WHITE) =
           prev_updates[j] = rho * prev_updates[j] + (1 - rho) * (safe_square(delta))
           field.value += alpha * delta
         else:
-          field.value += alpha * update[j] / cbrt(float(num_increments))
+          # Don't use straight cbrt(num_increments) because then the first game
+          # result will have a larger effect than later games.
+          # By only reducing the lr after every second game each side will
+          # matter equally as much for weight updates.
+          field.value += alpha * update[j] / cbrt(float((num_increments + 1) div 2))
 
         j += 1
 
   evals = @[]
   grads = @[]
 
+  logging.debug(&"ALPHA: {alpha / cbrt(float((num_increments + 1) div 2))}")
   if num_increments mod save_after == 0 and num_increments > 0:
     save_weights()
 

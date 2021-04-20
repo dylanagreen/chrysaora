@@ -16,11 +16,8 @@ proc tanh*[T: SomeFloat](t: Tensor[T]): Tensor[T] {.noInit.} =
   t.map_inline tanh(x)
 
 # I am not speed - Lightning McChrysaora
-proc `<`(x: Tensor[float32], y: float): Tensor[float32] =
-  result = x.map(proc(i:float32): float32 = float32(i < y))
-
-proc `>`(x: Tensor[float32], y: float): Tensor[float32] =
-  result = x.map(proc(i:float32): float32 = float32(i > y))
+proc `<`(x: Tensor[float32], y: float): Tensor[float32] = x.map(proc(i:float32): float32 = float32(i < y))
+proc `>`(x: Tensor[float32], y: float): Tensor[float32] = x.map(proc(i:float32): float32 = float32(i < y))
 
 # D_in is input dimension
 # D_out is output dimension.

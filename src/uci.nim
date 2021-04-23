@@ -87,17 +87,22 @@ proc set_option(parser: UCI, option: seq[string]) =
 
 
 proc set_up_position(parser: UCI, cmd: seq[string]) =
-  var same = false
-  # Checks that all the moves except the last two are identical to the previous
-  # position command. If they are then we can start the moves from the last two.
-  # Need to ensure the lengths of the two even match up to try.
-  if len(parser.previous_cmd) == len(cmd) - 2:
-    same = parser.previous_cmd.join(" ") == cmd[0..^3].join(" ")
+  # logging.debug("debug output")
+  # Finds the last made move in the final three moves.
+  # We shouldn't ever receive more than two moves different from the previous
+  # move string, which is why we only need to search those three.
+  var new_moves =  -1
+
+  if len(parser.previous_cmd) > 0:
+    new_moves = cmd[^3..^1].find(parser.previous_cmd[^1])
+
+    # logging.debug(new_moves)
 
   # If we load from a fen just load the board from the fen.
   # We don't want to load the fen again if we're skipping moves, hence not same
-  if "fen" in cmd and not same:
+  if "fen" in cmd and new_moves == -1:
     parser.board = load_fen(cmd[2..^1].join(" "))
+
   if "moves" in cmd:
     let start = cmd.find("moves")
 
@@ -106,20 +111,27 @@ proc set_up_position(parser: UCI, cmd: seq[string]) =
       raise newException(ValueError,
                          "Told to make moves, but no moves were passed")
 
-    var moves_to_make = cmd[start + 1..^1]
+    # This requires that there be at least a move to make
+    # So that we can just make the last few moves instead of starting from scratch
+    var moves_to_make: seq[string] = @[]
+    if new_moves == -1:
+      moves_to_make = cmd[start + 1..^1]
 
-    # This requires that there be at least two moves to make after the same
-    # So that we can just make the last two moves.
-    if same and start + 2 < len(cmd):
-      moves_to_make = cmd[^2..^1]
-    # Have to start over if there's more than two move difference.
-    elif "fen" in cmd:
-      parser.board = load_fen(cmd[2..^1].join(" "))
+      if "fen" in cmd:
+        parser.board = load_fen(cmd[2..^1].join(" "))
+      else:
+        parser.board = new_board()
     else:
-      parser.board = new_board()
+      # Remember that we only searched the last three moves so our start here
+      # is the new moves + (len - 3) + 1.
+      moves_to_make = cmd[len(cmd) + new_moves - 2..^1]
+
+    # logging.debug(cmd.join("~"))
+    # logging.debug(moves_to_make.join("~"))
 
     # Converts the moves to long algebraic to make them.
     for i, move in moves_to_make:
+      if move == "moves": continue # If the first move of the game is a single move things break.
       # I can't believe I need a sanity check to ignore duplicated moves
       # but for some reason the lichess bot passed the same move twice.
       if i > 0 and move == moves_to_make[i - 1]:
@@ -134,6 +146,8 @@ proc set_up_position(parser: UCI, cmd: seq[string]) =
     parser.board = new_board()
 
   parser.previous_cmd = @cmd
+
+  # logging.debug("end debug output")
 
 
 proc algebraic_to_uci*(parser: UCI, move: string): string =

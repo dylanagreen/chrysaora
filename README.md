@@ -1,5 +1,5 @@
 # Chrysaora
-Chrysaora may very well be the first serious attempt to build a world class chess engine in Nim.
+Chrysaora ~~may very well be~~ was the first serious attempt to build a world class chess engine in Nim.
 
 Chrysaora started as an attempt to use supervised learning and a small image classification styled network to play chess using Python. The results of this experiment are stored in [chrysaora_py](https://github.com/dylanagreen/chrysaora_py). The project has now shifted to building an experimental "hybrid" chess engine. This hybrid will have an evaluation function that consists of two parts:
 
@@ -10,15 +10,18 @@ Or at least, that's the plan...
 
 The work on chrysaora is heavily inspired by and based on the [Giraffe](https://arxiv.org/pdf/1509.01549.pdf) and [KnightCap](https://arxiv.org/pdf/cs/9901001.pdf) papers, both of which I consulted liberally while writing the engine. Most of my training code only came together after really understanding Knightcap.
 
+## How strong  is Chrysaora?
+Friend, Chrysaora can barely even play competent chess, let alone **good** chess.
+
 ### Dependencies
-Learning is done using [arraymancer](https://github.com/mratsim/Arraymancer), which is the only dependency outside the Nim standard library.
+Learning and evaluation is done using [arraymancer](https://github.com/mratsim/Arraymancer), which is the only dependency outside the Nim standard library. You **must** install arraymancer at version 0.6.1 and no later. Why? Bugs mostly.
 
 ### Naming
-Chrysaora is named after the genus of jellyfish, which in turn is named after Chrysaor, a being from Greek mythology. Chrysaor roughly translates as "he who has a golden armament." Major releases of Chrysaora are codenamed after other genus or species of jellyfish, typically things I find cool.
+Chrysaora is named after the genus of jellyfish, which in turn is named after Chrysaor, a being from Greek mythology. Chrysaor roughly translates as "he who has a golden armament." Major releases of Chrysaora are codenamed after species (as opposed to genuses) of jellyfish, typically things I find cool.
 
 For some reason I use female pronouns when referring to Chrysaora in my head, but I can't imagine she particularly cares considering she's a nonsentient chess engine.
 
-- v0.1.x **Noctiluca** - Named after a bioluminescent jellyfish as a bioluminescent algae bloom occurred while I was coding it. Everyone was quarantined so I coded Chrysaora instead of going to see it. Sad.
+- v0.1.x **Noctiluca** - Named after *Pelagia noctlicua*, a bioluminescent jellyfish. There was a bioluminescent algae bloom while I was coding Chrysaora. Everyone was quarantined and I coded Chrysaora instead of going to see it. Sad.
 
 #### Weights File Naming
 Each weights file is labeled by its major version, a training iteration delimiter, and the number of games that went into that training run.

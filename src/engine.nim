@@ -11,6 +11,7 @@ import strutils
 import system
 import tables
 import times # Why not just import everything at this point
+from winlean import SocketHandle
 
 import arraymancer
 
@@ -223,7 +224,14 @@ proc initialize_network*(name: string = "default.txt") =
 
 # Set up the selector
 var selector: Selector[int] = newSelector[int]()
-registerHandle(selector, int(getFileHandle(stdin)), {Event.READ}, 0)
+
+# Windows is stupid.
+when defined(windows):
+  var fd = SocketHandle(getFileHandle(stdin))
+else:
+  var fd = int(getFileHandle(stdin))
+
+registerHandle(selector, fd, {Event.READ}, 0)
 
 proc check_for_stop(): bool =
   var events: seq[ReadyKey] = select(selector, 1)
